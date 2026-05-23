@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="AI电商导购后端API", version="1.0.0")
+from app.api import chat
+from app.core.config import settings
+
+app = FastAPI(title=settings.app_name, version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,3 +18,11 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {"message": "AI电商导购后端服务运行中"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+app.include_router(chat.router, prefix="/api", tags=["chat"])
