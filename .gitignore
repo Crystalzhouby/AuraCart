@@ -2,11 +2,28 @@
 .gradle/
 build/
 
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# Exported specs may contain internal links or credentials
+specs/doc_export/
+
+# Backend runtime data
+*.sqlite
+*.sqlite3
+*.db
+server/.chroma/
+server/chroma/
+server/storage/
+
 # Local configuration file (sdk path, etc)
 local.properties
 
 # Log/OS Files
 *.log
+.DS_Store
 
 # Android Studio generated files and folders
 captures/

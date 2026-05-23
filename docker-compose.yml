@@ -1,0 +1,17 @@
+services:
+  server:
+    image: python:3.11-slim
+    working_dir: /workspace
+    command: bash -lc "pip install -r server/requirements.txt && uvicorn app.main:app --app-dir server --host 0.0.0.0 --port 8000 --reload"
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/workspace
+      - server_storage:/workspace/server/storage
+      - chroma_storage:/workspace/server/.chroma
+
+volumes:
+  server_storage:
+  chroma_storage:
