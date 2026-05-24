@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary purple palette -->
+    <color name="colorPrimary">#6C5CE7</color>
+    <color name="colorPrimaryDark">#5040C0</color>
+    <color name="colorAccent">#A29BFE</color>
+    <color name="colorAccentLight">#B5ADFF</color>
+    <color name="colorAccentBg">#146C5CE7</color>
+
+    <!-- Backgrounds -->
+    <color name="colorBackground">#F7F5FF</color>
+    <color name="colorSurface">#FFFFFF</color>
+    <color name="colorSurfaceHover">#F3F0FD</color>
+
+    <!-- Text -->
+    <color name="colorTextPrimary">#1A1535</color>
+    <color name="colorTextSecondary">#5A5478</color>
+    <color name="colorTextTertiary">#A099C0</color>
+
+    <!-- Semantic -->
+    <color name="colorPrice">#D63384</color>
+    <color name="colorSuccess">#00A878</color>
+    <color name="colorBorder">#E8E3F8</color>
+    <color name="colorBorderLight">#EDE9FC</color>
+
+    <!-- Misc -->
+    <color name="colorWhite">#FFFFFF</color>
+    <color name="colorBlack">#000000</color>
+    <color name="colorTransparent">#00000000</color>
+    <color name="colorUserBubble">#6C5CE7</color>
+    <color name="colorAiBubble">#FFFFFF</color>
+    <color name="colorStarFilled">#F59E0B</color>
+    <color name="colorStarEmpty">#D1D5DB</color>
+    <color name="colorOverlay">#59000000</color>
+</resources>

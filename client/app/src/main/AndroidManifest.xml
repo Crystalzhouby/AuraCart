@@ -9,16 +9,35 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.EcomGuide"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="true">
 
+        <!-- Main entry point: chat screen + drawer -->
         <activity
             android:name=".ui.MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Product detail page -->
+        <activity
+            android:name=".ui.detail.ProductDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Shopping cart -->
+        <activity
+            android:name=".ui.cart.CartActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Sidebar pages -->
+        <activity android:name=".ui.sidebar.ChatHistoryActivity" android:exported="false" />
+        <activity android:name=".ui.sidebar.MyOrdersActivity" android:exported="false" />
+        <activity android:name=".ui.sidebar.MessagesActivity" android:exported="false" />
 
     </application>
 

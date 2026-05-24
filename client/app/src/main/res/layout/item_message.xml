@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_marginStart="14dp" android:layout_marginEnd="14dp"
+    android:layout_marginBottom="10dp"
+    android:clickable="true" android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:background="@drawable/bg_card" android:padding="13dp"
+        android:elevation="2dp">
+        <FrameLayout android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginEnd="12dp">
+            <TextView android:id="@+id/tvMsgIcon"
+                android:layout_width="40dp" android:layout_height="40dp"
+                android:gravity="center" android:textSize="18sp"/>
+        </FrameLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/tvMsgTitle"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textColor="@color/colorTextPrimary" android:textSize="13sp"
+                android:textStyle="bold"/>
+            <TextView android:id="@+id/tvMsgPreview"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="2dp" android:textColor="@color/colorTextTertiary"
+                android:textSize="11sp" android:maxLines="1" android:ellipsize="end"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:orientation="vertical" android:gravity="center_horizontal"
+            android:layout_marginStart="8dp">
+            <TextView android:id="@+id/tvMsgTime"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/colorTextTertiary" android:textSize="10sp"/>
+        </LinearLayout>
+    </LinearLayout>
+    <!-- 未读红点 -->
+    <View android:id="@+id/viewUnread"
+        android:layout_width="8dp" android:layout_height="8dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="12dp"
+        android:background="@color/colorPrice"/>
+</FrameLayout>

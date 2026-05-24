@@ -1,9 +1,22 @@
 import json
+import re
 from pathlib import Path
 from typing import Optional
 
 from app.core.config import settings
 from app.schemas.product import Product
+
+# 将 products.jsonl 中的本地路径转为 HTTP 可访问路径
+# ../data/ecommerce_agent_dataset/1_美妆护肤/images/p_xxx.jpg
+#   → /images/1_美妆护肤/images/p_xxx.jpg
+_IMG_RE = re.compile(r"ecommerce_agent_dataset[/\\](.+)")
+
+
+def _fix_image_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return url
+    m = _IMG_RE.search(url)
+    return f"/images/{m.group(1)}" if m else url
 
 
 class ProductRepository:
@@ -19,7 +32,9 @@ class ProductRepository:
             for line in f:
                 line = line.strip()
                 if line:
-                    products.append(Product.model_validate(json.loads(line)))
+                    data = json.loads(line)
+                    data["image_url"] = _fix_image_url(data.get("image_url"))
+                    products.append(Product.model_validate(data))
         return products
 
     def search(self, query: str, limit: int = 3) -> list[Product]:

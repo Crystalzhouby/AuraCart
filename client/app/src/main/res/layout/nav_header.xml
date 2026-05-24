@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="@color/colorBackground">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="16dp">
+
+        <FrameLayout android:layout_width="48dp" android:layout_height="48dp" android:layout_marginEnd="12dp">
+            <ImageView android:layout_width="48dp" android:layout_height="48dp"
+                android:background="@drawable/bg_send_btn" android:padding="10dp"
+                android:src="@drawable/ic_favorite" android:tint="@color/colorWhite" />
+        </FrameLayout>
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="小明同学" android:textColor="@color/colorTextPrimary"
+                android:textSize="15sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="探索好物，发现精彩生活" android:textColor="@color/colorTextTertiary"
+                android:textSize="11sp" android:layout_marginTop="2dp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:background="@drawable/bg_card"
+        android:padding="4dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical" android:gravity="center"
+            android:padding="8dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="12" android:textColor="@color/colorTextPrimary"
+                android:textSize="15sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="历史对话" android:textColor="@color/colorTextTertiary" android:textSize="10sp"/>
+        </LinearLayout>
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/colorBorder"/>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical" android:gravity="center"
+            android:padding="8dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="3" android:textColor="@color/colorTextPrimary"
+                android:textSize="15sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="我的订单" android:textColor="@color/colorTextTertiary" android:textSize="10sp"/>
+        </LinearLayout>
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/colorBorder"/>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical" android:gravity="center"
+            android:padding="8dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="5" android:textColor="@color/colorTextPrimary"
+                android:textSize="15sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="消息" android:textColor="@color/colorTextTertiary" android:textSize="10sp"/>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
