@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Spacing -->
+    <dimen name="spacing_xs">4dp</dimen>
+    <dimen name="spacing_sm">8dp</dimen>
+    <dimen name="spacing_md">12dp</dimen>
+    <dimen name="spacing_lg">16dp</dimen>
+    <dimen name="spacing_xl">20dp</dimen>
+    <dimen name="spacing_xxl">24dp</dimen>
+
+    <!-- Radius -->
+    <dimen name="radius_sm">8dp</dimen>
+    <dimen name="radius_md">14dp</dimen>
+    <dimen name="radius_lg">20dp</dimen>
+    <dimen name="radius_xl">28dp</dimen>
+    <dimen name="radius_full">50dp</dimen>
+
+    <!-- Chat -->
+    <dimen name="chat_avatar_size">32dp</dimen>
+    <dimen name="chat_input_height">44dp</dimen>
+    <dimen name="product_card_width">145dp</dimen>
+    <dimen name="product_card_img_size">145dp</dimen>
+
+    <!-- Toolbar -->
+    <dimen name="toolbar_height">56dp</dimen>
+
+    <!-- Text sizes -->
+    <dimen name="text_xs">10sp</dimen>
+    <dimen name="text_sm">12sp</dimen>
+    <dimen name="text_md">14sp</dimen>
+    <dimen name="text_lg">16sp</dimen>
+    <dimen name="text_xl">18sp</dimen>
+    <dimen name="text_xxl">24sp</dimen>
+</resources>

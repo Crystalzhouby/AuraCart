@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:background="@drawable/bg_card"
+    android:padding="14dp"
+    android:layout_marginStart="14dp" android:layout_marginEnd="14dp"
+    android:layout_marginBottom="10dp" android:elevation="2dp">
+    <!-- Header: order id + status -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:layout_marginBottom="10dp">
+        <TextView android:id="@+id/tvOrderId"
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:textColor="@color/colorTextTertiary"
+            android:textSize="11sp"/>
+        <TextView android:id="@+id/tvStatus"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:paddingStart="10dp" android:paddingEnd="10dp"
+            android:paddingTop="3dp" android:paddingBottom="3dp"
+            android:textSize="11sp" android:textStyle="bold"/>
+    </LinearLayout>
+    <!-- Product thumbnails -->
+    <LinearLayout android:id="@+id/llImages"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:layout_marginBottom="10dp"/>
+    <!-- Footer: total + action button -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/tvTotal"
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:textColor="@color/colorTextSecondary"
+            android:textSize="13sp"/>
+        <TextView android:id="@+id/tvAction"
+            android:layout_width="wrap_content" android:layout_height="30dp"
+            android:gravity="center"
+            android:paddingStart="14dp" android:paddingEnd="14dp"
+            android:background="@drawable/bg_card"
+            android:textColor="@color/colorTextSecondary" android:textSize="11sp"
+            android:clickable="true" android:focusable="true"/>
+    </LinearLayout>
+</LinearLayout>

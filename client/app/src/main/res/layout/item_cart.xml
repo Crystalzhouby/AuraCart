@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="horizontal" android:gravity="center_vertical"
+    android:background="@drawable/bg_card" android:padding="12dp"
+    android:layout_marginStart="14dp" android:layout_marginEnd="14dp"
+    android:layout_marginBottom="10dp" android:elevation="2dp"
+    android:clickable="true" android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <ImageView android:id="@+id/ivCartImg"
+        android:layout_width="62dp" android:layout_height="62dp"
+        android:background="@color/colorBackground" android:scaleType="centerCrop"
+        android:layout_marginEnd="10dp"/>
+
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:orientation="vertical">
+        <TextView android:id="@+id/tvCartName"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textColor="@color/colorTextPrimary" android:textSize="13sp"
+            android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
+        <TextView android:id="@+id/tvCartSku"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="2dp" android:textColor="@color/colorTextTertiary"
+            android:textSize="11sp"/>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+            <TextView android:id="@+id/tvCartPrice"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:textColor="@color/colorPrice"
+                android:textSize="15sp" android:textStyle="bold"/>
+            <!-- Qty control -->
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="center_vertical">
+                <TextView android:id="@+id/btnDecrease"
+                    android:layout_width="26dp" android:layout_height="26dp"
+                    android:text="−" android:gravity="center"
+                    android:background="@drawable/bg_card"
+                    android:textColor="@color/colorTextSecondary" android:textSize="14sp"
+                    android:clickable="true" android:focusable="true"/>
+                <TextView android:id="@+id/tvQty"
+                    android:layout_width="32dp" android:layout_height="wrap_content"
+                    android:gravity="center" android:textColor="@color/colorTextPrimary"
+                    android:textSize="13sp" android:textStyle="bold"/>
+                <TextView android:id="@+id/btnIncrease"
+                    android:layout_width="26dp" android:layout_height="26dp"
+                    android:text="+" android:gravity="center"
+                    android:background="@drawable/bg_card"
+                    android:textColor="@color/colorTextSecondary" android:textSize="14sp"
+                    android:clickable="true" android:focusable="true"/>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

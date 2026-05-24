@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@color/colorBackground">
+
+    <!-- Toolbar -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:background="@color/colorSurface" android:paddingStart="8dp" android:paddingEnd="16dp"
+        android:elevation="2dp">
+        <ImageButton android:id="@+id/btnBack"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:src="@drawable/ic_back" android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="返回"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="@string/label_cart"
+            android:textColor="@color/colorTextPrimary" android:textSize="16sp"
+            android:textStyle="bold" android:gravity="center"/>
+        <View android:layout_width="40dp" android:layout_height="40dp"/>
+    </LinearLayout>
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorBorder"/>
+
+    <!-- Empty state -->
+    <LinearLayout android:id="@+id/layoutEmpty"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:orientation="vertical"
+        android:gravity="center" android:visibility="gone">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="🛒" android:textSize="48sp" android:alpha="0.4"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/cart_empty" android:textColor="@color/colorTextTertiary"
+            android:textSize="14sp" android:layout_marginTop="12dp"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/cart_empty_hint" android:textColor="@color/colorTextTertiary"
+            android:textSize="12sp" android:layout_marginTop="4dp"/>
+    </LinearLayout>
+
+    <!-- Cart items -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvCart"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:paddingTop="12dp"
+        android:clipToPadding="false" android:overScrollMode="never"/>
+
+    <!-- Bottom bar -->
+    <LinearLayout android:id="@+id/layoutBottom"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:visibility="gone">
+        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorBorder"/>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:background="@color/colorSurface" android:padding="12dp"
+            android:paddingBottom="24dp">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="合计" android:textColor="@color/colorTextSecondary" android:textSize="11sp"/>
+                <TextView android:id="@+id/tvTotal"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:textColor="@color/colorPrice" android:textSize="18sp" android:textStyle="bold"/>
+            </LinearLayout>
+            <Button android:id="@+id/btnCheckout"
+                android:layout_width="wrap_content" android:layout_height="40dp"
+                android:background="@drawable/bg_button_primary"
+                android:text="结算" android:textColor="@color/colorWhite"
+                android:textSize="14sp" android:textStyle="bold"
+                android:paddingStart="24dp" android:paddingEnd="24dp"
+                android:insetTop="0dp" android:insetBottom="0dp"
+                />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

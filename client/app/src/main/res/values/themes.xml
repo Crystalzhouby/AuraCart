@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.EcomGuide" parent="Theme.Material3.Light.NoActionBar">
-        <item name="colorPrimary">#FF6200EE</item>
-        <item name="colorPrimaryVariant">#FF3700B3</item>
-        <item name="colorOnPrimary">#FFFFFFFF</item>
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
+        <item name="colorOnPrimary">@color/colorWhite</item>
+        <item name="colorSecondary">@color/colorAccent</item>
+        <item name="colorOnSecondary">@color/colorWhite</item>
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <item name="colorSurface">@color/colorSurface</item>
+        <item name="colorOnSurface">@color/colorTextPrimary</item>
+        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:statusBarColor">@color/colorSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@color/colorBackground">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:background="@color/colorSurface" android:paddingStart="8dp" android:paddingEnd="16dp"
+        android:elevation="2dp">
+        <ImageButton android:id="@+id/btnBack"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:src="@drawable/ic_back" android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="返回"/>
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="历史对话"
+            android:textColor="@color/colorTextPrimary" android:textSize="16sp"
+            android:textStyle="bold" android:gravity="center"/>
+        <View android:layout_width="40dp" android:layout_height="40dp"/>
+    </LinearLayout>
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/colorBorder"/>
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvHistory"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:paddingTop="12dp"
+        android:clipToPadding="false" android:overScrollMode="never"/>
+</LinearLayout>
