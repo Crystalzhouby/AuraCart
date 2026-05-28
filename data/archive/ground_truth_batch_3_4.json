@@ -1,0 +1,660 @@
+[
+  {
+    "eval_id": "eval_3.1_01",
+    "question": "iPhone 17 Pro 买 256GB 还是 512GB？日常拍照和玩游戏够用吗？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.1 同商品 SKU 选择" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_digital_001"],
+      "expected_sku_ids": ["s_p_digital_001_1", "s_p_digital_001_4"],
+      "answer_key_points": [
+        "正确识别用户所指商品为iPhone 17 Pro(p_digital_001)，并列出256GB(8999元)和512GB(10499元)两个SKU的价差为1500元",
+        "明确回答了256GB是否够用：日常拍照和玩游戏256GB完全足够，可存储约6万张高清照片、150小时4K视频或500款常用应用",
+        "说明了512GB的适用人群：专业摄影师或视频创作者，需要存储大量原始素材的用户",
+        "提及了存储不可扩容的特性，建议用户根据自身使用习惯做决策",
+        "如果用户以日常使用为主，给出了明确推荐方向（256GB即可）；如果用户有专业创作需求，推荐512GB"
+      ],
+      "reasoning": "答案来源于p_digital_001.official_faq[2]（256GB是否足够）和[5]（不同存储版本价格差异）。该问题属于SKU选择咨询+使用场景匹配的复合问题。关键决策点是'日常拍照和玩游戏'这一使用场景——根据FAQ数据，256GB对此场景完全足够。Veto风险：V2（如果Agent编造256GB为8999元以外的价格或10499元以外的512GB价格，触发数值幻觉）; V1（如果Agent只跳转详情页而不做对比分析，触发强制跳转否决）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.15, "key_point_coverage": 0.55, "response_quality": 0.30 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.1_02",
+    "question": "小棕瓶 30ml、50ml、75ml 哪个更划算？第一次买选哪个？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.1 同商品 SKU 选择" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_001"],
+      "expected_sku_ids": ["s_p_beauty_001_1", "s_p_beauty_001_2", "s_p_beauty_001_3"],
+      "answer_key_points": [
+        "正确识别用户所指为雅诗兰黛小棕瓶(p_beauty_001)，列出三个SKU：30ml=720元、50ml=980元、75ml=1260元",
+        "计算并比较了每毫升单价：30ml=24元/ml, 50ml=19.6元/ml, 75ml=16.8元/ml",
+        "明确指出了性价比排序：75ml > 50ml > 30ml",
+        "针对'第一次买'给出了选择建议：30ml适合初次尝试，50ml是日常使用性价比之选",
+        "提及了开封后6个月保质期的约束，提醒75ml需在6个月内用完，避免因用量不足导致过期浪费"
+      ],
+      "reasoning": "答案来源于p_beauty_001.official_faq[1]（不同规格怎么选）。该问题包含两个子问题：'哪个更划算'（数学计算，客观）和'第一次买选哪个'（决策建议，主观）。key_points需同时覆盖客观数据和主观建议。注意75ml虽然单价最低，但受限于6个月开封保质期，如果用户用量较小可能导致过期浪费——这是FAQ中明确提到的约束条件。Veto风险：V2（如果Agent错误计算每毫升单价或将价格与SKU对应错误，触发数值幻觉）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.10, "key_point_coverage": 0.55, "response_quality": 0.35 },
+      "tolerance": {
+        "allow_partial_match": false, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.1_03",
+    "question": "这款跑鞋黑白两个颜色哪个更耐脏？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.1 同商品 SKU 选择" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_clothes_009"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款跑鞋'所指商品——数据集中同时拥有黑白两色的跑鞋为HOKA Clifton 9(p_clothes_009)，或在无法确定时向用户确认具体鞋款",
+        "从材质和颜色角度分析了耐脏性：黑色款更耐脏——深色对灰尘、泥渍的遮盖能力优于白色，日常穿着更省心",
+        "同时指出了白色款的维护实际并不困难：Clifton 9的工程网布鞋面较易清洁，定期用软刷清理即可保持整洁",
+        "给出了场景化的选择建议：如果经常户外/雨天穿着选黑色更实用，如果追求清爽视觉效果可选白色",
+        "未给出绝对结论（开放性问题的正确姿态），而是提供了决策框架让用户自行判断"
+      ],
+      "reasoning": "数据集中同时拥有黑色和白色颜色选项的跑鞋为HOKA Clifton 9(p_clothes_009)，SKU包含'经典黑'和'云朵白'两种配色。该问题属于开放性的主观偏好咨询，无唯一的正确答案。GT考核的是Agent是否提供了合理的决策框架（颜色与耐脏性的物理关系+使用场景分析），而非强制输出'黑色更耐脏'这一结论。评分时对结论的宽容度较高，重点考核分析过程是否有逻辑。Veto风险：无显著V1-V4风险，但需注意V2——如果Agent编造了数据集中不存在的颜色选项（如说这款鞋还有灰色），触发关键实体幻觉。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.10, "key_point_coverage": 0.50, "response_quality": 0.40 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.2_01",
+    "question": "雅诗兰黛小棕瓶和兰蔻小黑瓶哪个抗初老效果更好？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.2 同品类横向对比" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_001", "p_beauty_002"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别两款产品：雅诗兰黛小棕瓶(p_beauty_001)和兰蔻小黑瓶(p_beauty_002)",
+        "从核心成分维度对比：小棕瓶主打二裂酵母发酵产物+透明质酸+猴面包树籽提取物（夜间修护+淡纹紧致），小黑瓶主打98%高纯度二裂酵母+益生元复合物（肌底修护+强韧屏障+细腻毛孔）",
+        "从产品定位维度对比：小棕瓶偏重夜间修护和抗衰淡纹，小黑瓶更侧重肌底维稳和打开吸收通道（肌底液定位）",
+        "从价格维度对比：小棕瓶30ml=720元/50ml=980元/75ml=1260元，小黑瓶30ml=760元/50ml=1080元/75ml=1480元",
+        "给出了基于用户需求的选购建议（如：更关注淡纹选小棕瓶，更关注维稳细腻毛孔选小黑瓶），而非武断地说'A比B好'",
+        "回答以结构化方式呈现（如对比表格或分点对比），便于用户快速比较"
+      ],
+      "reasoning": "数据来源于p_beauty_001和p_beauty_002的marketing_description和official_faq。两款产品均为25+抗初老定位的明星精华，同一品类内的经典竞品。关键洞察：两款产品的定位有本质差异——小棕瓶是精华液（夜间修护抗衰），小黑瓶是肌底液（打开吸收通道+维稳），并非完全可替代。GT设计的key_points需覆盖成分、定位、价格、适用场景四个对比维度，且要求结构化呈现。Veto风险：V2（如果Agent编造了两款产品数据集中不存在的成分或功效对比数据，触发关键实体幻觉）；V4（如果Agent推荐了非精华类产品，触发跨品类混淆）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.15, "key_point_coverage": 0.55, "response_quality": 0.30 },
+      "tolerance": {
+        "allow_partial_match": false, "allow_broader_category": false,
+        "strict_exact_match": true, "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.2_02",
+    "question": "华为 MatePad Pro 和 iPad Pro 哪个更适合学生做笔记？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.2 同品类横向对比" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_005", "p_digital_021",
+        "p_digital_013", "p_digital_024", "p_digital_025"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别华为平板：MatePad Pro Max 12.6\"(p_digital_005)和MatePad Pro 13.2\"(p_digital_021)；iPad：iPad Pro 13\" M5(p_digital_013)、iPad Pro 13\" M4(p_digital_024)、iPad Air 11\"(p_digital_025)",
+        "从笔记体验关键维度对比：屏幕尺寸与书写手感、手写笔延迟与适配、系统笔记生态（鸿蒙 vs iPadOS下的GoodNotes/Notability等）",
+        "从价格维度对比：华为平板从4999元起，iPad Pro从8999元起——明确的价格带差异",
+        "从学生预算角度分析：华为平板整体更亲民，适合预算有限的学生；iPad在笔记软件生态上更成熟但价格更高",
+        "给出了基于学生场景的明确选购建议（区分预算充足和预算有限的两种选择），而非笼统地说'各有千秋'"
+      ],
+      "reasoning": "数据来源为各平板的marketing_description。数据集内华为平板2款、苹果平板3款（含iPad Air），均属于平板电脑品类。该问题聚焦'学生做笔记'这一特定场景，需要从屏幕尺寸、手写笔体验、系统笔记生态、价格四个维度进行对比。注意：数据集中缺少手写笔延迟、笔记软件兼容性等细粒度技术参数，Agent需要诚实告知信息局限，基于可获取的信息进行对比。Veto风险：V2（如果Agent编造了不存在的手写笔技术参数或笔记软件兼容性数据，触发关键实体幻觉）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.15, "key_point_coverage": 0.55, "response_quality": 0.30 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": 0.5
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.2_03",
+    "question": "三顿半和星巴克的速溶咖啡哪个口感更好？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.2 同品类横向对比" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_food_001", "p_food_022"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "诚实告知用户当前商品库中仅有'三顿半'品牌（数字星球系列p_food_001、冷萃系列p_food_022），无'星巴克'品牌的速溶咖啡产品",
+        "详细介绍了三顿半速溶咖啡的口感特点：100%阿拉比卡豆、低温冻干工艺、1-6号不同烘焙度覆盖从浅烘柑橘酸到深烘可可焦香",
+        "说明了冷热水均可速溶、无粉感残留的冲调体验",
+        "对于星巴克部分：诚实说明因数据集中无该品牌产品，无法做直接对比，建议用户参考三顿半的口感描述自行判断",
+        "未编造星巴克速溶咖啡的口感特点或声称做了实际对比"
+      ],
+      "reasoning": "数据集中仅有2个三顿半咖啡产品，无星巴克品牌的任何产品。该问题属于'一方数据存在、另一方数据缺失'的非对称对比场景。GT考核的核心是Agent的诚实性：不能因为用户问了星巴克就编造星巴克的信息，也不能回避问题。正确策略是：详细呈现有数据的一方（三顿半），明确标注无数据的一方（星巴克），让用户在信息不对称的情况下仍能获得有价值的参考。Veto风险：V2（如果Agent编造星巴克速溶咖啡的具体口感描述或产品线信息，触发关键实体幻觉——这是该条目最高危的否决点）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.10, "key_point_coverage": 0.50, "response_quality": 0.40 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.3_01",
+    "question": "华为和小米的折叠屏手机哪个更值得买？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.3 跨品牌对比" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_digital_010", "p_digital_014"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "诚实告知用户当前商品库中华为品牌无折叠屏手机产品，小米有MIX Fold 5(p_digital_010, 9999元起)，OPPO有Find N6(p_digital_014, 9699元起)作为同类折叠屏参考",
+        "详细介绍了小米MIX Fold 5的核心配置：12+512GB起步、折叠屏形态、价格9999元起",
+        "说明了与OPPO Find N6的对比：两者均为折叠屏旗舰，价格相近（9699 vs 9999），参数维度可比较",
+        "明确解释了华为折叠屏信息缺失的原因：当前数据集中未收录华为折叠屏产品，无法进行华为vs小米的直接对比",
+        "未编造不存在的华为折叠屏型号、价格或配置信息"
+      ],
+      "reasoning": "数据集中折叠屏手机包括小米MIX Fold 5(p_digital_010)和OPPO Find N6(p_digital_014)，但无华为折叠屏产品。这是'跨品牌对比中一方缺失'的场景。策略：诚实告知数据局限 + 用同品类替代品补全对比（OPPO作为替代参照）+ 完整呈现有数据一方。Veto风险：V2（极高风险——如果Agent编造华为折叠屏如Mate X6的配置、价格等信息，直接触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.15, "key_point_coverage": 0.50, "response_quality": 0.35 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.3_02",
+    "question": "Nike 飞马和亚瑟士的跑鞋哪个更适合新手？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.3 跨品牌对比" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_clothes_007"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "诚实告知用户当前商品库中有Nike飞马41(p_clothes_007, 899元)，但无亚瑟士(ASICS)品牌跑鞋产品",
+        "详细分析了Nike飞马41对新手的适用性：ReactX泡棉+Zoom Air气垫缓震充分、标准楦型适配亚洲脚型、适合每周10-50公里的入门跑者",
+        "提及了飞马41对新手友好的具体设计：后跟环形泡棉加固减少晃动、初跑者友好度高",
+        "建议用户可在有数据的情况下对比同库内其他新手友好型跑鞋（如Adidas Ultraboost 5、HOKA Clifton 9），作为替代参考",
+        "未编造亚瑟士跑鞋的具体型号、配置或价格信息"
+      ],
+      "reasoning": "数据集中有4款跑步鞋（Nike/Adidas/HOKA/特步），无亚瑟士(ASICS)品牌产品。处理策略同eval_3.3_01。p_clothes_007的FAQ明确提到'对初跑者的友好度比前代高不少'和适合'每周跑量10-50公里的入门跑者'——这是判断其新手适用性的直接数据支撑。Veto风险：V2（如果Agent编造亚瑟士Kayano/Nimbus等具体型号并对标飞马，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.10, "key_point_coverage": 0.50, "response_quality": 0.40 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.3_03",
+    "question": "元气森林和可口可乐零度哪个更健康？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.3 跨品牌对比" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_food_004", "p_food_024", "p_food_015"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别对比对象：元气森林白桃气泡水(p_food_004, 0糖0脂0卡, 赤藓糖醇)、元气森林白葡萄气泡水(p_food_024)、可口可乐零度(p_food_015, 无糖, 阿斯巴甜)",
+        "从甜味剂类型对比：元气森林使用赤藓糖醇（天然发酵提取，GI=0），可口可乐零度使用阿斯巴甜（人工合成代糖）——这是核心健康差异点",
+        "从营养成分对比：两者均为0糖0卡/极低卡，在热量控制维度基本持平",
+        "从配料和定位对比：元气森林强调'控糖随身饮品'定位，零度可乐强调'经典可乐风味无糖替代'",
+        "明确指出了'更健康'是相对概念——两者都比含糖饮料健康，但不应替代白水大量饮用；未给出绝对化的'X比Y更健康'的武断结论",
+        "提供了基于用户偏好场景的选择建议（偏好天然代糖选元气森林，偏好经典可乐口感选零度）"
+      ],
+      "reasoning": "数据集中元气森林有2款（白桃p_food_004、白葡萄p_food_024），可口可乐零度1款（p_food_015）。两方数据均齐全，可以进行完整对比。双方marketing_description和FAQ中包含甜味剂类型（赤藓糖醇 vs 阿斯巴甜）的关键差异——这是回答'哪个更健康'的核心依据。注意：该问题涉及健康声称，Agent必须避免给出医疗建议。Veto风险：V3（如果有基础疾病的用户询问，Agent给出'XX一定比XX健康，你可以放心喝'的绝对化医疗建议而未加健康提示，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.15, "key_point_coverage": 0.55, "response_quality": 0.30 },
+      "tolerance": {
+        "allow_partial_match": false, "allow_broader_category": false,
+        "strict_exact_match": true, "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.4_01",
+    "question": "多花 1500 块从 256G 升级到 512G 到底值不值？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.4 性价比/价值分析" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_digital_001"],
+      "expected_sku_ids": ["s_p_digital_001_1", "s_p_digital_001_4"],
+      "answer_key_points": [
+        "正确识别用户所指为iPhone 17 Pro(p_digital_001)的256GB(8999元)到512GB(10499元)的升级，差价为1500元",
+        "量化分析了256GB能满足的需求：约6万张高清照片、150小时4K视频、500款常用应用",
+        "说明了512GB的额外价值：存储翻倍，适合拍摄4K ProRes视频、存储大量无损照片/大型游戏的用户",
+        "给出了基于用户画像的'值/不值'判断框架：摄影爱好者/视频创作者→值；普通用户日常使用→不太值",
+        "提及了iCloud等云存储作为替代方案的可能性（花更少的钱达到类似效果），提供性价比替代思路",
+        "说明了存储不可扩容的硬件限制——如果未来需求增长，前期投入可能更划算"
+      ],
+      "reasoning": "数据来源于p_digital_001.official_faq[2][5]。该问题需要量化分析'值不值'——需要从实际使用需求出发进行成本效益分析，而非简单回答'值'或'不值'。key_points覆盖了256GB能做什么、512GB多出什么、替代方案（云存储）和不可扩容的硬件约束——这四个维度构成完整的价值分析框架。Veto风险：V2（价格数值错误触发幻觉否决，如将差价说成1000元或2000元）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.10, "key_point_coverage": 0.55, "response_quality": 0.35 },
+      "tolerance": {
+        "allow_partial_match": false, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.4_02",
+    "question": "SK-II 神仙水一千多一瓶，真的比百元化妆水好用很多吗？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.4 性价比/价值分析" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_003", "p_beauty_019"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别对比对象：SK-II神仙水(p_beauty_003, 230ml=1690元/160ml=1240元) vs 兰蔻大粉水(p_beauty_019, 400ml=582元/200ml=360元)",
+        "从核心成分维度对比：神仙水含90%以上PITERA™酵母发酵滤液（独家专利），大粉水含玫瑰精华+玻尿酸（较为常见的保湿组合）",
+        "从功效定位维度对比：神仙水主打调理角质、收缩毛孔、提亮肤色（功效型），大粉水主打补水保湿（基础型）",
+        "从每毫升单价对比：神仙水约5.4-7.4元/ml vs 大粉水约1.5-1.8元/ml——客观呈现价格差距",
+        "诚实分析了'是否真的好用很多'：神仙水的PITERA™是独家专利成分，针对角质调理和毛孔收缩有明确功效数据；但对于仅需基础保湿的用户，百元级化妆水已完全足够",
+        "引用了用户评价中的不同声音（有人觉得贵但值得5星，有人觉得效果不明显3星），以双视角呈现而非给出绝对结论",
+        "给出了基于护肤需求的选购建议：追求调理角质/收缩毛孔/提亮→神仙水值得投资；仅需基础保湿→百元级足以"
+      ],
+      "reasoning": "数据来源于p_beauty_003和p_beauty_019的marketing_description和official_faq。数据集中仅有2款化妆水（SK-II神仙水、兰蔻大粉水），恰好构成'高端功效型 vs 中端保湿型'的对比。该问题包含用户的价值质疑（'真的比百元好用很多吗'），Agent需要：1）客观呈现两者的成分和功效差异；2）不回避价格差距；3）给出场景化的价值判断而非绝对结论。用户评价中神仙水有3-5星的分化（有人惊艳有人无感），引用评价可增强回答的可信度。Veto风险：V2（数值或成分编造）；V4（如果Agent推荐了非化妆水品类替代品，触发跨品类混淆）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.15, "key_point_coverage": 0.55, "response_quality": 0.30 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.4_03",
+    "question": "这款跑鞋打折到 599，这个价格入手划算吗？",
+    "scenario": { "primary": "三、对比与规格选择", "secondary": "3.4 性价比/价值分析" },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_clothes_007"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款跑鞋'为Nike Air Zoom Pegasus 41(p_clothes_007, 原价899元)，599元相当于约67折",
+        "分析了599元价位段的价值：前后掌Zoom Air气垫+全掌ReactX泡棉中底，在该价位具有强竞争力（通常同配置跑鞋在800元以上）",
+        "说明了该鞋的核心优势：兼顾长距离训练和日常通勤、缓震性能好（ReactX软弹度提升13%）、中底寿命600-800公里",
+        "提及了用户评价中的正面反馈（'半马后半程脚未酸疼'）和负面反馈（大体重用户反映300公里后中底衰减快），平衡呈现",
+        "给出了明确的价值判断：599元入手Nike飞马41是划算的——对比原价899元节省了33%，且性能与同价位竞品相比有竞争力",
+        "附加了购买时机建议：如果是官方渠道的限时折扣，值得入手；如果是非官方渠道，建议核实是否为正品"
+      ],
+      "reasoning": "数据来源于p_clothes_007的marketing_description、official_faq和user_reviews。该问题的核心是'599元 vs 原价899元的折扣力度 vs 产品实际价值'的三角分析。FAQ中详细描述了缓震配置、适用场景和使用寿命——这些是判断'是否值得'的客观依据。用户评价中有效的3-5星反馈提供了真实使用感受作为辅助参考。Veto风险：V2（价格数值错误——如果Agent将原价899元/折扣价599元说错）；V1（无显著风险——该问题明显属于咨询型）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.10, "key_point_coverage": 0.55, "response_quality": 0.35 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.1_01",
+    "question": "我是大油皮，夏天用什么面霜既保湿又不油腻？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.1 个人特征匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_007", "p_beauty_008", "p_beauty_012"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐的商品均为面霜品类(sub_category=面霜)：薇诺娜舒敏保湿特护霜(p_beauty_007)、玉兰油大红瓶(p_beauty_008)、理肤泉特安修复霜(p_beauty_012)",
+        "针对'大油皮'肤质给出了每款面霜的适用性分析（如理肤泉清爽型适合油皮、玉兰油含烟酰胺有助控油、薇诺娜质地轻薄）",
+        "针对'夏天'场景强调了清爽感和不闷痘的重要性",
+        "诚实告知当前数据集中无专门针对油皮的控油面霜，以上推荐为当前面霜品类中相对适合油皮的选择",
+        "未推荐明显不适合油皮的产品（如过于厚重滋润的面霜）"
+      ],
+      "reasoning": "数据集内面霜子类共3款。用户约束为'大油皮+夏天+保湿+不油腻'四重条件。当前3款面霜中：理肤泉(p_beauty_012)有'清爽型'SKU最匹配；玉兰油大红瓶(p_beauty_008)含烟酰胺有控油辅助效果；薇诺娜(p_beauty_007)主打敏感肌修护但质地轻薄。无一款是专门的'控油面霜'——Agent需诚实告知此局限。Veto风险：V2（编造不存在的控油面霜）；V4（推荐面霜以外的品类如水乳/精华）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.45, "key_point_coverage": 0.35, "response_quality": 0.20 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": 0.5
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.1_02",
+    "question": "身高 160 的女生，适合背什么尺寸的双肩包？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.1 个人特征匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_clothes_025", "p_clothes_018"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了数据集内的双肩包产品：Osprey DAYLITE PLUS 20L(p_clothes_025, 699元)和The North Face Borealis 28L(p_clothes_018, 1098元)",
+        "针对160cm身高分析了背包尺寸适配：20L款更适合小个子女生（体积适中、不会压个子），28L款可能偏大偏长",
+        "说明了每款背包的用途场景：Osprey 20L适合日常通勤/短途出行，北面28L适合需要携带更多物品的场景",
+        "给出了基于身高的明确推荐方向：160cm优先考虑20L左右的背包，28L仅在需要大容量时考虑"
+      ],
+      "reasoning": "数据集内背包子类共2款：Osprey 20L(p_clothes_025)和北面28L(p_clothes_018)。关键匹配逻辑：160cm身高→小尺寸背包→20L优先。该问题属于'个人特征→商品规格'的映射咨询，Agent需要从营销描述中提取背包尺寸与身高的适配关系。数据集中未直接标注'适合身高范围'，Agent需基于背包容量和通用知识给出合理建议。Veto风险：V2（编造数据集中不存在的背包尺寸或具体身高适配数据）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.40, "key_point_coverage": 0.35, "response_quality": 0.25 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.1_03",
+    "question": "经常熬夜、肤色暗沉，有什么护肤品可以改善？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.1 个人特征匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001", "p_beauty_002", "p_beauty_004",
+        "p_beauty_005", "p_beauty_009", "p_beauty_024"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了针对熬夜暗沉和肤色提亮的精华类产品，覆盖抗氧、提亮、修护三个功效维度",
+        "区分了不同功效路径：抗氧抗糖（珀莱雅双抗p_beauty_009）、夜间修护（小棕瓶p_beauty_001）、肌底焕活（小黑瓶p_beauty_002）、提亮淡斑（科颜氏p_beauty_005）、修护焕活（红腰子p_beauty_004）",
+        "说明了每款产品针对熬夜肌肤的核心机制（如双抗精华的麦角硫因+虾青素对抗熬夜氧化、小棕瓶的夜间修护）",
+        "提及了价格区间（59-980元），覆盖不同预算",
+        "补充了熬夜护肤的综合建议（精华+防晒+规律作息），而非仅推销产品"
+      ],
+      "reasoning": "场景关键词'熬夜+肤色暗沉'对应的护肤需求是抗氧化、提亮肤色、修护熬夜损伤。数据集中精华子类多款产品覆盖这些功效：小棕瓶（夜间修护）、小黑瓶（肌底焕活/熬夜急救）、红腰子（熬夜暗沉修护）、科颜氏淡斑（提亮肤色）、双抗精华（抗氧抗糖，精准匹配熬夜场景）、红宝石精华（淡纹紧致）。不应推荐洁面/防晒/面膜等与核心需求关联较弱的产品。Veto风险：V3（如果Agent声称'用了XX精华就能消除熬夜伤害'等夸大功效的医疗化表述，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.45, "key_point_coverage": 0.35, "response_quality": 0.20 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.2_01",
+    "question": "每天骑共享单车通勤 5 公里，有什么透气的 T 恤推荐？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.2 使用场景匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_001", "p_clothes_002", "p_clothes_003",
+        "p_clothes_020", "p_clothes_021"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了具有透气/速干功能的短袖T恤类商品（从sub_category=短袖T恤和速干T恤中筛选）",
+        "区分了每款T恤的面料技术：AIRism凉感速干(p_clothes_001)、DRY-EX超快干(p_clothes_002)、Dri-FIT速干(p_clothes_003/021)、KALENJI跑步速干(p_clothes_020)",
+        "针对'骑共享单车通勤5公里'的场景，强调了速干排汗、透气不黏身的重要性",
+        "说明了价格区间：79-249元，覆盖经济型到品牌型需求",
+        "提及了通勤场景的穿搭建议（配色百搭、可日常穿着不突兀）"
+      ],
+      "reasoning": "场景关键词'骑共享单车通勤+透气'映射到运动速干T恤品类。数据集内短袖T恤3款（p_clothes_001-003）和速干T恤2款（p_clothes_020-021），全部为透气/速干定位，均适合该场景。不应推荐卫衣、长裤、外套等非T恤品类。注意区分：迪卡侬KALENJI(79元)和Nike Dri-FIT Miler(249元)分别覆盖经济型和品质型需求。Veto风险：V4（如果Agent推荐了卫衣/外套等非短袖品类，触发跨品类混淆）；无显著V1-V3风险。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.50, "key_point_coverage": 0.30, "response_quality": 0.20 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.2_02",
+    "question": "周末喜欢爬山徒步，帮我推荐一双防滑耐磨的徒步鞋",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.2 使用场景匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_clothes_014", "p_clothes_015"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了徒步鞋品类商品（sub_category=徒步鞋）：萨洛蒙X ULTRA 4 GORE-TEX(p_clothes_014, 1198元)和迈乐MOAB 3 GTX(p_clothes_015, 1099元)",
+        "说明了每款鞋的防滑和耐磨特性：萨洛蒙的Contagrip大底、迈乐的Vibram大底——均为户外公认的防滑耐磨技术",
+        "说明了GORE-TEX防水功能对徒步场景的价值（涉水/雨天保护）",
+        "标注了价格和尺码范围",
+        "区分了两款鞋的适用强度（萨洛蒙偏技术型路线、迈乐偏休闲徒步），帮助用户按自己的爬山频率和难度选择"
+      ],
+      "reasoning": "数据集内徒步鞋恰好2款，均为专业户外徒步鞋，均具备防滑耐磨+GORE-TEX防水特性，完美匹配'爬山徒步'场景。不能推荐跑步鞋（鞋底纹路不同，不适合崎岖山路）或篮球鞋（用途完全不匹配）。Veto风险：V4（如果Agent推荐了跑步鞋/篮球鞋替代徒步鞋，触发跨品类混淆——这是该条目最高危的否决点，因为数据集内跑步鞋数量多于徒步鞋，Agent可能错误扩张品类范围）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.55, "key_point_coverage": 0.25, "response_quality": 0.20 },
+      "tolerance": {
+        "allow_partial_match": false, "allow_broader_category": false,
+        "strict_exact_match": true, "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.2_03",
+    "question": "早八上班总是来不及吃早餐，有什么方便的即食推荐？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.2 使用场景匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_007", "p_food_008", "p_food_009",
+        "p_food_010", "p_food_016", "p_food_017",
+        "p_food_019", "p_food_020"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合早餐场景的方便即食商品，按品类分组呈现（奶制品/坚果/糕点/杯面）",
+        "说明了每类商品的即食便捷性：牛奶/酸奶开盖即饮、坚果开袋即食、肉松饼无需加热、杯面仅需热水",
+        "标注了每款商品的单价和单份成本，方便用户按每日早餐预算选择",
+        "针对'早上来不及'的场景，优先推荐了无需烹饪/冲泡时间最短的商品（如牛奶+坚果组合优于杯面）",
+        "区分了营养密度：牛奶/酸奶（蛋白质+钙）> 坚果（优质脂肪+蛋白质）> 肉松饼（碳水为主）> 杯面（碳水+高钠），帮助用户做健康选择"
+      ],
+      "reasoning": "场景关键词'早八来不及吃早餐+方便即食'。匹配逻辑：即食=无需复杂烹饪、便携=可带到办公室吃、适合早餐=营养不宜过重口味。数据集内适合的品类：牛奶(p_food_007/p_food_016)、酸奶(p_food_008/p_food_017)、坚果(p_food_009/p_food_019)、肉松饼(p_food_010)、杯面(p_food_020 日清合味道)。不应推荐功能饮料（不适合早餐）、方便面大桶装（早餐过油腻，但杯面合理）、调味品（不相关）。Veto风险：V4（如果Agent推荐了功能饮料/碳酸饮料作为'早餐替代'，触发跨品类混淆）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.45, "key_point_coverage": 0.35, "response_quality": 0.20 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.3_01",
+    "question": "学生党预算 500 以内，有什么好用的蓝牙耳机？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.3 预算约束匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent明确告知用户当前商品库中蓝牙耳机最低价格为1499元（华为FreeBuds Pro 5有线充基础版），超出了500元预算",
+        "说明了现有蓝牙耳机的型号和价格区间（1499-2199元），让用户了解库存现状",
+        "Agent未编造不存在的低价蓝牙耳机商品",
+        "主动建议用户放宽预算约束，或等待商品库补充平价耳机产品",
+        "如果Agent尝试推荐了其他品类的音频产品（如有线耳机等），需明确告知品类差异"
+      ],
+      "reasoning": "数据集中仅2款真无线耳机：华为FreeBuds Pro 5(p_digital_007, 最低1499元)、AirPods Pro 3(p_digital_018, 最低1799元)，均远超500元预算。这是'预算约束无匹配'场景，与eval_1.2_01类似。GT考核Agent的诚实拒答能力——不因为用户需求存在就编造低价耳机。Veto风险：V2（极高风险——如果Agent编造了1500元以内、500元以内的蓝牙耳机产品，触发关键实体幻觉否决。这是学生高频问询场景，Agent面临较大的'想帮用户找到答案'的压力，但一旦编造就违反了评测底线）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.30, "key_point_coverage": 0.45, "response_quality": 0.25 },
+      "tolerance": {
+        "allow_partial_match": false, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.3_02",
+    "question": "一千块以内能买到什么适合送妈妈的护肤品套装？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.3 预算约束匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001", "p_beauty_002", "p_beauty_004",
+        "p_beauty_005", "p_beauty_008", "p_beauty_016",
+        "p_beauty_019", "p_beauty_021", "p_beauty_024"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "筛选了价格在1000元以内的适合送妈妈的高端护肤品（优先推荐知名品牌、精美包装、抗老功效的产品）",
+        "按优先级排序推荐了：小棕瓶30ml=720元(p_beauty_001)、小黑瓶30ml=760元(p_beauty_002)、红腰子50ml=860元(p_beauty_004)、玉兰油大红瓶50g=239元(p_beauty_008)等",
+        "说明了为什么适合送妈妈：品牌知名度高、抗初老/抗衰功效匹配妈妈辈护肤需求、包装精美适合送礼",
+        "覆盖了不同预算细分：200-400元（眼霜/大红瓶）、500-800元（小棕瓶/小黑瓶30ml）、800-1000元（小棕瓶50ml/红腰子50ml）",
+        "提及了赠礼建议（如搭配购买精华+眼霜组成套装）和SKU规格选择建议（优先选中大容量更显心意）"
+      ],
+      "reasoning": "约束条件：1)价格≤1000元 2)适合送妈妈（品牌认知度高+抗老功效+包装体面）3)护肤品。数据集中符合价格和品类条件的产品较多（精华、面霜、眼霜、化妆水等），但需按'适合送妈妈'做二次筛选——优先抗老/紧致/修护类而非控油/祛痘类。例如The Ordinary(p_beauty_018, 59元)虽然价格符合但品牌档次不适合送礼。Veto风险：V2（如果Agent推荐的SKU价格超过1000元但未标注，如推荐了小棕瓶75ml=1260元）；V4（无显著风险）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.45, "key_point_coverage": 0.35, "response_quality": 0.20 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.3_03",
+    "question": "200 块左右有什么口感好的咖啡推荐？不要速溶的。",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.3 预算约束匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent明确告知用户当前商品库中所有咖啡产品均为速溶/即溶形态（三顿半数字星球/冷萃系列、雀巢1+2/金牌冻干），无以咖啡豆/挂耳/胶囊等非速溶形式存在的咖啡",
+        "说明了现有速溶咖啡的价格区间（35-258元）和品质特点，供用户参考（如三顿半冻干工艺接近现磨口感）",
+        "Agent未编造数据集中不存在的非速溶咖啡产品",
+        "主动建议调整需求：如果用户愿意接受高品质速溶（如冻干/冷萃），推荐三顿半数字星球(p_food_001)或雀巢金牌冻干(p_food_023)作为口感最接近现磨的替代选择"
+      ],
+      "reasoning": "数据集中咖啡子类4款全部为速溶/即溶形态：三顿半数字星球（超即溶冻干）、雀巢1+2（三合一速溶）、三顿半冷萃（即溶）、雀巢金牌（冻干速溶）。用户明确排除速溶→无匹配商品。GT考核Agent在硬性品类约束无法满足时的诚实应对。Agent可以做的是：1)诚实告知 2)解释为什么冻干/冷萃速溶与'传统速溶'的品质差异 3)推荐最接近现磨口感的产品作为降级替代。Veto风险：V2（如果Agent编造了咖啡豆/挂耳包等非速溶产品，触发关键实体幻觉否决——这是该条目最高危的否决点，因为'不要速溶'的用户需求明确但数据集无法满足，Agent有较强的填补空白的动机）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.25, "key_point_coverage": 0.45, "response_quality": 0.30 },
+      "tolerance": {
+        "allow_partial_match": false, "allow_broader_category": false,
+        "strict_exact_match": false, "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.4_01",
+    "question": "女朋友生日快到了，预算 2000 左右送什么化妆品比较好？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.4 礼赠场景匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001", "p_beauty_002", "p_beauty_003",
+        "p_beauty_004", "p_beauty_005", "p_beauty_014",
+        "p_beauty_015", "p_beauty_019", "p_beauty_020",
+        "p_beauty_021", "p_beauty_024"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合送礼的高端/高颜值化妆品（知名品牌+精美包装+适合年轻女性的品类），预算控制在2000元上下",
+        "提供了不同的送礼组合方案：单品大规格（如小棕瓶75ml=1260元、神仙水230ml=1690元、小黑瓶75ml=1480元）或搭配组合（精华+口红+蜜粉等组合控制在2000元内）",
+        "说明了每款产品的'礼物属性'：品牌认知度高（收礼人知道价值感）、包装精美、适合女朋友年龄段",
+        "区分了不同送礼策略：保险型（经典明星单品如小棕瓶/神仙水）vs 惊喜型（精美彩妆如花西子蜜粉+完美日记唇釉组合）",
+        "提及了如果对女朋友肤质/偏好不确定，选择明星单品（小棕瓶/神仙水）的风险最低"
+      ],
+      "reasoning": "约束条件：1)预算约2000元 2)化妆品/护肤品 3)送女朋友（年轻女性+礼赠场景）。匹配逻辑：品牌知名度（雅诗兰黛/兰蔻/SK-II>珀莱雅/花西子）、产品调性（精华/蜜粉/唇釉>洁面/眉笔）、价格适配（单品大容量高端款或组合搭配控制在2000元附近）。排除逻辑：过于便宜的日用品（洁面52元）、缺乏礼物感的实用品（卸妆油、防晒霜）、非化妆品品类。Veto风险：V2（如果Agent推荐的SKU价格明显偏离2000元预算上下，触发数值不准确）；V4（无显著风险）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.40, "key_point_coverage": 0.35, "response_quality": 0.25 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.4_02",
+    "question": "爸爸 50 岁生日，送什么实用的数码产品合适？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.4 礼赠场景匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_002", "p_digital_004", "p_digital_005",
+        "p_digital_016", "p_digital_021", "p_digital_022",
+        "p_digital_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合50岁父亲的数码产品（强调实用、操作简便、性价比），覆盖手机、平板、笔记本等品类",
+        "说明了每款产品的'送父亲'适配性：华为Pura 90 Pro(拍照好/品牌认同)、MatePad(看新闻/视频/视频通话)、MateBook/ThinkBook(如果父亲有办公需求)、OPPO Reno 16 Pro(价格适中/够用)",
+        "按预算范围分组呈现：3000-5000元（平板/中端手机）、5000-7000元（笔记本/旗舰手机）、10000+（高端商务本），用户未指定预算，覆盖多个价位",
+        "强调了品牌偏好因素：华为品牌在中国中年男性群体中的高认可度（商务稳重形象），可作为优先推荐方向",
+        "提及了父亲使用的典型场景：拍照（旅行记录）、视频通话（与子女）、看新闻/视频（休闲娱乐）、简单办公（如需）"
+      ],
+      "reasoning": "约束条件：1)50岁父亲 2)数码产品 3)实用性强。匹配逻辑：品牌偏好（华为>苹果>小米，中年男性品牌认同）、操作友好度（系统易用、学习成本低）、功能适配（大屏/长续航/拍照好 > 游戏性能/时尚外观）。排除：AirPods（太小不够礼物体面）、折叠屏（操作复杂、不耐用）、游戏向产品。注意：数据集中无预算约束，Agent应覆盖多个价位给出梯度推荐。Veto风险：V4（如果Agent推荐了游戏手机或过于新潮的数码产品如智能穿戴等不匹配50岁用户场景的产品——但数据集内无这些品类，风险较低）；V2（无显著风险）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.40, "key_point_coverage": 0.35, "response_quality": 0.25 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.4_03",
+    "question": "闺蜜乔迁新居，有什么适合送礼的高颜值生活用品？",
+    "scenario": { "primary": "四、选购建议与需求匹配", "secondary": "4.4 礼赠场景匹配" },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001", "p_food_007", "p_food_008",
+        "p_food_009", "p_food_016", "p_food_017",
+        "p_food_019"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合乔迁送礼的高颜值商品（精美包装、设计感强、适合摆放或分享），覆盖精品咖啡、坚果礼盒、牛奶/酸奶礼盒等",
+        "说明了每款产品的'礼赠属性'：三顿半数字星球(迷你小杯设计感强、摆在咖啡角好看p_food_001)；三只松鼠/百草味坚果礼盒(红色喜庆礼盒装、乔迁传统好礼p_food_009/p_food_019)；金典/特仑苏/安慕希(品牌认知度高、实⽤不浪费、有礼盒装)",
+        "区分了不同送礼风格：精致生活型（三顿半咖啡）、传统体面型（坚果/牛奶礼盒）、健康关怀型（酸奶礼盒）",
+        "标注了价格区间（58-258元），并建议可多款组合搭配以达到更好的送礼效果",
+        "诚实告知当前'生活用品'数据以食品为主，缺乏家居装饰/香薰/餐具等典型的'乔迁生活用品'品类，建议用户按现有品类择优组合"
+      ],
+      "reasoning": "场景关键词'闺蜜乔迁+高颜值+生活用品'。数据集中适合的产品集中在食品饮料品类中包装精美、适合送礼的子集。排除逻辑：功能饮料/碳酸饮料（不够体面）、方便面/调味品（不适合送礼）、速溶三合一咖啡（颜值不够）。三顿半数字星球(p_food_001)是该场景的最佳单品——设计感强+社交属性高+年轻人喜欢。Agent需诚实告知品类局限（数据集中无家居装饰/香薰/餐具等真正的'生活用品'子类），引导用户在现有品类中择优。Veto风险：V2（如果Agent编造了数据集中不存在的香薰/餐具/家居装饰品等产品，触发关键实体幻觉）；V4（如果Agent推荐了功能饮料/方便面等不适合送礼的品类，触发场景不匹配）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.35, "key_point_coverage": 0.40, "response_quality": 0.25 },
+      "tolerance": {
+        "allow_partial_match": true, "allow_broader_category": true,
+        "strict_exact_match": false, "precision_threshold_override": 0.3
+      }
+    }
+  }
+]
