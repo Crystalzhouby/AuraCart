@@ -1,0 +1,13 @@
+services:
+  postgres:
+    build: .
+    container_name: pg17-vector-zhparser
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "123456"
+      POSTGRES_DB: ecommerce
+    ports:
+      - "5432:5432"
+    volumes:
+      - ~/pgdata:/var/lib/postgresql/data
+    restart: always

@@ -1,70 +1,195 @@
-Server 目录说明
-=================
+# AuraCart — 智能导购 RAG 系统
 
-概述
+用户输入自然语言商品查询（如"推荐一款200元以下的防晒霜"），系统自动拆解意图、多策略检索商品、LLM 生成推荐理由并通过 SSE 流式返回。
+
 ---
-本目录为后端（server）相关文档的集中存放处，主要包含设计、需求、数据输入说明以及实现与编码计划等文档。文档用于记录后端服务的需求、设计决策、数据处理流程和编码实施细则，方便团队协作与后续维护。
 
-目录结构
+## 1. 前置条件
+
+| 依赖 | 版本要求 | 说明 |
+|------|----------|------|
+| Python | 3.12+ | conda 环境推荐 |
+| PostgreSQL | 14+ | 需安装 pgvector 和 zhparser 扩展 |
+| Embedding API Key | — | OpenAI 兼容接口（如豆包、阿里云等） |
+| LLM API Key | — | OpenAI 兼容接口 |
+
 ---
-server/
-- README.md                    本文件，本目录说明与导航
-- docs/                        后端相关设计与规范文档
-	- SPEC.md                    后端服务需求说明（接口、功能、非功能需求）
-	- DEFINE.md                  需求与问题定义（问题域、术语、目标、边界条件）
-	- DATA_INPUT.md              数据输入与处理说明（数据来源、格式、清洗、预处理流程）
-	- CON_PLAN.md                架构与实现方案（系统架构、组件交互、部署方案、选型理由）
-	- CODE_PLAN.md               编码实现计划（模块划分、开发任务、里程碑、编码规范）
 
-各文档说明
+## 2. 安装与启动
+
+### 2.1 环境准备
+
+```bash
+# 激活 conda 环境
+conda activate AuraCart
+
+# 进入 server 目录（后续所有命令均在此目录下执行）
+cd server
+
+# 安装 Python 依赖
+pip install -r requirements.txt
+```
+
+### 2.2 配置 API 密钥
+
+编辑 `server/config.yaml`，或创建 `server/.secrets.yaml` 设置密钥：
+
+```yaml
+# server/.secrets.yaml
+embedding:
+  api_key: "your-embedding-api-key"
+
+llm:
+  api_key: "your-llm-api-key"
+```
+
+`config.yaml` 中的其他配置项（数据库地址、模型名称、超时时间等）一般无需修改。
+
+### 2.3 启动数据库
+
+```bash
+cd server/scripts
+
+# 构建并启动 PostgreSQL（含 pgvector + zhparser）
+docker compose up -d --build
+
+# 首次启动后，进入容器激活中文分词扩展
+docker exec -it pg17-vector-zhparser psql -U postgres -d ecommerce
+```
+
+在 psql 中执行：
+
+```sql
+CREATE EXTENSION zhparser;
+CREATE TEXT SEARCH CONFIGURATION chinese (PARSER = zhparser);
+ALTER TEXT SEARCH CONFIGURATION chinese ADD MAPPING FOR n,v,a,i,e,l,j WITH simple;
+```
+
+更多数据库操作（停止/重启/清空）见 `server/scripts/operation.md`。
+
+### 2.4 初始化表结构
+
+```bash
+cd server
+alembic upgrade head
+```
+
+### 2.5 导入商品数据
+
+```bash
+cd server
+
+# 默认导入 ecommerce_agent_dataset/data/ 下全部 JSON
+python scripts/import_data.py
+
+# 或指定数据目录
+python scripts/import_data.py ../ecommerce_agent_dataset/data
+```
+
+### 2.6 启动服务
+
+```bash
+cd server
+
+python run.py                          # 默认 INFO 日志, 端口 8000
+python run.py --log DEBUG              # DEBUG 日志级别
+python run.py --port 8080              # 指定端口
+python run.py --reload                 # 开发模式热重载
+```
+
 ---
-- SPEC.md
-	- 内容：详细列出后端需要实现的功能点、API 规范（输入输出格式、状态码）、错误处理策略、性能与可用性要求、安全与权限需求等。
-	- 适用场景：用于需求评审、与前端/产品对齐、作为实现与测试的依据。
 
-- DEFINE.md
-	- 内容：定义问题背景、目标用户、约束条件、关键术语与度量指标（如成功率、延迟阈值）。
-	Server 目录说明
-	=================
+## 3. 功能概览
 
-	概述
-	---
-	本文件为 `server/` 的导航页，仅列出 `server` 目录下的结构和各项文档说明，便于开发者快速定位后端相关代码与文档。
+### 3.1 API 端点一览
 
-	`server/` 目录树
-	---
-	```text
-	server/
-	├── README.md            # 本文件，目录说明与导航
-	├── app/
-	│   ├── api/             # HTTP / SSE 路由（chat.py、products.py 等）
-	│   ├── core/            # 配置与初始化（config.py，读取 .env）
-	│   ├── schemas/         # Pydantic 请求/响应模型
-	│   ├── services/        # 业务服务层（RagService、ProductRepository、CartService）
-	│   └── prompts/         # 系统提示词与 Prompt 模板
-	├── docs/
-	│   ├── SPEC.md
-	│   ├── DEFINE.md
-	│   ├── DATA_INPUT.md
-	│   ├── CON_PLAN.md
-	│   └── CODE_PLAN.md
-	├── tests/               # 单元/集成测试
-	└── requirements.txt     # Python 依赖
-	```
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/health` | 健康检查 |
+| `GET` | `/api/search?q=...&top_k=10` | JSON 向量检索（不走 LLM） |
+| `GET` | `/api/search/stream?q=...` | SSE 全链路 RAG：查询解析 → 检索 → LLM 推荐 |
+| `GET` | `/api/products/{product_id}` | 商品基本信息（无 SKU 列表、无图片） |
+| `GET` | `/api/products/image/{product_id}` | 商品图片文件 |
+| `GET` | `/api/sku/{sku_id}` | SKU 单品详情 |
+| `POST` | `/api/admin/sync` | 手动触发数据增量同步 |
 
-	各文档简要说明
-	---
-	- `SPEC.md`：后端功能与 API 规范（输入/输出、状态码、错误策略、性能与安全要求）。
-	- `DEFINE.md`：问题与需求边界、目标用户、术语定义与约束。
-	- `DATA_INPUT.md`：数据源说明、格式示例、清洗与预处理流程；引用 `data/` 中脚本。
-	- `CON_PLAN.md`：架构设计、组件职责、部署与扩展建议（含选型理由）。
-	- `CODE_PLAN.md`：编码实现计划、模块划分、测试策略与 CI 集成要点。
+### 3.2 核心功能
 
-	贡献与维护
-	---
-	- 修改或新增文档请在 `server/docs/` 下提交 PR，并在 PR 描述中说明变更要点与影响范围。
-	- 建议在每个文档顶部添加版本号与最后修改人/时间，便于追溯。
+1. **向量语义搜索** — 基于 pgvector 余弦相似度，理解"保湿效果好""充电速度快"等模糊评价意图
+2. **中文关键词全文搜索** — 基于 zhparser 分词 + PostgreSQL tsvector，精确匹配品类/品牌关键词
+3. **结构化过滤** — 品牌、品类、价格、库存等字段的精确/范围/排除筛选
+4. **RRF 多路融合** — 将语义搜索和关键词搜索的异构得分通过倒数排序融合合并为统一排名
+5. **LLM 查询意图拆解** — 将自然语言查询自动分解为多条子查询，智能分配检索策略
+6. **LLM 推荐生成** — 基于检索到的商品信息，流式输出导购推荐文案
+7. **增量数据同步** — 后台定时轮询，将商品/营销/FAQ/评价变更自动更新到向量库
 
-	下一步
-	---
-	- 如需我把 `server/` 展开到文件级别（列出具体文件名与简短说明），我可以按你的偏好生成并提交。
+### 3.3 数据覆盖
+
+4 个品类 × 25 个商品 = 100 个产品：
+
+- 美妆个护（p_beauty_001 ~ 025）
+- 服装（p_clothes_001 ~ 025）
+- 数码电子（p_digital_001 ~ 025）
+- 食品（p_food_001 ~ 025）
+
+每个产品含 SKU 变体、营销描述、FAQ、用户评价等完整数据。
+
+---
+
+## 4. 快速验证
+
+```bash
+# 健康检查
+curl http://localhost:8000/health
+
+# JSON 向量检索
+curl "http://localhost:8000/api/search?q=防晒霜&top_k=5"
+
+# SSE 全链路检索
+curl -N "http://localhost:8000/api/search/stream?q=推荐一款200元以下的防晒霜"
+
+# 商品详情
+curl http://localhost:8000/api/products/PROD001
+
+# 运行自动化验证脚本
+cd server
+python test_demo.py
+```
+
+### 运行测试套件
+
+```bash
+cd server
+python -m pytest tests/ -v
+```
+
+---
+
+## 5. 目录结构
+
+```
+AuraCart/
+├── delivery/                    # 技术说明文档
+├── ecommerce_agent_dataset/     # 100 个商品 JSON + 100 张图片
+│   ├── data/                    # p_beauty_*.json, p_clothes_*.json, ...
+│   └── images/                  # 对应产品图片 .jpg
+├── server/                      # 主应用
+│   ├── run.py                   # 启动入口
+│   ├── config.yaml              # 运行时配置
+│   ├── requirements.txt         # Python 依赖
+│   ├── test_demo.py             # 接口冒烟测试脚本
+│   ├── app/
+│   │   ├── main.py              # FastAPI 入口 + lifespan
+│   │   ├── config.py            # YAML → Pydantic 配置加载
+│   │   ├── database.py          # SQLAlchemy 异步引擎
+│   │   ├── api/                 # 路由层 (search/products/admin)
+│   │   ├── models/              # 6 张 ORM 表
+│   │   ├── schemas/             # Pydantic 响应结构
+│   │   ├── services/            # 业务逻辑 (embedding/llm/retriever/sync)
+│   │   ├── rag/                 # RAG 管线 (prompt/merger/generator)
+│   │   └── core/                # 基础设施 (logging)
+│   ├── scripts/                 # Docker/导入脚本
+│   ├── tests/                   # 38 个 pytest 测试
+│   ├── alembic/                 # 数据库迁移
+│   └── docs/                    # 设计/方案文档
+```

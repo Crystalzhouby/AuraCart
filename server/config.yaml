@@ -1,0 +1,49 @@
+# ---- 数据库 ----
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "123456"
+  dbname: "ecommerce"
+  vector_dim: 1024
+
+# ---- Embedding (OpenAI 兼容) ----
+embedding:
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  api_key: ""  # 请在 .secrets.yaml 中设置
+  model: "text-embedding-v4"
+  batch_size: 10
+
+# ---- 大模型 (OpenAI 兼容) ----
+llm:
+  base_url: "https://ark.cn-beijing.volces.com/api/v3/"
+  api_key: ""  # 请在 .secrets.yaml 中设置
+  model: "ep-20260514111645-lmgt2"
+  temperature: 0.3
+
+# ---- 检索 ----
+search:
+  rrf_k: 60
+  top_k_per_query: 20
+  final_sku_limit: 10
+
+# ---- 日志 ----
+log:
+  level: "INFO"
+  dir: "log"
+
+# ---- 同步 ----
+sync:
+  interval_s: 2
+  enabled: true
+
+# ---- 数据集 ----
+dataset:
+  dir: "data/ecommerce_agent_dataset_"
+
+# ---- 超时 (秒) ----
+timeout:
+  query_parse: 30.0
+  retrieval: 1.0
+  generation: 60.0
+  total_request: 60.0
