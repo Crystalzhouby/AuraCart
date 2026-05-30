@@ -4,7 +4,7 @@ AuraCart 服务接口验证脚本
 验证各接口是否正常工作：
 
   1. GET /health                 — 健康检查
-  2. GET /api/search/stream      — SSE 全链路检索（需要 LLM）
+  2. GET /api/search?stream=true — SSE 全链路检索（需要 LLM）
   3. GET /api/products/{id}      — 商品详情
 
 使用方式:
@@ -54,16 +54,16 @@ def test_health(client: httpx.Client) -> int:
 
 
 def test_search_stream(client: httpx.Client) -> int:
-    """SSE 全链路检索 — GET /api/search/stream?q=推荐一款200元以下的防晒霜"""
-    print("\n[2/3] SSE 全链路检索  GET /api/search/stream?q=推荐一款200元以下的防晒霜")
+    """SSE 全链路检索 — GET /api/search?q=...&stream=true"""
+    print("\n[2/3] SSE 全链路检索  GET /api/search?q=推荐一款200元以下的防晒霜&stream=true")
     errors = 0
     events: dict[str, list[str]] = {}
 
     try:
         with client.stream(
             "GET",
-            "/api/search/stream",
-            params={"q": "推荐一款200元以下的防晒霜"},
+            "/api/search",
+            params={"q": "推荐一款200元以下的防晒霜", "stream": True},
             timeout=35.0,
         ) as resp:
             errors += check(resp.status_code == 200, f"HTTP {resp.status_code}")

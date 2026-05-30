@@ -3,8 +3,9 @@
 
 模块: app.api.search
 
-提供 SSE 流式 RAG 检索接口 /api/search/stream：通过 LLM 进行查询解析，
-多策略检索、结果合并以及 LLM 生成的推理 token。
+提供 RAG 检索接口 /api/search：
+- stream=True（默认） — SSE 流式：查询解析 → 多策略检索 → RRF 融合 → LLM 推荐生成
+- stream=False         — JSON 非流式：一次返回完整的管线结果
 
 需要嵌入服务、异步数据库会话和 LLM 服务实例。
 """
@@ -19,6 +20,7 @@ from app.database import get_db
 from app.config import settings
 from app.models.product import Product
 from app.models.sku import Sku
+from app.schemas.product import SearchResponse
 from app.services.embedding import EmbeddingService
 from app.services.llm import LLMService
 from app.services.query_parser import QueryParser
@@ -74,40 +76,39 @@ def get_llm_service() -> LLMService:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/search/stream")
-async def search_stream(
+@router.get("/search")
+async def search(
     request: Request,
     q: str = Query(..., min_length=1, description="搜索查询字符串"),
+    stream: bool = Query(True, description="是否开启 SSE 流式回答，默认 True"),
     db: AsyncSession = Depends(get_db),
     emb: EmbeddingService = Depends(get_embedding_service),
     llm: LLMService = Depends(get_llm_service),
 ):
     """
-    基于 RAG 的 AI 推理 SSE 流式搜索。
+    基于 RAG 的 AI 推理搜索，支持流式 (SSE) 与非流式 (JSON) 两种模式。
 
-    管道各阶段以 SSE 事件的形式发送：
-      1. "sub_queries" — LLM 将用户查询解析为结构化的子查询
-         （语义、关键词、过滤），支持可选的否定检测。
-      2. "products"    — Retriever 对向量库执行每个子查询；
-         Merger 合并排序结果，排除被否定的产品集合。
-      3. "reasoning"   — Generator 流式输出 AI token，分析产品
-         为何匹配用户的搜索意图。
-      4. "done"        — 表示流结束。
-      5. "error"       — 任何失败时发送，随后发送 "done"。
+    管线各阶段：
+      1. LLM 将用户查询解析为结构化的子查询（语义、关键词、过滤）。
+      2. Retriever 对向量库并行执行语义检索和关键词检索。
+      3. Merger 通过 RRF 融合排序，补充 SKU 与产品详情。
+      4. Generator 通过 LLM 生成推荐文案。
 
-    接口: GET /api/search/stream?q=...
+    接口: GET /api/search?q=...&stream=true|false
 
     参数:
         request (Request):       FastAPI Request 对象，用于连接管理。
         q (str):                 用户提供的搜索查询字符串。
+        stream (bool):           是否以 SSE 流式返回；默认 True。
         db (AsyncSession):       通过依赖注入获取的异步 SQLAlchemy 会话。
         emb (EmbeddingService):  通过依赖注入获取的嵌入服务。
         llm (LLMService):        通过依赖注入获取的 LLM 服务。
 
     返回值:
-        EventSourceResponse: 向客户端发送事件的 SSE 流。
+        stream=True  → EventSourceResponse（SSE 事件流）。
+        stream=False → SearchResponse（JSON）。
     """
-    # 使用配置驱动的参数初始化 RAG 管道组件。
+    # 初始化 RAG 管线组件。
     retriever = Retriever(db=db, emb=emb)
     parser = QueryParser(llm=llm)
     merger = Merger(
@@ -116,67 +117,111 @@ async def search_stream(
     )
     generator = Generator(llm=llm)
 
-    async def event_stream():
-        """
-        内部异步生成器，为流式管道产出 SSE 事件。
+    async def _run_pipeline(q: str) -> dict:
+        """执行 RAG 管线阶段 1-3，流式/非流式共用。"""
+        pipeline_log = structlog.get_logger("search")
+        result: dict = {}
 
-        产出:
-            dict: 包含 "event" 和 "data" 键的 SSE 事件对象。
-        """
+        # ---- 阶段 1: 查询解析 (LLM) ----
+        pipeline_log.info("阶段1: 查询解析开始", raw_query=q)
         try:
-            # ---- 阶段 1: 查询解析 (LLM) ----
-            pipeline_log = structlog.get_logger("search_stream")
-            pipeline_log.info("阶段1: 查询解析开始", raw_query=q)
-            try:
-                sub_queries = await asyncio.wait_for(
-                    parser.parse(q), timeout=settings.timeout.query_parse
-                )
-            except asyncio.TimeoutError:
-                pipeline_log.info("阶段1: 查询解析超时，回退为语义检索")
-                sub_queries = [SubQuery(text=q, strategy="semantic")]
-
-            subs_detail = [
-                {
-                    "text": s.text, "strategy": s.strategy,
-                    "field": s.field,
-                    "operator": s.operator, "value": s.value,
-                }
-                for s in sub_queries
-            ]
-            pipeline_log.info("阶段1: 查询解析完成", sub_queries=subs_detail)
-
-            # ---- 阶段 2: 多策略检索 ----
-            result = await retriever.retrieve(sub_queries, top_k=settings.search.top_k_per_query)
-            keyword_hits = result["keyword"]
-            semantic_hits = result["semantic"]
-
-            pipeline_log.info("阶段2: 检索完成",
-                              keyword_count=len(keyword_hits),
-                              semantic_count=len(semantic_hits))
-
-            # ---- 阶段 3: RRF 融合与排序 ----
-            ranked_skuhits = merger.merge(
-                keyword_ranked=keyword_hits,
-                semantic_ranked=semantic_hits,
+            sub_queries = await asyncio.wait_for(
+                parser.parse(q), timeout=settings.timeout.query_parse
             )
-            skus = await _get_skus(db, ranked_skuhits)
+        except asyncio.TimeoutError:
+            pipeline_log.info("阶段1: 查询解析超时，回退为语义检索")
+            sub_queries = [SubQuery(text=q, strategy="semantic")]
 
-            skus_summary = [
-                {"sku_id": s["sku_id"], "product_id": s["product_id"],
-                 "title": s["title"], "brand": s["brand"],
-                 "price": s["price"]}
-                for s in skus
-            ]
-            pipeline_log.info("阶段3: 合并排序结果",
-                              sku_count=len(skus),
-                              skus=skus_summary)
+        subs_detail = [
+            {
+                "text": s.text, "strategy": s.strategy,
+                "field": s.field, "operator": s.operator, "value": s.value,
+            }
+            for s in sub_queries
+        ]
+        pipeline_log.info("阶段1: 查询解析完成", sub_queries=subs_detail)
+        result["sub_queries"] = subs_detail
 
-            yield {"event": "products", "data": json.dumps(skus, ensure_ascii=False)}
+        # ---- 阶段 2: 多策略检索 ----
+        retrieve_result = await retriever.retrieve(
+            sub_queries, top_k=settings.search.top_k_per_query
+        )
+        pipeline_log.info("阶段2: 检索完成",
+                          keyword_count=len(retrieve_result["keyword"]),
+                          semantic_count=len(retrieve_result["semantic"]))
 
-            # ---- 阶段 4: LLM 生成 (token 流式输出) ----
-            if skus:
-                pipeline_log.info("阶段4: LLM生成开始", sku_count=len(skus))
-                agen = generator.generate(skus, q)
+        # ---- 阶段 3: RRF 融合与排序 ----
+        ranked_skuhits = merger.merge(
+            keyword_ranked=retrieve_result["keyword"],
+            semantic_ranked=retrieve_result["semantic"],
+        )
+        skus = await _get_skus(db, ranked_skuhits)
+        pipeline_log.info("阶段3: 合并排序结果", sku_count=len(skus))
+        result["products"] = skus
+
+        return result
+
+    # ---- 非流式模式 ----
+    if not stream:
+        pipeline_log = structlog.get_logger("search")
+        try:
+            result = await _run_pipeline(q)
+            products = result["products"]
+            subs = result["sub_queries"]
+
+            reasoning = None
+            if products:
+                pipeline_log.info("阶段4: LLM生成开始", sku_count=len(products))
+                tokens: list[str] = []
+                try:
+                    agen = generator.generate(products, q)
+                    deadline = asyncio.get_event_loop().time() + settings.timeout.generation
+                    while True:
+                        remaining = deadline - asyncio.get_event_loop().time()
+                        if remaining <= 0:
+                            break
+                        try:
+                            token = await asyncio.wait_for(
+                                agen.__anext__(), timeout=remaining
+                            )
+                            tokens.append(token)
+                        except StopAsyncIteration:
+                            break
+                except asyncio.TimeoutError:
+                    pipeline_log.info("阶段4: LLM生成超时", token_count=len(tokens))
+                reasoning = "".join(tokens)
+                pipeline_log.info("阶段4: LLM生成完成", token_count=len(tokens))
+            else:
+                pipeline_log.info("阶段4: 无候选商品，跳过生成")
+
+            return SearchResponse(
+                query=q, sub_queries=subs, products=products, reasoning=reasoning,
+            )
+        except Exception as e:
+            pipeline_log.info("搜索异常", error=str(e))
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            return SearchResponse(
+                query=q, sub_queries=[], products=[], reasoning=None,
+            )
+
+    # ---- 流式模式 (SSE) ----
+    async def event_stream():
+        """SSE 事件生成器，逐阶段产出事件。"""
+        pipeline_log = structlog.get_logger("search_stream")
+        try:
+            result = await _run_pipeline(q)
+            products = result["products"]
+            subs = result["sub_queries"]
+
+            yield {"event": "sub_queries", "data": json.dumps(subs, ensure_ascii=False)}
+            yield {"event": "products", "data": json.dumps(products, ensure_ascii=False)}
+
+            if products:
+                pipeline_log.info("阶段4: LLM生成开始", sku_count=len(products))
+                agen = generator.generate(products, q)
                 deadline = asyncio.get_event_loop().time() + settings.timeout.generation
                 token_count = 0
                 try:
@@ -199,13 +244,11 @@ async def search_stream(
             else:
                 pipeline_log.info("阶段4: 无候选商品，跳过生成")
 
-            # ---- 阶段 5: 完成 ----
             pipeline_log.info("阶段5: 流结束")
             yield {"event": "done", "data": "{}"}
 
         except Exception as e:
             pipeline_log.info("管道异常", error=str(e))
-            # 重置可能的失败事务，避免毒化数据库会话
             try:
                 await db.rollback()
             except Exception:

@@ -73,6 +73,24 @@ class SSESubQueryEvent(BaseModel):
     expanded_values: list[str] | None = None
 
 
+class SearchResponse(BaseModel):
+    """/api/search 非流式模式的顶层响应。
+
+    当 stream=False 时，一次性返回完整的 RAG 管线结果。
+
+    属性:
+        query: 用户提交的原始搜索字符串。
+        sub_queries: LLM 拆解后的子查询列表。
+        products: 检索匹配的 SKU+产品扁平列表。
+        reasoning: LLM 生成的完整推荐文案。
+    """
+
+    query: str
+    sub_queries: list[dict]
+    products: list[dict]
+    reasoning: str | None
+
+
 class SSEProduct(BaseModel):
     """渐进式搜索结果下发过程中通过 SSE 流传输的轻量产品快照。
 

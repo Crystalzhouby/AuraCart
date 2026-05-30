@@ -1,6 +1,6 @@
 # AuraCart — 智能导购 RAG 系统
 
-用户输入自然语言商品查询（如"推荐一款200元以下的防晒霜"），系统自动拆解意图、多策略检索商品、LLM 生成推荐理由并通过 SSE 流式返回。
+用户输入自然语言商品查询（如"推荐一款200元以下的防晒霜"），系统自动拆解意图、多策略检索商品、LLM 生成推荐理由。支持 SSE 流式与 JSON 非流式两种返回模式。
 
 ---
 
@@ -65,7 +65,7 @@ CREATE TEXT SEARCH CONFIGURATION chinese (PARSER = zhparser);
 ALTER TEXT SEARCH CONFIGURATION chinese ADD MAPPING FOR n,v,a,i,e,l,j WITH simple;
 ```
 
-更多数据库操作（停止/重启/清空）见 `server/scripts/operation.md`。
+创建完成数据库后，其余操作（停止/重启/清空）见 `server/scripts/operation.md`。
 
 ### 2.4 初始化表结构
 
@@ -106,7 +106,7 @@ python run.py --reload                 # 开发模式热重载
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `GET` | `/health` | 健康检查 |
-| `GET` | `/api/search/stream?q=...` | SSE 全链路 RAG：查询解析 → 检索 → LLM 推荐 |
+| `GET` | `/api/search?q=...&stream=true` | 全链路 RAG：查询解析 → 检索 → LLM 推荐（SSE/JSON） |
 | `GET` | `/api/products/{product_id}` | 商品基本信息（无 SKU 列表、无图片） |
 | `GET` | `/api/products/image/{product_id}` | 商品图片文件 |
 | `GET` | `/api/sku/{sku_id}` | SKU 单品详情 |
@@ -141,8 +141,11 @@ python run.py --reload                 # 开发模式热重载
 # 健康检查
 curl http://localhost:8000/health
 
-# SSE 全链路检索
-curl -N "http://localhost:8000/api/search/stream?q=推荐一款200元以下的防晒霜"
+# SSE 全链路检索（stream=true 为默认，可省略）
+curl -N "http://localhost:8000/api/search?q=推荐一款200元以下的防晒霜"
+
+# JSON 非流式检索
+curl "http://localhost:8000/api/search?q=推荐一款200元以下的防晒霜&stream=false"
 
 # 商品详情
 curl http://localhost:8000/api/products/PROD001
