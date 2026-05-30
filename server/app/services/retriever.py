@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from app.services.embedding import EmbeddingService
+from app.config import settings
 
 
 __all__ = ["Retriever", "SubQuery", "SKUHit", "Filters", "FilterClause"]
@@ -209,6 +210,34 @@ class Retriever:
         else:
             return f"{select_clause} {from_clause}"
 
+    @staticmethod
+    def _build_weight_expr(weights: dict[str, float]) -> tuple[str, dict]:
+        """根据权重配置生成 CASE WHEN 片段和参数绑定。
+
+        对每个已知 source 生成 WHEN 分支，权重值从 weights dict 读取，
+        未配置的 source 默认 1.0。ELSE 1.0 兜底所有未知 source。
+
+        参数:
+            weights: source → weight 映射，如 {"marketing": 1.0, "faq": 1.0, "user_review": 0.7}。
+
+        返回值:
+            (sql_fragment, params)
+            sql_fragment:  "CASE pr.source WHEN 'marketing' THEN :wv_mkt ... ELSE 1.0 END"
+            params:        参数绑定字典。
+        """
+        known_sources = ["marketing", "faq", "user_review"]
+        when_parts: list[str] = []
+        params: dict = {}
+
+        for src in known_sources:
+            w = weights.get(src, 1.0)
+            param_name = f"wv_{src}"
+            when_parts.append(f"WHEN '{src}' THEN :{param_name}")
+            params[param_name] = w
+
+        sql = "CASE pr.source " + " ".join(when_parts) + " ELSE 1.0 END"
+        return sql, params
+
     async def retrieve(
         self, subs: list[SubQuery], top_k: int = 20
     ) -> dict[str, list[SKUHit]]:
@@ -275,10 +304,11 @@ class Retriever:
             vec = await self.emb.embed(sub.text)
             vectors.append(str(vec))
 
-        # 构建 sum 得分表达式
+        # 构建 source 加权 + sum 得分表达式
+        weight_expr, w_params = self._build_weight_expr(settings.search.source_weights)
         score_parts = [f"(1 - (pr.embedding <=> :vec_{i}))" for i in range(len(vectors))]
         score_expr = " + ".join(score_parts)
-        score_expr_full = f"SUM({score_expr}) AS score"
+        score_expr_full = f"SUM({weight_expr} * ({score_expr})) AS score"
 
         sql_str = self._build_base_query(filters, score_expr_full)
 
@@ -294,6 +324,7 @@ class Retriever:
         params = {f"vec_{i}": v for i, v in enumerate(vectors)}
         params["limit"] = top_k
         params.update(filters._all_params())
+        params.update(w_params)  # 合并 source 权重参数
 
         sql = text(sql_str)
         result = await self.db.execute(sql, params)
@@ -323,6 +354,9 @@ class Retriever:
         """
         all_rows: list[dict] = []
 
+        # 构建 source 权重表达式（semantic 和 keyword 共用）
+        weight_expr, w_params = self._build_weight_expr(settings.search.source_weights)
+
         for sub in kw_subs:
             rows = []
             # 尝试 tsvector 全文搜索
@@ -330,7 +364,7 @@ class Retriever:
                 try:
                     base_sql = self._build_base_query(
                         filters,
-                        "ts_rank(pr.content_tsv, plainto_tsquery(:tsv_config, :kw)) AS score",
+                        f"{weight_expr} * ts_rank(pr.content_tsv, plainto_tsquery(:tsv_config, :kw)) AS score",
                     )
                     where_extra = "pr.content_tsv @@ plainto_tsquery(:tsv_config, :kw)"
                     if "WHERE" in base_sql:
@@ -344,7 +378,7 @@ class Retriever:
                     )
                     result = await self.db.execute(
                         sql,
-                        {"tsv_config": tsv_config, "kw": sub.text.strip(), "limit": top_k, **filters._all_params()},
+                        {"tsv_config": tsv_config, "kw": sub.text.strip(), "limit": top_k, **filters._all_params(), **w_params},
                     )
                     rows = result.fetchall()
                     if rows:
@@ -356,7 +390,7 @@ class Retriever:
             # 降级：ILIKE
             if not rows:
                 base_sql = self._build_base_query(
-                    filters, "0.3 AS score"
+                    filters, f"{weight_expr} * 0.3 AS score"
                 )
                 where_extra = (
                     "p.brand ILIKE :pat OR p.category ILIKE :pat OR p.title ILIKE :pat"
@@ -369,7 +403,7 @@ class Retriever:
                 sql = text(sql_str)
                 result = await self.db.execute(
                     sql,
-                    {"pat": f"%{sub.text}%", "limit": top_k, **filters._all_params()},
+                    {"pat": f"%{sub.text}%", "limit": top_k, **filters._all_params(), **w_params},
                 )
                 rows = result.fetchall()
 

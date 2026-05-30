@@ -669,3 +669,212 @@ async def test_semantic_search_applies_filters(mock_db, mock_emb):
     assert len(hits) == 1
     sql_called = mock_db.execute.call_args[0][0]
     assert "s.price < :val" in sql_called.text
+
+
+# ======================================================================
+# Step 2: _build_weight_expr() 单元测试
+# ======================================================================
+
+
+class TestBuildWeightExpr:
+    """测试 _build_weight_expr 的 CASE WHEN 生成和参数绑定。"""
+
+    def test_all_default_weights(self):
+        """空 dict 传入时所有 source 默认 1.0，SQL 仍含 3 个 WHEN 分支。"""
+        sql, params = Retriever._build_weight_expr({})
+        assert "CASE pr.source" in sql
+        assert "WHEN 'marketing'" in sql
+        assert "WHEN 'faq'" in sql
+        assert "WHEN 'user_review'" in sql
+        assert "ELSE 1.0 END" in sql
+        assert params["wv_marketing"] == 1.0
+        assert params["wv_faq"] == 1.0
+        assert params["wv_user_review"] == 1.0
+
+    def test_specified_weights(self):
+        """指定权重时参数值正确。"""
+        weights = {"marketing": 1.0, "faq": 1.0, "user_review": 0.7}
+        sql, params = Retriever._build_weight_expr(weights)
+        assert params["wv_marketing"] == 1.0
+        assert params["wv_faq"] == 1.0
+        assert params["wv_user_review"] == 0.7
+
+    def test_partial_weights(self):
+        """部分 source 未配置时走默认 1.0。"""
+        weights = {"user_review": 0.5}
+        sql, params = Retriever._build_weight_expr(weights)
+        assert params["wv_marketing"] == 1.0
+        assert params["wv_faq"] == 1.0
+        assert params["wv_user_review"] == 0.5
+
+    def test_zero_weight(self):
+        """权重为 0 时参数为 0.0。"""
+        weights = {"user_review": 0.0}
+        sql, params = Retriever._build_weight_expr(weights)
+        assert params["wv_user_review"] == 0.0
+
+    def test_sql_fragment_structure(self):
+        """验证 SQL 片段以 CASE 开头、END 结尾，且 WHEN 在 THEN 之前。"""
+        sql, _ = Retriever._build_weight_expr({})
+        assert sql.startswith("CASE pr.source")
+        assert sql.endswith("ELSE 1.0 END")
+        # 每个 WHEN 后面必须跟 THEN
+        assert "WHEN 'marketing' THEN :wv_marketing" in sql
+        assert "WHEN 'faq' THEN :wv_faq" in sql
+        assert "WHEN 'user_review' THEN :wv_user_review" in sql
+
+    def test_unknown_source_not_in_sql(self):
+        """未知 source（如 'expert_review'）不出现在 CASE WHEN 分支中，走 ELSE。"""
+        sql, params = Retriever._build_weight_expr({"expert_review": 0.8})
+        assert "expert_review" not in sql
+        assert ":wv_expert_review" not in params
+
+
+# ======================================================================
+# Step 3: _semantic_search 加权测试
+# ======================================================================
+
+
+@pytest.mark.asyncio
+async def test_semantic_search_includes_weight_expr(mock_db, mock_emb):
+    """验证 _semantic_search SQL 中包含 CASE WHEN 权重表达式。"""
+    from app.services.retriever import Filters
+
+    retriever = Retriever(db=mock_db, emb=mock_emb)
+
+    mock_row = MagicMock()
+    mock_row.sku_id = "SKU100"
+    mock_row.product_id = "PROD100"
+    mock_row.score = 0.88
+
+    mock_result = MagicMock()
+    mock_result.fetchall.return_value = [mock_row]
+    mock_db.execute.return_value = mock_result
+
+    subs = [SubQuery(text="保湿效果好", strategy="semantic")]
+    hits = await retriever._semantic_search(subs, Filters(conditions=[]), top_k=20)
+
+    assert len(hits) == 1
+    # 验证 SQL 包含权重表达式
+    sql_called = mock_db.execute.call_args[0][0]
+    sql_text = sql_called.text
+    assert "CASE pr.source" in sql_text
+    assert ":wv_marketing" in sql_text
+    assert ":wv_faq" in sql_text
+    assert ":wv_user_review" in sql_text
+
+
+@pytest.mark.asyncio
+async def test_semantic_search_weight_params_bound(mock_db, mock_emb):
+    """验证权重参数被绑定到 SQL 参数中。"""
+    from app.services.retriever import Filters
+
+    retriever = Retriever(db=mock_db, emb=mock_emb)
+
+    mock_row = MagicMock()
+    mock_row.sku_id = "SKU200"
+    mock_row.product_id = "PROD200"
+    mock_row.score = 1.2
+
+    mock_result = MagicMock()
+    mock_result.fetchall.return_value = [mock_row]
+    mock_db.execute.return_value = mock_result
+
+    subs = [SubQuery(text="防晒", strategy="semantic")]
+    await retriever._semantic_search(subs, Filters(conditions=[]), top_k=20)
+
+    # 验证 execute 调用参数中包含权重参数
+    call_params = mock_db.execute.call_args[0][1]
+    assert call_params["wv_marketing"] == 1.0
+    assert call_params["wv_faq"] == 1.0
+    assert call_params["wv_user_review"] == 0.7
+
+
+# ======================================================================
+# Step 4: _keyword_search 加权测试
+# ======================================================================
+
+
+@pytest.mark.asyncio
+async def test_keyword_search_includes_weight_expr(mock_db, mock_emb):
+    """验证 ts_rank 路径的 SQL 中包含 CASE WHEN 权重表达式。"""
+    from app.services.retriever import Filters
+
+    retriever = Retriever(db=mock_db, emb=mock_emb)
+
+    mock_row = MagicMock()
+    mock_row.sku_id = "SKU001"
+    mock_row.product_id = "PROD001"
+    mock_row.score = 0.75
+
+    mock_result = MagicMock()
+    mock_result.fetchall.return_value = [mock_row]
+    mock_db.execute.return_value = mock_result
+
+    subs = [SubQuery(text="蓝牙", strategy="keyword")]
+    hits = await retriever._keyword_search(subs, Filters(conditions=[]), top_k=20)
+
+    assert len(hits) == 1
+    sql_called = mock_db.execute.call_args[0][0]
+    sql_text = sql_called.text
+    assert "CASE pr.source" in sql_text
+    assert ":wv_user_review" in sql_text
+
+
+@pytest.mark.asyncio
+async def test_keyword_search_weight_params_bound(mock_db, mock_emb):
+    """验证 keyword 检索的参数中包含权重值。"""
+    from app.services.retriever import Filters
+
+    retriever = Retriever(db=mock_db, emb=mock_emb)
+
+    mock_row = MagicMock()
+    mock_row.sku_id = "SKU002"
+    mock_row.product_id = "PROD002"
+    mock_row.score = 0.6
+
+    mock_result = MagicMock()
+    mock_result.fetchall.return_value = [mock_row]
+    mock_db.execute.return_value = mock_result
+
+    subs = [SubQuery(text="运动鞋", strategy="keyword")]
+    await retriever._keyword_search(subs, Filters(conditions=[]), top_k=20)
+
+    call_params = mock_db.execute.call_args[0][1]
+    assert call_params["wv_marketing"] == 1.0
+    assert call_params["wv_faq"] == 1.0
+    assert call_params["wv_user_review"] == 0.7
+
+
+@pytest.mark.asyncio
+async def test_keyword_fallback_includes_weight_expr(mock_db, mock_emb):
+    """验证 ILIKE 降级路径的 SQL 中也包含权重表达式。"""
+    from app.services.retriever import Filters
+
+    retriever = Retriever(db=mock_db, emb=mock_emb)
+
+    empty_result = MagicMock()
+    empty_result.fetchall.return_value = []
+
+    fallback_row = MagicMock()
+    fallback_row.sku_id = "SKU003"
+    fallback_row.product_id = "PROD003"
+    fallback_row.score = 0.21  # 0.7 * 0.3
+
+    fallback_result = MagicMock()
+    fallback_result.fetchall.return_value = [fallback_row]
+
+    mock_db.execute.side_effect = [empty_result, empty_result, fallback_result]
+
+    subs = [SubQuery(text="资生堂", strategy="keyword")]
+    hits = await retriever._keyword_search(subs, Filters(conditions=[]), top_k=20)
+
+    assert len(hits) == 1
+    # 验证降级 SQL 也包含权重表达式
+    # side_effect 的第三次调用是 ILIKE fallback
+    sql_called = mock_db.execute.call_args[0][0]
+    sql_text = sql_called.text
+    assert "CASE pr.source" in sql_text
+    # 验证 ILIKE 参数中也包含权重
+    call_params = mock_db.execute.call_args[0][1]
+    assert "wv_marketing" in call_params

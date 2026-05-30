@@ -15,7 +15,7 @@ from app.services.llm import LLMService
 from app.rag.prompt import GENERATOR_SYSTEM
 
 # source → 中文标签映射，用于格式化匹配文本
-SOURCE_LABEL = {"user": "[用户评价]", "marketing": "[官方描述]", "faq": "[FAQ]"}
+SOURCE_LABEL = {"user_review": "[用户评价]", "marketing": "[官方描述]", "faq": "[FAQ]"}
 
 
 class Generator:

@@ -52,23 +52,23 @@ class TestTruncateTexts:
     """测试 _truncate_texts 纯函数的截断与排序行为。"""
 
     def test_sort_by_source_priority(self):
-        """faq 应排在 marketing 前面（user > faq > marketing）。"""
+        """faq 应排在 marketing 前面，user_review 应排在最后（faq > marketing > user_review）。"""
         texts = [
             {"content": "官方描述A", "source": "marketing", "metadata": None},
-            {"content": "用户评价X", "source": "user", "metadata": None},
+            {"content": "用户评价X", "source": "user_review", "metadata": None},
             {"content": "FAQ内容B", "source": "faq", "metadata": None},
         ]
         result = _truncate_texts(texts, max_count=10, max_chars=1000)
         sources = [t["source"] for t in result]
-        assert sources == ["user", "faq", "marketing"]
+        assert sources == ["faq", "marketing", "user_review"]
 
     def test_truncate_by_max_count(self):
         """超过 max_count 时截断到指定条数。"""
         texts = [
-            {"content": "评价1", "source": "user", "metadata": None},
-            {"content": "评价2", "source": "user", "metadata": None},
-            {"content": "评价3", "source": "user", "metadata": None},
-            {"content": "评价4", "source": "user", "metadata": None},
+            {"content": "评价1", "source": "user_review", "metadata": None},
+            {"content": "评价2", "source": "user_review", "metadata": None},
+            {"content": "评价3", "source": "user_review", "metadata": None},
+            {"content": "评价4", "source": "user_review", "metadata": None},
         ]
         result = _truncate_texts(texts, max_count=2, max_chars=1000)
         assert len(result) == 2
@@ -76,8 +76,8 @@ class TestTruncateTexts:
     def test_truncate_by_max_chars(self):
         """超出 max_chars 时截断（但至少保留 1 条）。"""
         texts = [
-            {"content": "很长的评价内容ABCDEFGHIJ", "source": "user", "metadata": None},
-            {"content": "第二条评价", "source": "user", "metadata": None},
+            {"content": "很长的评价内容ABCDEFGHIJ", "source": "user_review", "metadata": None},
+            {"content": "第二条评价", "source": "user_review", "metadata": None},
         ]
         result = _truncate_texts(texts, max_count=10, max_chars=10)
         # 第一条 10 字符刚好等于 max_chars=10，第二条不会加入
@@ -94,18 +94,19 @@ class TestTruncateTexts:
         texts = [
             {"content": "未知来源", "source": "unknown_type", "metadata": None},
             {"content": "官方描述", "source": "marketing", "metadata": None},
-            {"content": "用户评价", "source": "user", "metadata": None},
+            {"content": "用户评价", "source": "user_review", "metadata": None},
         ]
         result = _truncate_texts(texts, max_count=10, max_chars=1000)
         sources = [t["source"] for t in result]
-        assert sources[0] == "user"
+        # marketing(1) > user_review(2) > unknown_type(99)
+        assert sources[0] == "marketing"
         assert sources[-1] == "unknown_type"
 
     def test_preserves_at_least_one(self):
         """即使第一条就超出 max_chars，也应保留至少 1 条。"""
         texts = [
-            {"content": "A" * 100, "source": "user", "metadata": None},
-            {"content": "B" * 50, "source": "faq", "metadata": None},
+            {"content": "A" * 100, "source": "faq", "metadata": None},
+            {"content": "B" * 50, "source": "user_review", "metadata": None},
         ]
         result = _truncate_texts(texts, max_count=10, max_chars=5)
         assert len(result) >= 1
@@ -166,7 +167,7 @@ class TestGetSkus:
             {"product_id": "P1", "title": "测试商品", "brand": "品牌A",
              "category": "美妆", "sub_category": "防晒", "base_price": 100.0,
              "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
-             "content": "好评！保湿效果好", "source": "user", "extra_data": None},
+             "content": "好评！保湿效果好", "source": "user_review", "extra_data": None},
             {"product_id": "P1", "title": "测试商品", "brand": "品牌A",
              "category": "美妆", "sub_category": "防晒", "base_price": 100.0,
              "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
@@ -188,11 +189,11 @@ class TestGetSkus:
             {"product_id": "P2", "title": "商品B", "brand": "B",
              "category": "数码", "sub_category": "手机", "base_price": 2000.0,
              "sku_id": "SKU2", "properties": None, "price": 1999.0, "stock": 5,
-             "content": "评价B", "source": "user", "extra_data": None},
+             "content": "评价B", "source": "user_review", "extra_data": None},
             {"product_id": "P1", "title": "商品A", "brand": "A",
              "category": "美妆", "sub_category": "防晒", "base_price": 100.0,
              "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
-             "content": "评价A", "source": "user", "extra_data": None},
+             "content": "评价A", "source": "user_review", "extra_data": None},
         ])
         # RRF 排 SKU2 第一，SKU1 第二
         skuhits = [
@@ -245,7 +246,7 @@ class TestBuildContext:
         skus = [{
             **_BASE_SKU,
             "matched_texts": [
-                {"content": "保湿效果好", "source": "user", "metadata": None},
+                {"content": "保湿效果好", "source": "user_review", "metadata": None},
             ],
         }]
         output = gen._build_context(skus)
@@ -261,7 +262,7 @@ class TestBuildContext:
             "matched_texts": [
                 {"content": "官方推荐", "source": "marketing", "metadata": None},
                 {"content": "常见问题", "source": "faq", "metadata": None},
-                {"content": "用户好评", "source": "user", "metadata": None},
+                {"content": "用户好评", "source": "user_review", "metadata": None},
             ],
         }]
         output = gen._build_context(skus)
@@ -276,7 +277,7 @@ class TestBuildContext:
         skus = [
             {**_BASE_SKU, "sku_id": "SKU1", "matched_texts": []},
             {**_BASE_SKU, "sku_id": "SKU2", "matched_texts": [
-                {"content": "好评", "source": "user", "metadata": None},
+                {"content": "好评", "source": "user_review", "metadata": None},
             ]},
         ]
         output = gen._build_context(skus)

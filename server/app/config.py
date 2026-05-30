@@ -122,6 +122,10 @@ class SearchSettings(BaseSettings):
     max_match_chars_per_sku: int = 500
     """每个 SKU 的 matched_texts 总字符数上限。"""
 
+    source_weights: dict[str, float] = {}
+    """各 source 的检索得分权重，key 为 product_review.source 值。
+    默认 {} 表示全部等权（1.0）。示例: {"marketing": 1.0, "faq": 1.0, "user_review": 0.7}"""
+
 
 class SyncSettings(BaseSettings):
     """后台数据同步循环的配置。"""

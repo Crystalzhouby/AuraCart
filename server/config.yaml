@@ -28,6 +28,10 @@ search:
   final_sku_limit: 10
   max_match_texts_per_sku: 3
   max_match_chars_per_sku: 500
+  source_weights:
+    marketing: 1.0
+    faq: 1.0
+    user_review: 0.7
 
 # ---- 日志 ----
 log:

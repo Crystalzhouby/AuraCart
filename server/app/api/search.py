@@ -272,7 +272,7 @@ async def search(
 # ---------------------------------------------------------------------------
 
 # source → 优先级（数值越小优先级越高），供 _truncate_texts 排序
-_SOURCE_PRIORITY = {"user": 0, "faq": 1, "marketing": 2}
+_SOURCE_PRIORITY = {"faq": 0, "marketing": 1, "user_review": 2}
 
 
 def _truncate_texts(
