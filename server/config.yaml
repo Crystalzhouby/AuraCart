@@ -26,6 +26,8 @@ search:
   rrf_k: 60
   top_k_per_query: 20
   final_sku_limit: 10
+  max_match_texts_per_sku: 3
+  max_match_chars_per_sku: 500
 
 # ---- 日志 ----
 log:

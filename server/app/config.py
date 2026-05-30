@@ -116,6 +116,12 @@ class SearchSettings(BaseSettings):
     final_sku_limit: int = 10
     """RRF 融合后返回给用户的最大 SKU 数量。"""
 
+    max_match_texts_per_sku: int = 3
+    """每个 SKU 最多附带几条 product_review 评论文本。"""
+
+    max_match_chars_per_sku: int = 500
+    """每个 SKU 的 matched_texts 总字符数上限。"""
+
 
 class SyncSettings(BaseSettings):
     """后台数据同步循环的配置。"""

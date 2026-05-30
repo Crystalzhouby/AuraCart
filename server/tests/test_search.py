@@ -1,13 +1,16 @@
 # tests/test_search.py
-"""测试搜索接口的流式与非流式两种模式。
+"""测试搜索接口的流式与非流式两种模式，以及 _truncate_texts 截断函数。
 
 使用 ASGI transport（无需启动真实服务器）验证 GET /api/search
 的查询参数要求、状态码以及基本可达性。
 """
 
 import pytest
+from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient, ASGITransport
 from app.main import app
+from app.api.search import _truncate_texts, _get_skus
+from app.services.retriever import SKUHit
 
 
 @pytest.mark.asyncio
@@ -38,3 +41,257 @@ async def test_search_nonstream_route_exists():
             assert resp.status_code in (200, 500, 503)
         except Exception:
             pass
+
+
+# ======================================================================
+# _truncate_texts 单元测试
+# ======================================================================
+
+
+class TestTruncateTexts:
+    """测试 _truncate_texts 纯函数的截断与排序行为。"""
+
+    def test_sort_by_source_priority(self):
+        """faq 应排在 marketing 前面（user > faq > marketing）。"""
+        texts = [
+            {"content": "官方描述A", "source": "marketing", "metadata": None},
+            {"content": "用户评价X", "source": "user", "metadata": None},
+            {"content": "FAQ内容B", "source": "faq", "metadata": None},
+        ]
+        result = _truncate_texts(texts, max_count=10, max_chars=1000)
+        sources = [t["source"] for t in result]
+        assert sources == ["user", "faq", "marketing"]
+
+    def test_truncate_by_max_count(self):
+        """超过 max_count 时截断到指定条数。"""
+        texts = [
+            {"content": "评价1", "source": "user", "metadata": None},
+            {"content": "评价2", "source": "user", "metadata": None},
+            {"content": "评价3", "source": "user", "metadata": None},
+            {"content": "评价4", "source": "user", "metadata": None},
+        ]
+        result = _truncate_texts(texts, max_count=2, max_chars=1000)
+        assert len(result) == 2
+
+    def test_truncate_by_max_chars(self):
+        """超出 max_chars 时截断（但至少保留 1 条）。"""
+        texts = [
+            {"content": "很长的评价内容ABCDEFGHIJ", "source": "user", "metadata": None},
+            {"content": "第二条评价", "source": "user", "metadata": None},
+        ]
+        result = _truncate_texts(texts, max_count=10, max_chars=10)
+        # 第一条 10 字符刚好等于 max_chars=10，第二条不会加入
+        assert len(result) >= 1
+        assert len(result) <= 2
+
+    def test_empty_list(self):
+        """空列表直接返回空列表。"""
+        result = _truncate_texts([], max_count=3, max_chars=500)
+        assert result == []
+
+    def test_unknown_source_falls_to_last(self):
+        """未知 source 排到最后（优先级 99）。"""
+        texts = [
+            {"content": "未知来源", "source": "unknown_type", "metadata": None},
+            {"content": "官方描述", "source": "marketing", "metadata": None},
+            {"content": "用户评价", "source": "user", "metadata": None},
+        ]
+        result = _truncate_texts(texts, max_count=10, max_chars=1000)
+        sources = [t["source"] for t in result]
+        assert sources[0] == "user"
+        assert sources[-1] == "unknown_type"
+
+    def test_preserves_at_least_one(self):
+        """即使第一条就超出 max_chars，也应保留至少 1 条。"""
+        texts = [
+            {"content": "A" * 100, "source": "user", "metadata": None},
+            {"content": "B" * 50, "source": "faq", "metadata": None},
+        ]
+        result = _truncate_texts(texts, max_count=10, max_chars=5)
+        assert len(result) >= 1
+
+
+# ======================================================================
+# _get_skus 单元测试（mock DB）
+# ======================================================================
+
+
+class _MockRow:
+    """模拟 SQLAlchemy 查询返回的 Row 对象，支持属性访问。"""
+
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+def _make_mock_db(rows: list[dict]) -> AsyncMock:
+    """构造一个返回指定行的 mock AsyncSession。
+
+    _get_skus 中 await db.execute(...) 返回的 Result 对象
+    会被直接 for 迭代，因此 mock 返回 list[_MockRow] 即可。
+    """
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = [_MockRow(**r) for r in rows]
+    return mock_db
+
+
+class TestGetSkus:
+    """测试 _get_skus 的 SQL 扩展与聚合行为。"""
+
+    @pytest.mark.asyncio
+    async def test_empty_skuhits(self):
+        """空列表直接返回空列表。"""
+        db = _make_mock_db([])
+        result = await _get_skus(db, [])
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_no_reviews(self):
+        """product_review 无数据时 matched_texts 为空列表。"""
+        db = _make_mock_db([
+            {"product_id": "P1", "title": "测试商品", "brand": "品牌A",
+             "category": "美妆", "sub_category": "防晒", "base_price": 100.0,
+             "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
+             "content": None, "source": None, "extra_data": None},
+        ])
+        skuhits = [SKUHit(sku_id="SKU1", product_id="P1", score=0.9)]
+        result = await _get_skus(db, skuhits)
+        assert len(result) == 1
+        assert result[0]["matched_texts"] == []
+
+    @pytest.mark.asyncio
+    async def test_with_reviews_aggregated(self):
+        """同一 SKU 的多条 product_review 聚合到 matched_texts。"""
+        db = _make_mock_db([
+            {"product_id": "P1", "title": "测试商品", "brand": "品牌A",
+             "category": "美妆", "sub_category": "防晒", "base_price": 100.0,
+             "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
+             "content": "好评！保湿效果好", "source": "user", "extra_data": None},
+            {"product_id": "P1", "title": "测试商品", "brand": "品牌A",
+             "category": "美妆", "sub_category": "防晒", "base_price": 100.0,
+             "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
+             "content": "官方推荐产品", "source": "marketing", "extra_data": None},
+            {"product_id": "P1", "title": "测试商品", "brand": "品牌A",
+             "category": "美妆", "sub_category": "防晒", "base_price": 100.0,
+             "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
+             "content": "Q:适合干皮吗 A:适合", "source": "faq", "extra_data": None},
+        ])
+        skuhits = [SKUHit(sku_id="SKU1", product_id="P1", score=0.9)]
+        result = await _get_skus(db, skuhits)
+        assert len(result) == 1
+        assert len(result[0]["matched_texts"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_preserves_rrf_order(self):
+        """返回结果保持 RRF 排名顺序。"""
+        db = _make_mock_db([
+            {"product_id": "P2", "title": "商品B", "brand": "B",
+             "category": "数码", "sub_category": "手机", "base_price": 2000.0,
+             "sku_id": "SKU2", "properties": None, "price": 1999.0, "stock": 5,
+             "content": "评价B", "source": "user", "extra_data": None},
+            {"product_id": "P1", "title": "商品A", "brand": "A",
+             "category": "美妆", "sub_category": "防晒", "base_price": 100.0,
+             "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
+             "content": "评价A", "source": "user", "extra_data": None},
+        ])
+        # RRF 排 SKU2 第一，SKU1 第二
+        skuhits = [
+            SKUHit(sku_id="SKU2", product_id="P2", score=0.95),
+            SKUHit(sku_id="SKU1", product_id="P1", score=0.90),
+        ]
+        result = await _get_skus(db, skuhits)
+        assert result[0]["sku_id"] == "SKU2"
+        assert result[1]["sku_id"] == "SKU1"
+
+    @pytest.mark.asyncio
+    async def test_sku_id_not_in_db(self):
+        """DB 中不存在的 sku_id 被跳过。"""
+        db = _make_mock_db([])
+        skuhits = [SKUHit(sku_id="NONEXIST", product_id="PX", score=0.5)]
+        result = await _get_skus(db, skuhits)
+        assert result == []
+
+
+# ======================================================================
+# Generator._build_context 单元测试
+# ======================================================================
+
+
+# 基础 SKU dict（不含 matched_texts）
+_BASE_SKU = {
+    "product_id": "P1", "title": "测试防晒霜", "brand": "测试品牌",
+    "category": "美妆", "base_price": 100.0,
+    "sku_id": "SKU1", "properties": {"容量": "60ml"},
+    "price": 99.0,
+}
+
+
+class TestBuildContext:
+    """测试 _build_context 的匹配文本格式化行为。"""
+
+    def test_no_matched_texts_section(self):
+        """无 matched_texts 时不输出【用户评价与描述】段落。"""
+        from app.rag.generator import Generator
+        gen = Generator(llm=None)  # _build_context 不需要 LLM
+        skus = [{**_BASE_SKU, "matched_texts": []}]
+        output = gen._build_context(skus)
+        assert "【用户评价与描述】" not in output
+        assert "测试防晒霜" in output
+
+    def test_with_matched_texts(self):
+        """有 matched_texts 时输出段落并带来源标签。"""
+        from app.rag.generator import Generator
+        gen = Generator(llm=None)
+        skus = [{
+            **_BASE_SKU,
+            "matched_texts": [
+                {"content": "保湿效果好", "source": "user", "metadata": None},
+            ],
+        }]
+        output = gen._build_context(skus)
+        assert "【用户评价与描述】" in output
+        assert "[用户评价] 保湿效果好" in output
+
+    def test_source_labels(self):
+        """不同 source 使用对应中文标签。"""
+        from app.rag.generator import Generator
+        gen = Generator(llm=None)
+        skus = [{
+            **_BASE_SKU,
+            "matched_texts": [
+                {"content": "官方推荐", "source": "marketing", "metadata": None},
+                {"content": "常见问题", "source": "faq", "metadata": None},
+                {"content": "用户好评", "source": "user", "metadata": None},
+            ],
+        }]
+        output = gen._build_context(skus)
+        assert "[官方描述] 官方推荐" in output
+        assert "[FAQ] 常见问题" in output
+        assert "[用户评价] 用户好评" in output
+
+    def test_mixed_skus(self):
+        """部分 SKU 有 matched_texts，部分没有，只输出有的。"""
+        from app.rag.generator import Generator
+        gen = Generator(llm=None)
+        skus = [
+            {**_BASE_SKU, "sku_id": "SKU1", "matched_texts": []},
+            {**_BASE_SKU, "sku_id": "SKU2", "matched_texts": [
+                {"content": "好评", "source": "user", "metadata": None},
+            ]},
+        ]
+        output = gen._build_context(skus)
+        assert "【用户评价与描述】" in output
+        assert "[用户评价] 好评" in output
+
+    def test_unknown_source_label(self):
+        """未知 source 使用 [其他] 标签。"""
+        from app.rag.generator import Generator
+        gen = Generator(llm=None)
+        skus = [{
+            **_BASE_SKU,
+            "matched_texts": [
+                {"content": "未知来源内容", "source": "unknown", "metadata": None},
+            ],
+        }]
+        output = gen._build_context(skus)
+        assert "[其他] 未知来源内容" in output

@@ -14,6 +14,9 @@ RAG 生成模块。
 from app.services.llm import LLMService
 from app.rag.prompt import GENERATOR_SYSTEM
 
+# source → 中文标签映射，用于格式化匹配文本
+SOURCE_LABEL = {"user": "[用户评价]", "marketing": "[官方描述]", "faq": "[FAQ]"}
+
 
 class Generator:
     """基于 LLM 的推荐生成器，将结构化的候选商品信息转化为自然语言的购物建议。
@@ -88,6 +91,18 @@ class Generator:
                     sku_desc += f" ({props})"
                 lines.append(sku_desc)
 
+            lines.append("")
+
+        # ---- 追加匹配文本（用户评价/官方描述/FAQ） ----
+        matched_lines: list[str] = []
+        for item in skus:
+            for mt in item.get("matched_texts", []):
+                label = SOURCE_LABEL.get(mt.get("source", ""), "[其他]")
+                matched_lines.append(f"{label} {mt.get('content', '')}")
+
+        if matched_lines:
+            lines.append("【用户评价与描述】")
+            lines.extend(matched_lines)
             lines.append("")
 
         return "\n".join(lines)
