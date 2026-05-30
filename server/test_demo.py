@@ -1,12 +1,11 @@
 """
 AuraCart 服务接口验证脚本
 ========================
-对应 README.md 中的 4 条 curl 命令，验证各接口是否正常工作：
+验证各接口是否正常工作：
 
   1. GET /health                 — 健康检查
-  2. GET /api/search             — JSON 向量检索（无需 LLM）
-  3. GET /api/search/stream      — SSE 全链路检索（需要 LLM）
-  4. GET /api/products/{id}      — 商品详情
+  2. GET /api/search/stream      — SSE 全链路检索（需要 LLM）
+  3. GET /api/products/{id}      — 商品详情
 
 使用方式:
     python test_demo.py
@@ -38,7 +37,7 @@ def check(condition: bool, msg: str) -> int:
 
 def test_health(client: httpx.Client) -> int:
     """健康检查 — GET /health → {"status":"ok"}"""
-    print("\n[1/4] 健康检查  GET /health")
+    print("\n[1/3] 健康检查  GET /health")
     try:
         resp = client.get("/health")
         resp.raise_for_status()
@@ -54,37 +53,9 @@ def test_health(client: httpx.Client) -> int:
     return errors
 
 
-def test_search(client: httpx.Client) -> int:
-    """向量检索 — GET /api/search?q=防晒霜&top_k=5"""
-    print("\n[2/4] JSON 向量检索  GET /api/search?q=防晒霜&top_k=5")
-    try:
-        resp = client.get("/api/search", params={"q": "防晒霜", "top_k": 5})
-        resp.raise_for_status()
-    except httpx.RequestError as e:
-        print(f"  ✗ 请求失败: {e}")
-        return 1
-
-    data = resp.json()
-    errors = 0
-    errors += check(resp.status_code == 200, f"HTTP {resp.status_code}")
-    errors += check("query" in data, "响应包含 query 字段")
-    errors += check("products" in data, "响应包含 products 字段")
-    errors += check("total" in data, "响应包含 total 字段")
-    errors += check(isinstance(data.get("products"), list), "products 为列表")
-    errors += check(data.get("total", 0) >= 1, f"至少 1 条结果 (实际: {data.get('total')})")
-
-    if data.get("products"):
-        p = data["products"][0]
-        errors += check("product_id" in p, "产品包含 product_id")
-        errors += check("title" in p, "产品包含 title")
-        errors += check("skus" in p, "产品包含 skus 列表")
-        print(f"      首条: {p.get('title')} ({p.get('product_id')}) — 共{data['total']}条")
-    return errors
-
-
 def test_search_stream(client: httpx.Client) -> int:
     """SSE 全链路检索 — GET /api/search/stream?q=推荐一款200元以下的防晒霜"""
-    print("\n[3/4] SSE 全链路检索  GET /api/search/stream?q=推荐一款200元以下的防晒霜")
+    print("\n[2/3] SSE 全链路检索  GET /api/search/stream?q=推荐一款200元以下的防晒霜")
     errors = 0
     events: dict[str, list[str]] = {}
 
@@ -147,7 +118,7 @@ def test_search_stream(client: httpx.Client) -> int:
 
 def test_product_detail(client: httpx.Client) -> int:
     """商品详情 — GET /api/products/PROD001"""
-    print("\n[4/4] 商品详情  GET /api/products/PROD001")
+    print("\n[3/3] 商品详情  GET /api/products/PROD001")
     try:
         resp = client.get("/api/products/PROD001")
         resp.raise_for_status()
@@ -196,7 +167,6 @@ def main() -> int:
     total_errors = 0
     with httpx.Client(base_url=args.base_url) as client:
         total_errors += test_health(client)
-        total_errors += test_search(client)
         total_errors += test_search_stream(client)
         total_errors += test_product_detail(client)
 

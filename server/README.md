@@ -106,7 +106,6 @@ python run.py --reload                 # 开发模式热重载
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `GET` | `/health` | 健康检查 |
-| `GET` | `/api/search?q=...&top_k=10` | JSON 向量检索（不走 LLM） |
 | `GET` | `/api/search/stream?q=...` | SSE 全链路 RAG：查询解析 → 检索 → LLM 推荐 |
 | `GET` | `/api/products/{product_id}` | 商品基本信息（无 SKU 列表、无图片） |
 | `GET` | `/api/products/image/{product_id}` | 商品图片文件 |
@@ -141,9 +140,6 @@ python run.py --reload                 # 开发模式热重载
 ```bash
 # 健康检查
 curl http://localhost:8000/health
-
-# JSON 向量检索
-curl "http://localhost:8000/api/search?q=防晒霜&top_k=5"
 
 # SSE 全链路检索
 curl -N "http://localhost:8000/api/search/stream?q=推荐一款200元以下的防晒霜"

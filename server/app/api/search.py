@@ -3,26 +3,22 @@
 
 模块: app.api.search
 
-通过两种策略提供产品搜索功能：
-1. /api/search         — 直接向量相似度搜索，返回排序结果。
-2. /api/search/stream  — Server-Sent Events (SSE) 管道：通过 LLM 进行查询解析，
-   多策略检索、结果合并以及 LLM 生成的推理 token。
+提供 SSE 流式 RAG 检索接口 /api/search/stream：通过 LLM 进行查询解析，
+多策略检索、结果合并以及 LLM 生成的推理 token。
 
-两个接口均需要嵌入服务和异步数据库会话。
-流式接口额外需要一个 LLM 服务实例。
+需要嵌入服务、异步数据库会话和 LLM 服务实例。
 """
 import json
 import asyncio
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select
+from sqlalchemy import select
 from sse_starlette.sse import EventSourceResponse
 import structlog
 from app.database import get_db
 from app.config import settings
 from app.models.product import Product
 from app.models.sku import Sku
-from app.schemas.product import ProductOut, SkuOut, SearchResponse
 from app.services.embedding import EmbeddingService
 from app.services.llm import LLMService
 from app.services.query_parser import QueryParser
@@ -76,100 +72,6 @@ def get_llm_service() -> LLMService:
 # ---------------------------------------------------------------------------
 # 路由
 # ---------------------------------------------------------------------------
-
-
-@router.get("/search", response_model=SearchResponse)
-async def search(
-    q: str = Query(..., min_length=1, description="搜索查询字符串"),
-    top_k: int = Query(10, ge=1, le=50, description="最大返回结果数 (1-50)"),
-    db: AsyncSession = Depends(get_db),
-    emb: EmbeddingService = Depends(get_embedding_service),
-):
-    """
-    在产品评论上执行向量相似度搜索。
-
-    将用户查询编码为嵌入向量，然后使用 pgvector 余弦相似度 (<=>)
-    查找最相关的产品评论。结果按产品去重，并按最高相似度排序。
-    每个返回的产品包含所有活跃的 SKU 变体。
-
-    接口: GET /api/search?q=...&top_k=...
-
-    参数:
-        q (str):              用户提供的搜索查询字符串。
-        top_k (int):          返回的顶层结果最大数量（限定范围 1-50）。
-        db (AsyncSession):    通过依赖注入获取的异步 SQLAlchemy 会话。
-        emb (EmbeddingService):通过依赖注入获取的嵌入服务。
-
-    返回值:
-        SearchResponse: Pydantic 模型，包含原始查询、匹配的 ProductOut 对象列表
-                        和结果总数。
-    """
-    # 步骤 1: 将原始查询字符串转换为向量嵌入。
-    query_vector = await emb.embed(q)
-
-    # 步骤 2: 在活跃产品评论上执行余弦相似度搜索。
-    # <=> 运算符计算余弦距离；1 - 距离 = 相似度。
-    sql = text("""
-        SELECT pr.product_id, 1 - (pr.embedding <=> :vec) AS similarity
-        FROM product_review pr
-        JOIN product p ON p.product_id = pr.product_id AND p.is_active = TRUE
-        ORDER BY pr.embedding <=> :vec
-        LIMIT :limit
-    """)
-    result = await db.execute(sql, {"vec": str(query_vector), "limit": top_k})
-    rows = result.fetchall()
-
-    # 若无匹配评论，提前返回空结果。
-    if not rows:
-        return SearchResponse(query=q, products=[], total=0)
-
-    # 步骤 3: 按 product_id 去重，每个产品保留最高分数。
-    product_scores: dict[str, float] = {}
-    for row in rows:
-        pid = row.product_id
-        score = row.similarity
-        if pid not in product_scores or score > product_scores[pid]:
-            product_scores[pid] = score
-
-    # 步骤 4: 按相似度降序排列产品。
-    ranked_pids = sorted(product_scores, key=product_scores.get, reverse=True)
-
-    # 步骤 5: 为每个排序后的产品填充完整详情和活跃 SKU。
-    products = []
-    for pid in ranked_pids:
-        prod = await db.execute(
-            select(Product)
-            .where(Product.product_id == pid, Product.is_active == True)
-        )
-        prod = prod.scalar_one_or_none()
-        if prod is None:
-            continue
-
-        skus_result = await db.execute(
-            select(Sku)
-            .where(Sku.product_id == pid, Sku.is_active == True)
-        )
-        skus = [
-            SkuOut(
-                sku_id=s.sku_id,
-                properties=s.properties,
-                price=float(s.price),
-                stock=s.stock,
-            )
-            for s in skus_result.scalars().all()
-        ]
-
-        products.append(ProductOut(
-            product_id=prod.product_id,
-            title=prod.title,
-            brand=prod.brand,
-            category=prod.category,
-            base_price=float(prod.base_price) if prod.base_price else None,
-            image_path=prod.image_path,
-            skus=skus,
-        ))
-
-    return SearchResponse(query=q, products=products, total=len(products))
 
 
 @router.get("/search/stream")

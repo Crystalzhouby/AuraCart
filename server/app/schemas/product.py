@@ -2,8 +2,8 @@
 """
 产品、SKU 及搜索响应序列化的 Pydantic schema 定义。
 
-本模块定义了产品 API 层所使用的请求/响应结构，包括嵌套的 SKU 子 schema、
-顶层搜索响应，以及用于实时查询反馈的 SSE 流式负载。所有 ORM 模式的 schema
+本模块定义了产品 API 层所使用的请求/响应结构，包括嵌套的 SKU 子 schema，
+以及用于实时查询反馈的 SSE 流式负载。所有 ORM 模式的 schema
 均设置 ``from_attributes=True``，以便直接从 SQLAlchemy 模型实例进行填充。
 """
 
@@ -50,44 +50,6 @@ class ProductInfo(BaseModel):
     base_price: float | None
 
     model_config = {"from_attributes": True}
-
-
-class ProductOut(BaseModel):
-    """产品详情及搜索接口返回的面向公网的产品表示。
-
-    属性:
-        product_id: 跨表共享的业务级产品标识符。
-        title: 产品展示名称。
-        brand: 制造商或品牌名称（可选）。
-        category: 顶层产品分类（例如 "Laptops"）。
-        base_price: 变体选择前的默认标价。
-        image_path: 产品主图的相对或绝对 URL。
-        skus: 该产品下嵌套的 SKU 变体列表。
-    """
-
-    product_id: str
-    title: str
-    brand: str | None
-    category: str | None
-    base_price: float | None
-    image_path: str | None
-    skus: list[SkuOut]
-
-    model_config = {"from_attributes": True}
-
-
-class SearchResponse(BaseModel):
-    """/search 接口返回的顶层包装。
-
-    属性:
-        query: 用户提交的原始搜索字符串。
-        products: 匹配产品的排序列表（可能为空）。
-        total: 找到的匹配产品总数。
-    """
-
-    query: str
-    products: list[ProductOut]
-    total: int
 
 
 class SSESubQueryEvent(BaseModel):

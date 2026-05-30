@@ -30,64 +30,8 @@ curl http://localhost:8000/health
 {"status":"ok"}
 ```
 
----
 
-## 2. JSON 向量检索
-
-**接口:** `GET /api/search`
-
-**功能:** 基于 pgvector 余弦相似度的商品检索，返回 product 级别结果（每个产品含全部活跃 SKU）。不经过 LLM，纯向量搜索。
-
-**参数:**
-
-| 参数 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `q` | string | 是 | — | 搜索关键词/短句 |
-| `top_k` | int | 否 | 10 | 返回数量上限 (1-50) |
-
-**请求示例:**
-
-```bash
-# 基础查询
-curl "http://localhost:8000/api/search?q=防晒霜&top_k=5"
-# 通过URL中的中文需要做编码，可使用脚本server\scripts\transfer_api_request.py做转换。
-```
-
-**预期响应:**
-
-```json
-{
-  "query": "防晒霜",
-  "products": [
-    {
-      "product_id": "PROD001",
-      "title": "安耐晒小金瓶防晒霜",
-      "brand": "安耐晒",
-      "category": "美妆护肤",
-      "base_price": 198.0,
-      "image_path": "ecommerce_agent_dataset/images/p_beauty_001_live.jpg",
-      "skus": [
-        {
-          "sku_id": "SKU001_60ml",
-          "properties": {"容量": "60ml"},
-          "price": 198.0,
-          "stock": 42
-        }
-      ]
-    }
-  ],
-  "total": 5
-}
-```
-
-**验证要点:**
-- `total` 字段 > 0 表示检索到结果
-- 每个 `product` 含完整的 SKU 列表
-- `image_path` 可用于后续调用图片接口
-
----
-
-## 3. SSE 全链路 RAG 检索
+## 2. SSE 全链路 RAG 检索
 
 **接口:** `GET /api/search/stream`
 
@@ -99,34 +43,18 @@ curl "http://localhost:8000/api/search?q=防晒霜&top_k=5"
 |------|------|------|------|
 | `q` | string | 是 | 自然语言查询 |
 
-**测试方法（Bash / Git Bash）:**
+**测试方法（Bash）:**
 
 ```bash
 curl -N "http://localhost:8000/api/search/stream?q=推荐一款200元以下的防晒霜"
-```
-
-**测试方法（PowerShell）:**
-
-```powershell
-$q = "推荐一款200元以下的防晒霜"
-$encoded = [System.Web.HttpUtility]::UrlEncode($q)
-curl -N "http://localhost:8000/api/search/stream?q=$encoded"
+# 通过URL中的中文需要做编码，可使用脚本server\scripts\transfer_api_request.py做转换。
 ```
 
 **SSE 事件序列与预期:**
 
 事件按以下顺序发送 ——
 
-**(1) sub_queries — 查询解析结果**
-
-```
-event: sub_queries
-data: [{"text":"防晒霜","strategy":"keyword",...},{"text":"产品防晒效果是否出色","strategy":"semantic",...},{"text":"","strategy":"structured_filter","field":"price","operator":"lt","value":200,...}]
-```
-
-LLM 将用户查询拆解为多条子查询，每条标注检索策略（semantic / keyword / structured_filter）。
-
-**(2) products — 检索合并后的候选商品（SKU 级别）**
+**(1) products — 检索合并后的候选商品（SKU 级别）**
 
 ```
 event: products
@@ -173,7 +101,7 @@ data: {}
 
 ---
 
-## 4. 商品基本信息
+## 3. 商品基本信息
 
 **接口:** `GET /api/products/{product_id}`
 
@@ -208,7 +136,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/products/NONEXI
 
 ---
 
-## 5. 商品图片
+## 4. 商品图片
 
 **接口:** `GET /api/products/image/{product_id}`
 
@@ -241,7 +169,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/products/image/
 
 ---
 
-## 6. SKU 详情
+## 5. SKU 详情
 
 **接口:** `GET /api/sku/{sku_id}`
 
@@ -274,7 +202,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/sku/NONEXIST
 
 ---
 
-## 7. 手动数据同步
+## 6. 手动数据同步
 
 **接口:** `POST /api/admin/sync`
 
@@ -294,7 +222,7 @@ curl -X POST http://localhost:8000/api/admin/sync
 
 ---
 
-## 8. 自动化验证脚本
+## 7. 自动化验证脚本
 
 项目提供了自动化验证脚本，一键测试以上所有接口：
 
@@ -306,20 +234,19 @@ python test_demo.py
 python test_demo.py --base-url http://localhost:8080
 ```
 
-脚本依次执行 4 个测试用例：
+脚本依次执行 3 个测试用例：
 1. `GET /health` — 健康检查
-2. `GET /api/search` — JSON 向量检索
-3. `GET /api/search/stream` — SSE 全链路检索
-4. `GET /api/products/{product_id}` — 商品详情 + 404 断言
+2. `GET /api/search/stream` — SSE 全链路检索
+3. `GET /api/products/{product_id}` — 商品详情 + 404 断言
 
 全部通过时输出 `Result: ALL PASSED`。
 
 ---
 
-## 9. 测试注意事项
+## 8. 测试注意事项
 
 1. **中文查询需要 URL 编码** — 直接粘贴中文到 curl 可能失败，推荐使用编码后的 URL 或使用 `python test_demo.py`
 2. **SSE 接口超时** — `config.yaml` 中 `timeout.total_request` 默认 60s，复杂查询可能接近此限
 3. **数据库必须处于运行状态** — 所有接口（除 `/health`）依赖 PostgreSQL
 4. **LLM 依赖** — `/api/search/stream` 需要 LLM API Key 有效，否则阶段 1 和阶段 4 将失败
-5. **Embedding 依赖** — `/api/search` 和 `/api/search/stream` 均需要 Embedding API Key 有效
+5. **Embedding 依赖** — `/api/search/stream` 需要 Embedding API Key 有效

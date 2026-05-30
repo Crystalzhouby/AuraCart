@@ -83,10 +83,6 @@ _TEST_CASES = [
         'curl -N "http://localhost:8000/api/search/stream?q=%E6%8E%A8%E8%8D%90%E4%B8%80%E6%AC%BE200%E5%85%83%E4%BB%A5%E4%B8%8B%E7%9A%84%E9%98%B2%E6%99%92%E9%9C%9C"',
     ),
     (
-        "curl 'http://localhost:8000/api/search?q=防晒霜&top_k=5'",
-        "curl 'http://localhost:8000/api/search?q=%E9%98%B2%E6%99%92%E9%9C%9C&top_k=5'",
-    ),
-    (
         "curl http://localhost:8000/api/search/stream?q=hello",
         "curl http://localhost:8000/api/search/stream?q=hello",
     ),
