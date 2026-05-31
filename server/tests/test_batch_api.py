@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from app.main import app
+from app.api.products import _normalize_ids
 
 
 @pytest.mark.asyncio
@@ -64,3 +65,38 @@ async def test_products_batch_exceeds_max():
             assert resp.status_code == 422
         except Exception:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Batch API completion: ID normalization edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_ids_deduplicates():
+    """_normalize_ids 应去重，保持首次出现顺序。"""
+    result = _normalize_ids("p1,p2,p1,p3,p2")
+    assert result == ["p1", "p2", "p3"]
+
+
+def test_normalize_ids_handles_extra_commas():
+    """_normalize_ids 应处理多余的逗号和空格。"""
+    result = _normalize_ids("p1,, p2 ,p3")
+    assert result == ["p1", "p2", "p3"]
+
+
+def test_normalize_ids_handles_all_empty():
+    """_normalize_ids 在全空时返回空列表。"""
+    result = _normalize_ids(",, ,")
+    assert result == []
+
+
+def test_normalize_ids_handles_empty_string():
+    """_normalize_ids 在空字符串时返回空列表。"""
+    result = _normalize_ids("")
+    assert result == []
+
+
+def test_normalize_ids_handles_whitespace_ids():
+    """_normalize_ids 应处理首尾有空格的 ID。"""
+    result = _normalize_ids(" p1 , p2 , p3 ")
+    assert result == ["p1", "p2", "p3"]

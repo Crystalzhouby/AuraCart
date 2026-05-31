@@ -135,6 +135,25 @@ async def get_sku(
 # ---------------------------------------------------------------------------
 
 
+def _normalize_ids(ids: str) -> list[str]:
+    """解析、去空格、去重、去空的 ID 列表。
+
+    参数:
+        ids: 逗号分隔的 ID 字符串，可能包含空格和重复项。
+
+    返回值:
+        list[str]: 去重（保持首次出现顺序）的 ID 列表。
+    """
+    result: list[str] = []
+    seen: set[str] = set()
+    for raw in ids.split(","):
+        item = raw.strip()
+        if item and item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+
 @router.get("/products/batch")
 async def get_products_batch(
     ids: str = Query(..., min_length=1, description="逗号分隔的 product_id 列表（最多 20 个）"),
@@ -153,7 +172,7 @@ async def get_products_batch(
         list[dict]: 包含 product_id/title/brand/category/sub_category/base_price 的列表。
         不存在的 ID 被忽略（不报错），已下架的被过滤。
     """
-    id_list = [i.strip() for i in ids.split(",") if i.strip()]
+    id_list = _normalize_ids(ids)
     max_ids = settings.search.max_batch_ids
     if len(id_list) > max_ids:
         raise HTTPException(status_code=422, detail=f"最多支持 {max_ids} 个 ID")
@@ -197,7 +216,7 @@ async def get_product_images_batch(
     返回值:
         list[dict]: [{product_id, image_url}, ...]。
     """
-    id_list = [i.strip() for i in ids.split(",") if i.strip()]
+    id_list = _normalize_ids(ids)
     max_ids = settings.search.max_batch_ids
     if len(id_list) > max_ids:
         raise HTTPException(status_code=422, detail=f"最多支持 {max_ids} 个 ID")
@@ -233,7 +252,7 @@ async def get_sku_batch(
     返回值:
         list[dict]: [{sku_id, product_id, properties, price, stock}, ...]。
     """
-    id_list = [i.strip() for i in ids.split(",") if i.strip()]
+    id_list = _normalize_ids(ids)
     max_ids = settings.search.max_batch_ids
     if len(id_list) > max_ids:
         raise HTTPException(status_code=422, detail=f"最多支持 {max_ids} 个 ID")
