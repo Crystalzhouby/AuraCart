@@ -56,10 +56,9 @@ def truncate_by_tokens(
     after_count = count_tokens(truncated)
     if before_count != after_count:
         logger.info(
-            "Memory 截断",
-            original_token_count=before_count,
-            after_token_count=after_count,
-            removed_rounds=len(history) - len(truncated),
+            "Memory 截断: original=%d after=%d removed_rounds=%d",
+            before_count, after_count,
+            len(history) - len(truncated),
         )
 
     return truncated

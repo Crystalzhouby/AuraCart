@@ -8,7 +8,7 @@
 """
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -128,3 +128,132 @@ async def get_sku(
         raise HTTPException(status_code=404, detail="SKU not found")
 
     return sku
+
+
+# ---------------------------------------------------------------------------
+# Batch API 端点
+# ---------------------------------------------------------------------------
+
+
+@router.get("/products/batch")
+async def get_products_batch(
+    ids: str = Query(..., min_length=1, description="逗号分隔的 product_id 列表（最多 20 个）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    批量获取产品基本信息。
+
+    接口: GET /api/products/batch?ids=p1,p2,p3,...
+
+    参数:
+        ids: 逗号分隔的产品 ID 字符串。
+        db: 异步 SQLAlchemy 会话。
+
+    返回值:
+        list[dict]: 包含 product_id/title/brand/category/sub_category/base_price 的列表。
+        不存在的 ID 被忽略（不报错），已下架的被过滤。
+    """
+    id_list = [i.strip() for i in ids.split(",") if i.strip()]
+    max_ids = settings.search.max_batch_ids
+    if len(id_list) > max_ids:
+        raise HTTPException(status_code=422, detail=f"最多支持 {max_ids} 个 ID")
+    if not id_list:
+        return []
+
+    rows = await db.execute(
+        select(Product).where(
+            Product.product_id.in_(id_list),
+            Product.is_active == True,
+        )
+    )
+    products = rows.scalars().all()
+    return [
+        {
+            "product_id": p.product_id,
+            "title": p.title,
+            "brand": p.brand,
+            "category": p.category,
+            "sub_category": p.sub_category,
+            "base_price": float(p.base_price) if p.base_price else None,
+        }
+        for p in products
+    ]
+
+
+@router.get("/products/image/batch")
+async def get_product_images_batch(
+    ids: str = Query(..., min_length=1, description="逗号分隔的 product_id 列表（最多 20 个）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    批量获取产品图片路径。
+
+    接口: GET /api/products/image/batch?ids=p1,p2,p3,...
+
+    参数:
+        ids: 逗号分隔的产品 ID 字符串。
+        db: 异步 SQLAlchemy 会话。
+
+    返回值:
+        list[dict]: [{product_id, image_url}, ...]。
+    """
+    id_list = [i.strip() for i in ids.split(",") if i.strip()]
+    max_ids = settings.search.max_batch_ids
+    if len(id_list) > max_ids:
+        raise HTTPException(status_code=422, detail=f"最多支持 {max_ids} 个 ID")
+    if not id_list:
+        return []
+
+    rows = await db.execute(
+        select(Product.product_id, Product.image_path).where(
+            Product.product_id.in_(id_list),
+            Product.is_active == True,
+        )
+    )
+    return [
+        {"product_id": row.product_id, "image_url": row.image_path}
+        for row in rows
+    ]
+
+
+@router.get("/sku/batch")
+async def get_sku_batch(
+    ids: str = Query(..., min_length=1, description="逗号分隔的 sku_id 列表（最多 20 个）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    批量获取 SKU 详情。
+
+    接口: GET /api/sku/batch?ids=sk1,sk2,sk3,...
+
+    参数:
+        ids: 逗号分隔的 SKU ID 字符串。
+        db: 异步 SQLAlchemy 会话。
+
+    返回值:
+        list[dict]: [{sku_id, product_id, properties, price, stock}, ...]。
+    """
+    id_list = [i.strip() for i in ids.split(",") if i.strip()]
+    max_ids = settings.search.max_batch_ids
+    if len(id_list) > max_ids:
+        raise HTTPException(status_code=422, detail=f"最多支持 {max_ids} 个 ID")
+    if not id_list:
+        return []
+
+    rows = await db.execute(
+        select(Sku).where(
+            Sku.sku_id.in_(id_list),
+            Sku.is_active == True,
+        )
+    )
+    skus = rows.scalars().all()
+    return [
+        {
+            "sku_id": s.sku_id,
+            "product_id": s.product_id,
+            "properties": s.properties,
+            "price": float(s.price),
+            "stock": s.stock,
+        }
+        for s in skus
+    ]
