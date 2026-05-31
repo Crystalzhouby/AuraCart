@@ -126,6 +126,9 @@ class SearchSettings(BaseSettings):
     """各 source 的检索得分权重，key 为 product_review.source 值。
     默认 {} 表示全部等权（1.0）。示例: {"marketing": 1.0, "faq": 1.0, "user_review": 0.7}"""
 
+    reasoning_max_chars: int = 200
+    """推荐理由生成的字数软约束。LLM 遵循度 ±30%，不做代码级强制截断。"""
+
 
 class SyncSettings(BaseSettings):
     """后台数据同步循环的配置。"""

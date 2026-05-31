@@ -12,6 +12,7 @@ RAG 生成模块。
 """
 
 from app.services.llm import LLMService
+from app.config import settings
 from app.rag.prompt import GENERATOR_SYSTEM
 
 # source → 中文标签映射，用于格式化匹配文本
@@ -107,15 +108,53 @@ class Generator:
 
         return "\n".join(lines)
 
-    async def generate(self, products: list[dict], user_query: str):
+    @staticmethod
+    def _format_sub_queries(sub_queries: list[dict] | None) -> str:
+        """将 sub_queries 列表格式化为自然语言文本。
+
+        只提取 text 非空且非空白字符的子查询。structured_filter 的 text 通常为空，
+        已经在 DB 层完成过滤，不需要 LLM 再关注。
+
+        参数：
+            sub_queries: 查询解析阶段产出的子查询列表，或 None。
+
+        返回：
+            格式化后的自然语言字符串；sub_queries 为空/None 或无可展示项时返回 ""。
+        """
+        if not sub_queries:
+            return ""
+
+        items: list[str] = []
+        for sq in sub_queries:
+            text = (sq.get("text") or "").strip()
+            if text:
+                items.append(text)
+
+        if not items:
+            return ""
+
+        lines = ["用户关心以下方面："]
+        for i, text in enumerate(items, 1):
+            lines.append(f"{i}. {text}")
+        return "\n".join(lines)
+
+    async def generate(
+        self,
+        products: list[dict],
+        user_query: str,
+        sub_queries: list[dict] | None = None,
+    ):
         """根据商品和查询构建提示词，并以流式方式生成推荐回复。
 
         将格式化后的商品上下文和用户原始查询注入 GENERATOR_SYSTEM 模板以构建系统提示词，
         并通过一条独立的用户消息重申请求内容，为生成过程提供接地气的上下文。
+        如传入 sub_queries，则格式化后追加到用户消息中，帮助 LLM
+        理解已解析的用户意图。
 
         参数：
             products: 商品字典列表，作为 LLM 在当前推荐中的知识基础。
             user_query: 终端用户的原始自然语言查询。
+            sub_queries: 查询解析阶段的子查询列表，None 时退化为原行为。
 
         生成：
             str: 生成的推荐内容 token，通过底层 LLM 服务逐 token 流式输出。
@@ -124,10 +163,16 @@ class Generator:
         system_prompt = GENERATOR_SYSTEM.format(
             product_context=context,
             user_query=user_query,
+            reasoning_max_chars=settings.search.reasoning_max_chars,
         )
+        user_msg = f"请根据以上商品信息，为用户推荐：{user_query}"
+        formatted_subs = self._format_sub_queries(sub_queries)
+        if formatted_subs:
+            user_msg += f"\n\n{formatted_subs}"
+
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"请根据以上商品信息，为用户推荐：{user_query}"},
+            {"role": "user", "content": user_msg},
         ]
 
         # 逐 token 流式输出，用于用户端实时展示

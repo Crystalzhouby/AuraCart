@@ -182,7 +182,7 @@ async def search(
                 pipeline_log.info("阶段4: LLM生成开始", sku_count=len(products))
                 tokens: list[str] = []
                 try:
-                    agen = generator.generate(products, q)
+                    agen = generator.generate(products, q, sub_queries=subs)
                     deadline = asyncio.get_event_loop().time() + settings.timeout.generation
                     while True:
                         remaining = deadline - asyncio.get_event_loop().time()
@@ -229,7 +229,7 @@ async def search(
 
             if products:
                 pipeline_log.info("阶段4: LLM生成开始", sku_count=len(products))
-                agen = generator.generate(products, q)
+                agen = generator.generate(products, q, sub_queries=subs)
                 deadline = asyncio.get_event_loop().time() + settings.timeout.generation
                 token_count = 0
                 try:
