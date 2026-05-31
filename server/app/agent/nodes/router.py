@@ -16,15 +16,38 @@ logger = structlog.get_logger("agent.router")
 
 
 def _parse_router_response(raw: str) -> dict:
-    """从 LLM 原始响应中提取 JSON，失败返回 fallback 默认值。"""
+    """从 LLM 原始响应中提取 JSON，失败返回 fallback 默认值。
+
+    增强容错：
+    - markdown 代码围栏 (```json ... ```)
+    - 尾随逗号（常见 LLM 错误）
+    - JSON 前后的说明文字
+    """
+    if not raw:
+        return {"intent": "recommend", "is_scenario": False}
+
+    # 尝试提取第一个 { ... } JSON 对象
+    start = raw.find("{")
+    end = raw.rfind("}") + 1
+    if start < 0 or end <= start:
+        return {"intent": "recommend", "is_scenario": False}
+
+    json_str = raw[start:end]
+
+    # 1. 直接解析
     try:
-        # 尝试提取第一个 { ... } JSON 对象
-        start = raw.find("{")
-        end = raw.rfind("}") + 1
-        if start >= 0 and end > start:
-            return json.loads(raw[start:end])
+        return json.loads(json_str)
     except json.JSONDecodeError:
         pass
+
+    # 2. 移除尾随逗号后重试（常见 LLM 输出错误）
+    import re
+    cleaned = re.sub(r",\s*([}\]])", r"\1", json_str)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
     return {"intent": "recommend", "is_scenario": False}
 
 

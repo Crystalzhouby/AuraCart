@@ -5,7 +5,7 @@
 import json
 import pytest
 from unittest.mock import AsyncMock
-from app.agent.nodes.router import router_node
+from app.agent.nodes.router import router_node, _parse_router_response
 
 
 @pytest.mark.asyncio
@@ -94,3 +94,56 @@ async def test_router_fallback_on_bad_json():
 
     assert result["intent"] == "recommend"
     assert result["is_scenario"] is False
+
+
+# ---------------------------------------------------------------------------
+# Router completion: enhanced JSON parsing robustness
+# ---------------------------------------------------------------------------
+
+
+def test_parse_router_response_markdown_fence():
+    """_parse_router_response 应能处理 markdown 代码围栏包裹的 JSON。"""
+    raw = '```json\n{"intent": "recommend", "is_scenario": false}\n```'
+    result = _parse_router_response(raw)
+    assert result["intent"] == "recommend"
+    assert result["is_scenario"] is False
+
+
+def test_parse_router_response_trailing_comma():
+    """_parse_router_response 应能处理 JSON 中的尾随逗号（常见 LLM 错误）。"""
+    raw = '{"intent": "recommend", "is_scenario": true,}'
+    result = _parse_router_response(raw)
+    assert result["intent"] == "recommend"
+    assert result["is_scenario"] is True
+
+
+def test_parse_router_response_text_before_json():
+    """_parse_router_response 应能从非 JSON 文本中提取 JSON 对象。"""
+    raw = '分析结果如下：用户想要推荐商品。\n{"intent": "recommend", "is_scenario": false}'
+    result = _parse_router_response(raw)
+    assert result["intent"] == "recommend"
+    assert result["is_scenario"] is False
+
+
+def test_parse_router_response_empty_returns_fallback():
+    """_parse_router_response 在空字符串时应返回 fallback。"""
+    result = _parse_router_response("")
+    assert result == {"intent": "recommend", "is_scenario": False}
+
+
+def test_parse_router_response_pure_text_returns_fallback():
+    """_parse_router_response 在纯文本无 JSON 时应返回 fallback。"""
+    result = _parse_router_response("这是纯文本回复，不包含任何 JSON 对象")
+    assert result == {"intent": "recommend", "is_scenario": False}
+
+
+@pytest.mark.asyncio
+async def test_router_handles_markdown_fence_response():
+    """Router 节点应处理 LLM 返回 markdown 代码围栏包裹的 JSON。"""
+    mock_llm = AsyncMock()
+    mock_llm.chat.return_value = '```json\n{"intent": "chat", "is_scenario": false}\n```'
+
+    state = {"user_query": "你好", "conversation_history": []}
+    result = await router_node(state, llm=mock_llm)
+
+    assert result["intent"] == "chat"
