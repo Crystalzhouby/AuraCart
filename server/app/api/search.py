@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 import structlog
-from app.database import get_db
+from app.database import get_db, engine
 from app.config import settings
 from app.schemas.product import SearchResponse
 from app.services.embedding import EmbeddingService
@@ -25,6 +25,7 @@ from app.services.retriever import Retriever, SubQuery
 from app.services.sku_utils import _get_skus
 from app.rag.merger import Merger
 from app.rag.generator import Generator
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 router = APIRouter(prefix="/api", tags=["search"])
 
@@ -212,48 +213,33 @@ async def search(
                 query=q, sub_queries=[], products=[], reasoning=None,
             )
 
-    # ---- 流式模式 (SSE) ----
+    # ---- 流式模式 (SSE) — Agent 工作流 ----
     async def event_stream():
-        """SSE 事件生成器，逐阶段产出事件。"""
-        pipeline_log = structlog.get_logger("search_stream")
+        """Agent 工作流 SSE 事件生成器。"""
         try:
-            result = await _run_pipeline(q)
-            products = result["products"]
-            subs = result["sub_queries"]
+            # 构建 Agent Graph
+            from app.agent.graph import build_graph
+            agent_graph = build_graph(
+                llm=llm,
+                emb_service=emb,
+                async_session_factory=async_sessionmaker(bind=engine),
+            )
 
-            yield {"event": "sub_queries", "data": json.dumps(subs, ensure_ascii=False)}
-            yield {"event": "products", "data": json.dumps(products, ensure_ascii=False)}
+            # SSE 事件队列
+            queue: asyncio.Queue = asyncio.Queue()
 
-            if products:
-                pipeline_log.info("阶段4: LLM生成开始", sku_count=len(products))
-                agen = generator.generate(products, q, sub_queries=subs)
-                deadline = asyncio.get_event_loop().time() + settings.timeout.generation
-                token_count = 0
-                try:
-                    while True:
-                        remaining = deadline - asyncio.get_event_loop().time()
-                        if remaining <= 0:
-                            break
-                        try:
-                            token = await asyncio.wait_for(
-                                agen.__anext__(), timeout=remaining
-                            )
-                            yield {"event": "reasoning", "data": token}
-                            token_count += 1
-                        except StopAsyncIteration:
-                            break
-                except asyncio.TimeoutError:
-                    pipeline_log.info("阶段4: LLM生成超时", token_count=token_count)
-                else:
-                    pipeline_log.info("阶段4: LLM生成完成", token_count=token_count)
-            else:
-                pipeline_log.info("阶段4: 无候选商品，跳过生成")
-
-            pipeline_log.info("阶段5: 流结束")
-            yield {"event": "done", "data": "{}"}
+            # Agent 事件消费循环
+            async for event in _agent_event_stream(
+                user_query=q,
+                graph=agent_graph,
+                queue=queue,
+                total_timeout=settings.timeout.total_request,
+            ):
+                yield event
 
         except Exception as e:
-            pipeline_log.info("管道异常", error=str(e))
+            pipeline_log = structlog.get_logger("agent_stream")
+            pipeline_log.error("Agent 管道异常", error=str(e))
             try:
                 await db.rollback()
             except Exception:
@@ -262,6 +248,116 @@ async def search(
             yield {"event": "done", "data": "{}"}
 
     return EventSourceResponse(event_stream())
+
+
+# ---------------------------------------------------------------------------
+# Agent 工作流 SSE 集成 (M10)
+# ---------------------------------------------------------------------------
+
+
+async def _agent_event_stream(
+    user_query: str,
+    graph,
+    queue: asyncio.Queue,
+    total_timeout: float = 60.0,
+):
+    """LangGraph Agent 工作流的 SSE 事件消费循环。
+
+    启动 graph.ainvoke 作为后台任务，消费 Queue 中的 SSE 事件，
+    在完成后发送 next_options。
+
+    参数:
+        user_query: 用户查询字符串。
+        graph: 编译后的 LangGraph StateGraph。
+        queue: 节点间传递 SSE 事件的 asyncio.Queue。
+        total_timeout: 总体超时（秒），默认 60s。
+
+    Yields:
+        dict: SSE 事件 {"event": str, "data": str}。
+    """
+    from app.agent.state import AgentState
+
+    # 构建初始状态
+    initial_state: AgentState = {
+        "user_query": user_query,
+        "conversation_history": [],
+        "intent": "recommend",
+        "is_scenario": False,
+        "requirements": {},
+        "scenario_description": None,
+        "products_summary": [],
+        "chat_reply": "",
+        "next_options": [],
+        "failed_categories": [],
+    }
+    initial_state["_sse_queue"] = queue  # type: ignore[index]
+
+    # 后台启动 graph 执行
+    graph_task = asyncio.create_task(graph.ainvoke(initial_state))
+    done_received = False
+    overall_deadline = asyncio.get_event_loop().time() + total_timeout
+
+    try:
+        while True:
+            # 计算剩余时间
+            remaining = overall_deadline - asyncio.get_event_loop().time()
+            if remaining <= 0:
+                yield {"event": "error", "data": json.dumps({"message": "请求超时"})}
+                yield {"event": "done", "data": "{}"}
+                break
+
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=min(remaining, 5.0))
+            except asyncio.TimeoutError:
+                # 消费空闲超时：检查 graph 是否已完成
+                if graph_task.done():
+                    if graph_task.exception():
+                        # graph 执行异常
+                        exc = graph_task.exception()
+                        yield {"event": "error", "data": json.dumps({"message": str(exc)})}
+                        yield {"event": "done", "data": "{}"}
+                        break
+                    if done_received:
+                        break
+                    # graph 已完成但 queue 没有更多事件且未收到 done
+                    yield {"event": "error", "data": json.dumps({"message": "Graph 未发送 done 事件"})}
+                    yield {"event": "done", "data": "{}"}
+                    break
+                # graph 仍在运行但无新事件 → 继续等待
+                continue
+
+            # 序列化事件数据为 JSON 字符串
+            data_str = json.dumps(event["data"], ensure_ascii=False)
+            yield {"event": event["event"], "data": data_str}
+
+            if event["event"] == "done":
+                done_received = True
+                break
+
+    except asyncio.CancelledError:
+        # FastAPI 客户端断开连接 → 取消 graph 任务
+        if not graph_task.done():
+            graph_task.cancel()
+        yield {"event": "error", "data": json.dumps({"message": "客户端连接断开"})}
+        yield {"event": "done", "data": "{}"}
+        return
+
+    finally:
+        # 清理 graph 任务
+        if not graph_task.done():
+            graph_task.cancel()
+
+        # 发送 next_options（从 graph 最终状态读取）
+        if done_received and graph_task.done() and not graph_task.cancelled():
+            try:
+                final_state = graph_task.result()
+                if final_state and final_state.get("next_options"):
+                    yield {
+                        "event": "next_options",
+                        "data": json.dumps(final_state["next_options"], ensure_ascii=False),
+                    }
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------
