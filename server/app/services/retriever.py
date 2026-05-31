@@ -91,6 +91,8 @@ class SubQuery:
         value (str | float | None)：单个比较值。
         expanded_values (list[str] | None)：经 LLM 值扩展后，
             用于 "in"/"not_in" 操作符的多个值。
+        category (str | None)：品类大类（如"面部护肤"），默认 None。
+        sub_category (str | None)：品类细类（如"防晒霜"），默认 None。
     """
     text: str
     strategy: str  # "semantic" | "keyword" | "structured_filter"
@@ -98,6 +100,8 @@ class SubQuery:
     operator: str | None = None  # "eq" | "lt" | "gt" | "in" | "not_in" | "contains" | "not_contains"
     value: str | float | None = None
     expanded_values: list[str] | None = None
+    category: str | None = None       # 品类大类（如"面部护肤"）
+    sub_category: str | None = None   # 品类细类（如"防晒霜"）
 
 
 class Retriever:
