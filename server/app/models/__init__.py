@@ -14,6 +14,7 @@ AuraCart 应用中所有 SQLAlchemy ORM 模型的统一注册中心。
 - ``ProductFaq``       – 产品的问答对
 - ``UserReview``       – 用户提交的评价/评分
 - ``ProductReview``    – 含向量嵌入的聚合评价语料
+- ``CategoryLookup``   – 合法 (category, sub_category) 值对查找表
 
 用法::
 
@@ -29,6 +30,7 @@ from app.models.product_marketing import ProductMarketing  # noqa: E402, F401
 from app.models.product_faq import ProductFaq  # noqa: E402, F401
 from app.models.user_review import UserReview  # noqa: E402, F401
 from app.models.product_review import ProductReview  # noqa: E402, F401
+from app.models.category_lookup import CategoryLookup  # noqa: E402, F401
 
 # ---------------------------------------------------------------------------
 # 显式控制 ``from app.models import *`` 时暴露的内容。
@@ -40,4 +42,5 @@ __all__ = [
     "ProductFaq",
     "UserReview",
     "ProductReview",
+    "CategoryLookup",
 ]
