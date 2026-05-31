@@ -180,23 +180,35 @@ async def _category_task(
                 for s in skus
             ]
 
-            # 7. Generator 流式生成推荐理由（品类顺序式 - Q1 方案B）
+            # 7. Generator 流式生成推荐理由（缓冲后统一发送——品类顺序式 Q1 方案B）
             generator = Generator(llm=llm)
-            tokens = []
+            tokens: list[str] = []
             agen = generator.generate(skus, user_query, sub_queries=subs)
-            async for token in agen:
-                tokens.append(token)
-                if queue:
-                    await queue.put({
-                        "event": "reasoning",
-                        "data": {"token": token, "category": category, "sub_category": sub_category}
-                    })
+            deadline = asyncio.get_event_loop().time() + settings.timeout.generation
+            try:
+                while True:
+                    remaining = deadline - asyncio.get_event_loop().time()
+                    if remaining <= 0:
+                        logger.warning(f"Generator 超时: {category}/{sub_category}", token_count=len(tokens))
+                        break
+                    try:
+                        token = await asyncio.wait_for(agen.__anext__(), timeout=remaining)
+                        tokens.append(token)
+                    except StopAsyncIteration:
+                        break
+                    except asyncio.TimeoutError:
+                        logger.warning(f"Generator token 超时: {category}/{sub_category}", token_count=len(tokens))
+                        break
+            except Exception as gen_err:
+                logger.warning(f"Generator 异常: {category}/{sub_category}", error=str(gen_err))
 
+            # 缓冲 token，由主流程统一按品类顺序发送
             return {
                 "category": category,
                 "sub_category": sub_category,
                 "products_summary": summary,
                 "error": None,
+                "reasoning_tokens": tokens,
             }
 
     except Exception as e:
@@ -206,7 +218,53 @@ async def _category_task(
             "sub_category": sub_category,
             "products_summary": [],
             "error": str(e),
+            "reasoning_tokens": [],
         }
+
+
+async def _send_reasoning_sequential(
+    safe_results: list[dict],
+    group_keys: list[str],
+    queue,
+) -> None:
+    """按品类顺序串行发送 reasoning token（品类顺序式 — Q1 方案B）。
+
+    各品类任务将 token 缓存在 reasoning_tokens 中，
+    此函数按 group_keys 顺序将它们整体发送到 SSE 队列。
+
+    参数:
+        safe_results: 品类任务返回的结构化结果列表。
+        group_keys: groups 字典的键列表（决定发送顺序）。
+        queue: SSE 事件队列。
+    """
+    if not queue:
+        return
+
+    # 建立 sub_category → result 的映射，便于按 group_keys 顺序访问
+    result_map = {}
+    for r in safe_results:
+        sc = r.get("sub_category", "")
+        result_map[sc] = r
+
+    for key in group_keys:
+        r = result_map.get(key, {})
+        if r.get("error"):
+            continue  # 失败品类跳过
+        tokens: list[str] = r.get("reasoning_tokens", [])
+        if not tokens:
+            continue
+
+        category = r.get("category", "")
+        sub_category = r.get("sub_category", "")
+        full_text = "".join(tokens)
+        await queue.put({
+            "event": "reasoning",
+            "data": {
+                "token": full_text,
+                "category": category,
+                "sub_category": sub_category,
+            }
+        })
 
 
 async def retrieval_node(
@@ -255,21 +313,25 @@ async def retrieval_node(
 
     # 将 asyncio.gather 返回的异常转换为结构化错误
     safe_results = []
+    group_key_list = list(groups.keys())
     for i, r in enumerate(results):
         if isinstance(r, Exception):
-            group_keys = list(groups.keys())
-            key = group_keys[i] if i < len(group_keys) else "unknown"
+            key = group_key_list[i] if i < len(group_key_list) else "unknown"
             safe_results.append({
                 "category": "", "sub_category": key,
                 "products_summary": [], "error": str(r),
+                "reasoning_tokens": [],
             })
         else:
             safe_results.append(r)
 
-    # Step 4: 聚合 products_summary
+    # Step 4: 品类顺序式发送 reasoning（Q1 方案B）
+    await _send_reasoning_sequential(safe_results, group_key_list, queue)
+
+    # Step 5: 聚合 products_summary
     products_summary, failed_categories = _aggregate_results(safe_results)
 
-    # Step 5: 发送 done 事件
+    # Step 6: 发送 done 事件
     if queue:
         await queue.put({
             "event": "done",
