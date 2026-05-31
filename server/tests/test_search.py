@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient, ASGITransport
 from app.main import app
-from app.api.search import _truncate_texts, _get_skus
+from app.services.sku_utils import _truncate_texts, _get_skus
 from app.services.retriever import SKUHit
 
 
