@@ -13,6 +13,68 @@ from app.services.llm import LLMService
 logger = structlog.get_logger("agent.scenario_gen")
 
 
+def _parse_category_list(category_list: str) -> set[tuple[str, str]]:
+    """将 category_list 字符串解析为 (category, sub_category) 集合。
+
+    格式: "面部护肤|防晒霜\\n服饰|墨镜\\n..."
+    """
+    result = set()
+    if not category_list:
+        return result
+    for line in category_list.strip().split("\n"):
+        line = line.strip()
+        if "|" in line:
+            parts = line.split("|", 1)
+            cat = parts[0].strip()
+            sub = parts[1].strip() if len(parts) > 1 else ""
+            if cat and sub:
+                result.add((cat, sub))
+    return result
+
+
+def _cross_validate_categories(
+    category: str | None,
+    sub_category: str | None,
+    lookup: set[tuple[str, str]],
+) -> tuple[str | None, str | None]:
+    """对 LLM 输出的 category/sub_category 做交叉校验。
+
+    策略：
+    1. 精确匹配 → 保留
+    2. 去除前后空格后匹配 → 修正为精确值
+    3. 不匹配 → 返回 (None, None)
+
+    参数:
+        category: LLM 输出的品类大类。
+        sub_category: LLM 输出的品类细类。
+        lookup: 从 category_lookup 表中解析的合法 (category, sub_category) 集合。
+
+    返回值:
+        (category, sub_category) 或 (None, None)。
+    """
+    if not category or not sub_category:
+        return None, None
+
+    cat_stripped = category.strip()
+    sub_stripped = sub_category.strip()
+
+    # 1. 精确匹配
+    if (cat_stripped, sub_stripped) in lookup:
+        return cat_stripped, sub_stripped
+
+    # 2. 模糊匹配：在 lookup 中搜索去除空格和大小写差异后的匹配项
+    for lc, ls in lookup:
+        if lc.strip() == cat_stripped and ls.strip() == sub_stripped:
+            return lc, ls
+
+    # 3. 无法匹配
+    logger.warning(
+        "品类交叉校验失败，回退到 default 组",
+        category=category, sub_category=sub_category,
+    )
+    return None, None
+
+
 async def scenario_gen_node(state: dict, llm: LLMService, category_list: str = "") -> dict:
     """Scenario Gen 节点函数。
 
@@ -54,9 +116,18 @@ async def scenario_gen_node(state: dict, llm: LLMService, category_list: str = "
             "requirements": {"sub_queries": []},
         }
 
-    # 标准化 SubQuery 字典格式
+    # 构建品类查找表用于交叉校验
+    lookup = _parse_category_list(category_list)
+
+    # 标准化 SubQuery 字典格式 + 交叉校验
     subs_dicts = []
     for sq in sub_queries:
+        raw_category = sq.get("category")
+        raw_sub_category = sq.get("sub_category")
+        # 交叉校验：修正或回退
+        validated_category, validated_sub_category = _cross_validate_categories(
+            raw_category, raw_sub_category, lookup
+        )
         subs_dicts.append({
             "text": sq.get("text", ""),
             "strategy": sq.get("strategy", "semantic"),
@@ -64,8 +135,8 @@ async def scenario_gen_node(state: dict, llm: LLMService, category_list: str = "
             "operator": sq.get("operator"),
             "value": sq.get("value"),
             "expanded_values": sq.get("expanded_values"),
-            "category": sq.get("category"),
-            "sub_category": sq.get("sub_category"),
+            "category": validated_category,
+            "sub_category": validated_sub_category,
         })
 
     # 追加到 conversation_history + 截断
