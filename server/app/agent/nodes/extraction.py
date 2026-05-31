@@ -13,6 +13,39 @@ from app.services.llm import LLMService
 logger = structlog.get_logger("agent.extraction")
 
 
+def _format_history_context(conversation_history: list[dict]) -> str:
+    """从 conversation_history 中提取子查询，格式化为 LLM 可消费的历史需求文本。
+
+    每轮对话只取 sub_queries 中的 text/strategy/category/sub_category 关键字段，
+    省略内部细节（field/operator/value 等），控制注入量。
+
+    参数:
+        conversation_history: 对话历史列表。
+
+    返回值:
+        str: 格式化的历史需求文本（在提示词中注入）。空历史返回 ""。
+    """
+    if not conversation_history:
+        return ""
+
+    lines = []
+    for i, entry in enumerate(conversation_history, 1):
+        subs = entry.get("sub_queries", [])
+        for sq in subs:
+            parts = [f"text={sq.get('text', '')}"]
+            if sq.get("category"):
+                parts.append(f"category={sq['category']}")
+            if sq.get("sub_category"):
+                parts.append(f"sub_category={sq['sub_category']}")
+            lines.append(", ".join(parts))
+    if not lines:
+        return ""
+
+    header = "## 用户历史需求"
+    body = "\n".join(f"- {line}" for line in lines)
+    return f"{header}\n{body}"
+
+
 async def extraction_node(state: dict, llm: LLMService) -> dict:
     """Intent Extraction 节点函数。
 
@@ -26,18 +59,11 @@ async def extraction_node(state: dict, llm: LLMService) -> dict:
     user_query = state.get("user_query", "")
     conversation_history = state.get("conversation_history", [])
 
-    # 构建对话历史上下文
-    history_text = ""
-    if conversation_history:
-        history_text = json.dumps(conversation_history, ensure_ascii=False)
-
-    # 组装提示词：QUERY_PARSE_SYSTEM + 对话历史 + 用户查询
+    # 组装提示词：QUERY_PARSE_SYSTEM + 历史需求上下文 + 用户查询
+    history_context = _format_history_context(conversation_history)
     system_prompt = QUERY_PARSE_SYSTEM
-    if history_text:
-        system_prompt = QUERY_PARSE_SYSTEM.replace(
-            "现在请对以下用户查询进行拆解",
-            f"## 对话历史\n{history_text}\n\n现在请对以下用户查询进行拆解"
-        )
+    if history_context:
+        system_prompt = QUERY_PARSE_SYSTEM + "\n\n" + history_context
 
     messages = [
         {"role": "system", "content": system_prompt},

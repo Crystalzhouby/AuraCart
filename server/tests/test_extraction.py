@@ -2,7 +2,7 @@
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.agent.nodes.extraction import extraction_node
+from app.agent.nodes.extraction import extraction_node, _format_history_context
 
 
 async def _async_gen(*items):
@@ -102,3 +102,68 @@ async def test_extraction_uses_config_driven_max_tokens():
             assert mock_truncate.called
             kwargs = mock_truncate.call_args.kwargs
             assert kwargs.get("max_tokens") == 500
+
+
+# ---------------------------------------------------------------------------
+# Extraction completion: conversation history formatting
+# ---------------------------------------------------------------------------
+
+
+def test_format_history_context_empty():
+    """空历史应返回空字符串。"""
+    assert _format_history_context([]) == ""
+
+
+def test_format_history_context_extracts_sub_queries():
+    """应从 conversation_history 中提取子查询并格式化为历史需求文本。"""
+    history = [
+        {"sub_queries": [
+            {"text": "蓝牙耳机", "strategy": "keyword", "category": "数码电子", "sub_category": "蓝牙耳机"},
+        ]},
+        {"sub_queries": [
+            {"text": "价格低于200", "strategy": "structured_filter", "field": "price", "operator": "lt", "value": 200},
+        ]},
+    ]
+    result = _format_history_context(history)
+    assert "蓝牙耳机" in result
+    assert "数码电子" in result
+    assert "价格低于200" in result
+    assert "历史需求" in result
+
+
+def test_format_history_context_handles_missing_fields():
+    """SubQuery 缺少可选字段时不应崩溃。"""
+    history = [
+        {"sub_queries": [
+            {"text": "跑鞋", "strategy": "keyword"},
+        ]},
+    ]
+    result = _format_history_context(history)
+    assert "跑鞋" in result
+
+
+@pytest.mark.asyncio
+async def test_extraction_injects_history_context():
+    """Extraction 应将历史需求以结构化格式注入提示词。"""
+    mock_llm = MagicMock()
+    mock_llm.chat_stream.return_value = _async_gen(json.dumps([
+        {"text": "墨镜", "strategy": "keyword",
+         "field": None, "operator": None, "value": None, "expanded_values": None,
+         "category": "服饰", "sub_category": "墨镜"},
+    ]))
+
+    state = {
+        "user_query": "再推荐一个墨镜",
+        "conversation_history": [
+            {"sub_queries": [{"text": "去三亚度假", "strategy": "semantic", "category": None, "sub_category": None}]},
+        ],
+    }
+
+    with patch("app.agent.memory.truncate_by_tokens") as mock_truncate:
+        mock_truncate.return_value = state["conversation_history"] + [
+            {"sub_queries": [{"text": "墨镜", "strategy": "keyword"}]}
+        ]
+        result = await extraction_node(state, llm=mock_llm)
+
+    assert "requirements" in result
+    assert len(result["requirements"]["sub_queries"]) == 1
