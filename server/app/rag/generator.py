@@ -160,9 +160,12 @@ class Generator:
             str: 生成的推荐内容 token，通过底层 LLM 服务逐 token 流式输出。
         """
         context = self._build_context(products)
+        requirements_summary = ""
+        if sub_queries:
+            requirements_summary = self._format_sub_queries(sub_queries)
         system_prompt = GENERATOR_SYSTEM.format(
             product_context=context,
-            user_query=user_query,
+            requirements_summary=requirements_summary,
             reasoning_max_chars=settings.search.reasoning_max_chars,
         )
         user_msg = f"请根据以上商品信息，为用户推荐：{user_query}"

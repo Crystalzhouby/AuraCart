@@ -98,5 +98,7 @@ class QueryParser:
                 operator=item.get("operator"),
                 value=item.get("value"),
                 expanded_values=item.get("expanded_values"),
+                category=item.get("category"),
+                sub_category=item.get("sub_category"),
             ))
         return subs

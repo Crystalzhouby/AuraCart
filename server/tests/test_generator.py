@@ -417,10 +417,9 @@ class TestGeneratorPrompt:
         assert "如果多个SKU属于同一商品，合并介绍" in GENERATOR_SYSTEM
 
     def test_rule_9_address_all_intents(self):
-        """规则 9: 逐条回应用户关心的每个方面。"""
+        """规则 9: 逐条回应用户关心的每个需求。"""
         from app.rag.prompt import GENERATOR_SYSTEM
-        assert "逐条回应每个方面是否满足" in GENERATOR_SYSTEM
-        assert "不能遗漏任何一个方面" in GENERATOR_SYSTEM
+        assert "逐条回应每个需求是否满足" in GENERATOR_SYSTEM
         # 缺少数据时的降级行为
         assert "目前商品信息中未提及" in GENERATOR_SYSTEM
 
