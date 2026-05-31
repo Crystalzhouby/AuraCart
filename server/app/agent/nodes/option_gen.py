@@ -26,6 +26,8 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
     products_summary = json.dumps(state.get("products_summary", []), ensure_ascii=False)
     conversation_history = json.dumps(state.get("conversation_history", []), ensure_ascii=False)
     scenario_description = state.get("scenario_description") or "无"
+    failed_categories = state.get("failed_categories", [])
+    failed_categories_str = json.dumps(failed_categories, ensure_ascii=False) if failed_categories else "无"
 
     prompt = (
         OPTION_GEN_SYSTEM
@@ -33,6 +35,7 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
         .replace("{products_summary}", products_summary)
         .replace("{conversation_history}", conversation_history)
         .replace("{scenario_description}", scenario_description)
+        .replace("{failed_categories}", failed_categories_str)
     )
     messages = [
         {"role": "system", "content": prompt},
