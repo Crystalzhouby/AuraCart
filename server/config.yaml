@@ -37,6 +37,7 @@ search:
   reasoning_max_chars: 500
   max_category_concurrency: 5
   max_batch_ids: 20
+  memory_max_tokens: 2000
 
 # ---- 日志 ----
 log:

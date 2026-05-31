@@ -6,6 +6,7 @@ Intent Extraction 节点 — 明确商品需求路径。
 """
 import json
 import structlog
+from app.config import settings
 from app.rag.prompt import QUERY_PARSE_SYSTEM
 from app.services.llm import LLMService
 
@@ -74,9 +75,9 @@ async def extraction_node(state: dict, llm: LLMService) -> dict:
     new_entry = {"sub_queries": subs_dicts}
     new_history = conversation_history + [new_entry]
 
-    # 写时截断（2000 token）
+    # 写时截断（使用配置驱动的 token 上限）
     from app.agent.memory import truncate_by_tokens
-    new_history = truncate_by_tokens(new_history, max_tokens=2000, logger=logger)
+    new_history = truncate_by_tokens(new_history, max_tokens=settings.search.memory_max_tokens, logger=logger)
 
     return {
         "requirements": {"sub_queries": subs_dicts},

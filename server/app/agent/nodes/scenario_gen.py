@@ -6,6 +6,7 @@ Scenario Gen 节点 — 场景化需求路径。
 """
 import json
 import structlog
+from app.config import settings
 from app.agent.prompts.scenario_gen_prompt import SCENARIO_GEN_SYSTEM
 from app.services.llm import LLMService
 
@@ -71,7 +72,7 @@ async def scenario_gen_node(state: dict, llm: LLMService, category_list: str = "
     new_entry = {"sub_queries": subs_dicts}
     new_history = conversation_history + [new_entry]
     from app.agent.memory import truncate_by_tokens
-    new_history = truncate_by_tokens(new_history, max_tokens=2000, logger=logger)
+    new_history = truncate_by_tokens(new_history, max_tokens=settings.search.memory_max_tokens, logger=logger)
 
     return {
         "scenario_description": scenario_description,

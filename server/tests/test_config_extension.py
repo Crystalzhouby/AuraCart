@@ -46,8 +46,17 @@ def test_settings_from_yaml_loads_all_fields():
     assert isinstance(s.database.max_overflow, int)
     assert isinstance(s.search.max_category_concurrency, int)
     assert isinstance(s.search.max_batch_ids, int)
+    assert isinstance(s.search.memory_max_tokens, int)
     # 验证默认值合理
     assert s.database.pool_size >= 5
     assert s.database.max_overflow >= 0
     assert s.search.max_category_concurrency >= 1
     assert s.search.max_batch_ids >= 1
+    assert s.search.memory_max_tokens >= 500
+
+
+def test_search_memory_max_tokens_default():
+    """SearchSettings 应有 memory_max_tokens 字段，默认 2000。"""
+    s = Settings.from_yaml()
+    assert hasattr(s.search, "memory_max_tokens")
+    assert s.search.memory_max_tokens == 2000

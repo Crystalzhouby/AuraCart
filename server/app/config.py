@@ -141,6 +141,9 @@ class SearchSettings(BaseSettings):
     max_batch_ids: int = 20
     """Batch API 单次请求允许的最大 ID 数量。"""
 
+    memory_max_tokens: int = 2000
+    """Memory 截断的 token 数上限（char/4 估算）。"""
+
 
 class SyncSettings(BaseSettings):
     """后台数据同步循环的配置。"""
