@@ -6,6 +6,8 @@ database:
   password: "123456"
   dbname: "ecommerce"
   vector_dim: 1024
+  pool_size: 8
+  max_overflow: 5
 
 # ---- Embedding (OpenAI 兼容) ----
 embedding:
@@ -33,6 +35,8 @@ search:
     faq: 1.0
     user_review: 0.7
   reasoning_max_chars: 500
+  max_category_concurrency: 5
+  max_batch_ids: 20
 
 # ---- 日志 ----
 log:

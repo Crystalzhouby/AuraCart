@@ -51,6 +51,12 @@ class DatabaseSettings(BaseSettings):
     vector_dim: int = 1024
     """pgvector 向量维度（必须与 embedding 模型输出维度一致）。"""
 
+    pool_size: int = 8
+    """SQLAlchemy 连接池常驻连接数。"""
+
+    max_overflow: int = 5
+    """SQLAlchemy 连接池溢出上限。"""
+
     @property
     def url(self) -> str:
         """
@@ -128,6 +134,12 @@ class SearchSettings(BaseSettings):
 
     reasoning_max_chars: int = 200
     """推荐理由生成的字数软约束。LLM 遵循度 ±30%，不做代码级强制截断。"""
+
+    max_category_concurrency: int = 5
+    """品类并行检索的最大并发数，启动时加载，运行时不动态调整。"""
+
+    max_batch_ids: int = 20
+    """Batch API 单次请求允许的最大 ID 数量。"""
 
 
 class SyncSettings(BaseSettings):

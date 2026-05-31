@@ -18,7 +18,12 @@ from app.config import settings
 
 # 绑定到应用数据库的异步引擎
 # echo=False 在生产环境中抑制 SQL 查询日志
-engine = create_async_engine(settings.database.url, echo=False)
+engine = create_async_engine(
+    settings.database.url,
+    echo=False,
+    pool_size=settings.database.pool_size,
+    max_overflow=settings.database.max_overflow,
+)
 
 # 异步会话工厂 —— 每次调用产生一个新的 AsyncSession
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
