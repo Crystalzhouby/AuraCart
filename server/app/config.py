@@ -258,6 +258,9 @@ class Settings(BaseSettings):
 
         # --- 从 YAML 各节构建独立的配置组 ---
         db_data = data.get("database", {})
+        # 允许 Docker 环境变量覆盖数据库连接参数
+        db_data["host"] = os.environ.get("DB_HOST", db_data.get("host", "localhost"))
+        db_data["port"] = int(os.environ.get("DB_PORT", db_data.get("port", 5432)))
         db = DatabaseSettings(**db_data)
 
         emb_data = data.get("embedding", {})

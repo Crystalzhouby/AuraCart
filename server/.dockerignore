@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Logs
+log/
+*.log
+
+# Tests
+tests/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Documentation
+docs/
+README.md
+
+# Data (mounted as volume)
+ecommerce_agent_dataset/
+
+# Config secrets
+.secrets.yaml

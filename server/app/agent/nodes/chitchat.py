@@ -47,8 +47,9 @@ async def chitchat_node(state: dict, llm: LLMService) -> dict:
         logger.warning("ChitChat LLM 调用失败，使用 fallback", error=str(e))
         reply = FALLBACK_REPLY
 
-    # 通过 SSE 队列发送 chat_reply 事件
+    # 通过 SSE 队列发送 chat_reply 事件，然后发送 done
     if queue:
         await queue.put({"event": "chat_reply", "data": reply})
+        await queue.put({"event": "done", "data": {}})
 
     return {"chat_reply": reply}

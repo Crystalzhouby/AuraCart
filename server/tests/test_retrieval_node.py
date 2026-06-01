@@ -174,7 +174,7 @@ async def test_send_reasoning_sequential_skips_failed():
     while not queue.empty():
         events.append(queue.get_nowait())
 
-    # 失败的品类不发送 events (done 由 retrieval_node 发送)
+    # 失败的品类不发送 events (done 由终端节点 option_gen 发送)
     reasoning_events = [e for e in events if e["event"] == "reasoning"]
     assert len(reasoning_events) == 0
 
@@ -226,7 +226,7 @@ async def test_retrieval_node_sends_sequential_reasoning():
         events.append(queue.get_nowait())
 
     event_types = [e["event"] for e in events]
-    assert "done" in event_types
-    # done 事件应包含 total_categories
-    done_event = [e for e in events if e["event"] == "done"][0]
-    assert "total_categories" in done_event["data"]
+    # retrieval 是中间节点，不再发送 done（done 由终端节点 option_gen 发送）
+    assert "done" not in event_types
+    # 在 mock 场景下品类任务可能失败，这不影响 retrieval 节点的正确性
+    # 关键验证：节点返回了正确结构，且未能发送 done（职责已移交给 option_gen）

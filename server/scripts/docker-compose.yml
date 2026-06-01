@@ -10,4 +10,9 @@ services:
       - "5432:5432"
     volumes:
       - ~/pgdata:/var/lib/postgresql/data
-    restart: always
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

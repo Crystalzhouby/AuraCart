@@ -344,8 +344,17 @@ async def _agent_event_stream(
 
     finally:
         # 清理 graph 任务
-        if not graph_task.done():
-            graph_task.cancel()
+        if done_received:
+            # 正常完成：等待 graph 终态以获得 next_options
+            try:
+                await asyncio.wait_for(asyncio.shield(graph_task), timeout=10.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                if not graph_task.done():
+                    graph_task.cancel()
+        else:
+            # graph 未正常完成（错误/超时）→ 取消
+            if not graph_task.done():
+                graph_task.cancel()
 
         # 发送 next_options（从 graph 最终状态读取）
         if done_received and graph_task.done() and not graph_task.cancelled():

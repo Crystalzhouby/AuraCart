@@ -331,16 +331,6 @@ async def retrieval_node(
     # Step 5: 聚合 products_summary
     products_summary, failed_categories = _aggregate_results(safe_results)
 
-    # Step 6: 发送 done 事件
-    if queue:
-        await queue.put({
-            "event": "done",
-            "data": {
-                "total_categories": len(groups),
-                "failed_categories": failed_categories,
-            }
-        })
-
     return {
         "products_summary": products_summary,
         "failed_categories": [f["sub_category"] for f in failed_categories],

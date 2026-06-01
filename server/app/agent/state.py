@@ -2,10 +2,10 @@
 AgentState 定义 — LangGraph 工作流共享状态的类型结构。
 
 使用 Python TypedDict 定义，通过 Annotated[list, add] 实现
-conversation_history 的自动累加。_sse_queue 作为隐藏字段，
-不参与 LangGraph State 序列化，仅用于 SSE 事件通道。
+conversation_history 的自动累加。_sse_queue 作为 SSE 事件通道，
+必须在 TypedDict 中声明，否则 LangGraph 节点间传递时会将其丢弃。
 """
-from typing import TypedDict, Annotated
+from typing import TypedDict, Annotated, Any
 from operator import add
 
 
@@ -23,10 +23,7 @@ class AgentState(TypedDict):
         chat_reply: Chit-Chat 输出文本。
         next_options: Option Gen 输出的下一步选项列表。
         failed_categories: 检索失败的品类列表。
-
-    注意:
-        _sse_queue 不在 TypedDict 声明中，通过 state["_sse_queue"] = queue
-        在 graph 执行前动态注入。节点通过 state.get("_sse_queue") 获取。
+        _sse_queue: asyncio.Queue，SSE 事件通道。不参与序列化/持久化。
     """
 
     user_query: str
@@ -39,3 +36,4 @@ class AgentState(TypedDict):
     chat_reply: str
     next_options: list[str]
     failed_categories: list[str]
+    _sse_queue: Any

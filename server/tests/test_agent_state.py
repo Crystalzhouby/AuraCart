@@ -55,8 +55,8 @@ def test_agent_state_sse_queue_injection():
     assert state["_sse_queue"] is queue
 
 
-def test_agent_state_sse_queue_not_in_keys_by_default():
-    """_sse_queue 不应出现在 AgentState 的默认字段中（不参与 LangGraph State 序列化）。"""
+def test_agent_state_sse_queue_in_annotations():
+    """_sse_queue 必须在 AgentState 的 __annotations__ 中，确保 LangGraph 节点间传递时保留该字段。"""
     state = AgentState(
         user_query="test",
         conversation_history=[],
@@ -69,8 +69,9 @@ def test_agent_state_sse_queue_not_in_keys_by_default():
         failed_categories=[],
         scenario_description=None,
     )
-    # _sse_queue 不在 TypedDict 的 __annotations__ 中（类级别检查）
-    assert "_sse_queue" not in AgentState.__annotations__
+    # _sse_queue 必须在 AgentState TypedDict 中，否则 LangGraph 在节点间传递时
+    # 会将其丢弃，导致 SSE 事件无法发送到客户端。
+    assert "_sse_queue" in AgentState.__annotations__
 
 
 @pytest.mark.asyncio

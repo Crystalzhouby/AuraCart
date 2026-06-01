@@ -109,14 +109,16 @@ class Generator:
         return "\n".join(lines)
 
     @staticmethod
-    def _format_sub_queries(sub_queries: list[dict] | None) -> str:
+    def _format_sub_queries(sub_queries: list | None) -> str:
         """将 sub_queries 列表格式化为自然语言文本。
 
         只提取 text 非空且非空白字符的子查询。structured_filter 的 text 通常为空，
         已经在 DB 层完成过滤，不需要 LLM 再关注。
 
+        兼容 dict 和 SubQuery 对象两种输入（API 层传 dict，Agent 层传 SubQuery）。
+
         参数：
-            sub_queries: 查询解析阶段产出的子查询列表，或 None。
+            sub_queries: 查询解析阶段产出的子查询列表（dict 或 SubQuery），或 None。
 
         返回：
             格式化后的自然语言字符串；sub_queries 为空/None 或无可展示项时返回 ""。
@@ -126,7 +128,11 @@ class Generator:
 
         items: list[str] = []
         for sq in sub_queries:
-            text = (sq.get("text") or "").strip()
+            # 兼容 dict 和 SubQuery dataclass
+            if isinstance(sq, dict):
+                text = (sq.get("text") or "").strip()
+            else:
+                text = (getattr(sq, "text", None) or "").strip()
             if text:
                 items.append(text)
 
