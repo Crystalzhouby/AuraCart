@@ -17,8 +17,11 @@ from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
+import structlog
 from app.services.embedding import EmbeddingService
 from app.config import settings
+
+logger = structlog.get_logger("agent.retrieval")
 
 
 __all__ = ["Retriever", "SubQuery", "SKUHit", "Filters", "FilterClause"]
@@ -331,6 +334,7 @@ class Retriever:
         params.update(w_params)  # 合并 source 权重参数
 
         sql = text(sql_str)
+        logger.info("semantic_search SQL", sql=sql_str, params={k: str(v)[:80] for k, v in params.items()})
         result = await self.db.execute(sql, params)
         rows = result.fetchall()
 
@@ -380,10 +384,9 @@ class Retriever:
                         sql_with_where
                         + " ORDER BY score DESC LIMIT :limit"
                     )
-                    result = await self.db.execute(
-                        sql,
-                        {"tsv_config": tsv_config, "kw": sub.text.strip(), "limit": top_k, **filters._all_params(), **w_params},
-                    )
+                    kw_params = {"tsv_config": tsv_config, "kw": sub.text.strip(), "limit": top_k, **filters._all_params(), **w_params}
+                    logger.info("keyword_search SQL (tsvector)", config=tsv_config, sql=sql_with_where, params={k: str(v)[:80] for k, v in kw_params.items()})
+                    result = await self.db.execute(sql, kw_params)
                     rows = result.fetchall()
                     if rows:
                         break
@@ -391,13 +394,14 @@ class Retriever:
                     await self.db.rollback()
                     continue
 
-            # 降级：ILIKE
+            # 降级：ILIKE（同时搜索产品字段和评价内容）
             if not rows:
                 base_sql = self._build_base_query(
                     filters, f"{weight_expr} * 0.3 AS score"
                 )
                 where_extra = (
-                    "p.brand ILIKE :pat OR p.category ILIKE :pat OR p.title ILIKE :pat"
+                    "pr.content ILIKE :pat OR p.brand ILIKE :pat "
+                    "OR p.category ILIKE :pat OR p.title ILIKE :pat"
                 )
                 if "WHERE" in base_sql:
                     sql_str = base_sql + " AND (" + where_extra + ") LIMIT :limit"
@@ -405,10 +409,9 @@ class Retriever:
                     sql_str = base_sql + " WHERE " + where_extra + " LIMIT :limit"
 
                 sql = text(sql_str)
-                result = await self.db.execute(
-                    sql,
-                    {"pat": f"%{sub.text}%", "limit": top_k, **filters._all_params(), **w_params},
-                )
+                ilike_params = {"pat": f"%{sub.text}%", "limit": top_k, **filters._all_params(), **w_params}
+                logger.info("keyword_search SQL (ILIKE fallback)", sql=sql_str, params={k: str(v)[:80] for k, v in ilike_params.items()})
+                result = await self.db.execute(sql, ilike_params)
                 rows = result.fetchall()
 
             for r in rows:

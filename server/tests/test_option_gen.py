@@ -18,7 +18,7 @@ async def test_option_gen_basic():
 
     state = {
         "requirements": {"sub_queries": [{"text": "跑鞋", "strategy": "keyword"}]},
-        "products_summary": [
+        "retrieval_results": [
             {"product_id": "p001", "sku_id": "sk001", "title": "安踏C202", "price": 399,
              "category": "运动户外", "sub_category": "跑鞋"}
         ],
@@ -39,7 +39,7 @@ async def test_option_gen_fallback_on_error():
 
     state = {
         "requirements": {"sub_queries": [{"text": "test"}]},
-        "products_summary": [],
+        "retrieval_results": [],
         "conversation_history": [],
         "scenario_description": None,
     }
@@ -59,7 +59,7 @@ async def test_option_gen_truncates_too_many():
 
     state = {
         "requirements": {"sub_queries": []},
-        "products_summary": [],
+        "retrieval_results": [],
         "conversation_history": [],
         "scenario_description": None,
     }
@@ -89,21 +89,21 @@ async def test_option_gen_injects_failed_categories_into_prompt():
 
     state = {
         "requirements": {"sub_queries": [{"text": "test"}]},
-        "products_summary": [],
+        "retrieval_results": [],
         "conversation_history": [],
         "scenario_description": None,
         "failed_categories": ["防晒霜", "墨镜"],  # 检索失败的品类
     }
     await option_gen_node(state, llm=mock_llm)
 
-    # 验证提示词中注入了失败品类信息（区别于 products_summary）
+    # 验证提示词中注入了失败品类信息（区别于 retrieval_results）
     assert len(captured_system_content) == 1
     prompt = captured_system_content[0]
 
     # 应该包含格式化的失败品类列表
     assert "防晒霜" in prompt
     assert "墨镜" in prompt
-    # 不应是 products_summary 中的（已设为空），应来自 failed_categories 注入
+    # 不应是 retrieval_results 中的（已设为空），应来自 failed_categories 注入
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,7 @@ async def test_option_gen_omits_failed_categories_when_empty():
 
     state = {
         "requirements": {"sub_queries": []},
-        "products_summary": [],
+        "retrieval_results": [],
         "conversation_history": [],
         "scenario_description": None,
         "failed_categories": [],
@@ -136,7 +136,7 @@ async def test_option_gen_empty_failed_categories():
 
     state = {
         "requirements": {"sub_queries": []},
-        "products_summary": [],
+        "retrieval_results": [],
         "conversation_history": [],
         "scenario_description": None,
         "failed_categories": [],

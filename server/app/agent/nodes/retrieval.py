@@ -6,7 +6,7 @@ Product Retrieval 节点 — 最复杂节点。
 2. 按 sub_category 分组（三级回退）
 3. 并行检索 + Generator 流式生成（asyncio.Semaphore，独立 session）
 4. 品类顺序式 SSE 发送（products + reasoning 事件，由 retrieval_node 统一发送）
-5. 聚合 products_summary + failed_categories
+5. 聚合 retrieval_results + failed_categories
 """
 import asyncio
 import json
@@ -25,18 +25,32 @@ logger = structlog.get_logger("agent.retrieval")
 def _group_sub_queries(sub_queries: list[dict]) -> dict[str, list[dict]]:
     """按 sub_category 分组，三级回退：sub_category → category → default。
 
+    structured_filter 子查询（如价格过滤）会被合并到所有非 default 分组中，
+    确保过滤条件与关键词/语义搜索同时生效。
+
     参数:
         sub_queries: 字典形式的 SubQuery 列表。
 
     返回值:
         分组后的字典，key 为品类路由键。
     """
+    # 分离 structured_filter 和普通子查询
+    filter_subs = [sq for sq in sub_queries if sq.get("strategy") == "structured_filter"]
+    normal_subs = [sq for sq in sub_queries if sq.get("strategy") != "structured_filter"]
+
     groups: dict[str, list[dict]] = {}
-    for sq in sub_queries:
+    for sq in normal_subs:
         key = sq.get("sub_category") or sq.get("category") or "default"
         if key not in groups:
             groups[key] = []
         groups[key].append(sq)
+
+    # 将 structured_filter 合并到所有非 default 分组中
+    if filter_subs and groups:
+        for key in list(groups.keys()):
+            if key != "default":
+                groups[key].extend(filter_subs)
+
     return groups
 
 
@@ -45,12 +59,12 @@ def _aggregate_results(results: list[dict]) -> tuple[list[dict], list[dict]]:
 
     参数:
         results: 品类任务返回的结构化结果列表，每项格式:
-            {category, sub_category, products_summary, error}
+            {category, sub_category, skus, error}
 
     返回值:
-        (products_summary, failed_categories)
+        (retrieval_results, failed_categories)
     """
-    products_summary = []
+    retrieval_results = []
     failed_categories = []
     for r in results:
         if r["error"]:
@@ -60,8 +74,8 @@ def _aggregate_results(results: list[dict]) -> tuple[list[dict], list[dict]]:
                 "error": r["error"],
             })
         else:
-            products_summary.extend(r.get("products_summary", []))
-    return products_summary, failed_categories
+            retrieval_results.extend(r.get("skus", []))
+    return retrieval_results, failed_categories
 
 
 async def _filter_sub_queries(
@@ -113,7 +127,7 @@ async def _category_task(
 ) -> dict:
     """单个品类的检索任务（在独立 session 中执行）。
 
-    返回结构化结果: {category, sub_category, products_summary, product_ids, reasoning_text, error}
+    返回结构化结果: {category, sub_category, skus, product_ids, reasoning_text, error}
     """
     category = sub_queries[0].get("category", "") if sub_queries else ""
     sub_category = group_key if group_key != "default" else ""
@@ -136,6 +150,8 @@ async def _category_task(
             ]
 
             # 2. 检索
+            logger.info(f"品类 [{category}/{sub_category}] 开始检索",
+                        sub_queries=[s.text for s in subs], count=len(subs))
             retriever = Retriever(db=db, emb=emb_service)
             retrieve_result = await retriever.retrieve(
                 subs, top_k=settings.search.top_k_per_query
@@ -151,11 +167,14 @@ async def _category_task(
                 semantic_ranked=retrieve_result["semantic"],
             )
 
+            logger.info(f"品类 [{category}/{sub_category}] 检索完成",
+                        sku_count=len(ranked))
+
             if not ranked:
                 return {
                     "category": category,
                     "sub_category": sub_category,
-                    "products_summary": [],
+                    "skus": [],
                     "product_ids": [],
                     "reasoning_text": "",
                     "error": None,
@@ -171,15 +190,7 @@ async def _category_task(
                 for s in skus
             ]
 
-            # 6. 提取 products_summary
-            summary = [
-                {"product_id": s["product_id"], "sku_id": s["sku_id"],
-                 "title": s["title"], "price": s["price"],
-                 "category": category, "sub_category": sub_category}
-                for s in skus
-            ]
-
-            # 7. Generator 流式生成推荐理由（缓冲后统一发送——品类顺序式 Q1 方案B）
+            # 6. Generator 流式生成推荐理由（缓冲后统一发送——品类顺序式 Q1 方案B）
             generator = Generator(llm=llm)
             tokens: list[str] = []
             agen = generator.generate(skus, user_query, sub_queries=subs)
@@ -202,12 +213,15 @@ async def _category_task(
                 logger.warning(f"Generator 异常: {category}/{sub_category}", error=str(gen_err))
 
             # 缓冲 token，拼接为完整文本后由 retrieval_node 统一按品类顺序发送 SSE
+            reasoning_text = "".join(tokens)
+            logger.info(f"品类 [{category}/{sub_category}] 推荐理由",
+                        reasoning_preview=reasoning_text[:200])
             return {
                 "category": category,
                 "sub_category": sub_category,
-                "products_summary": summary,
+                "skus": skus,
                 "product_ids": product_ids,
-                "reasoning_text": "".join(tokens),
+                "reasoning_text": reasoning_text,
                 "error": None,
             }
 
@@ -216,7 +230,7 @@ async def _category_task(
         return {
             "category": category,
             "sub_category": sub_category,
-            "products_summary": [],
+            "skus": [],
             "product_ids": [],
             "reasoning_text": "",
             "error": str(e),
@@ -240,14 +254,14 @@ async def retrieval_node(
         _sse_queue: SSE 事件队列（可选）。
 
     返回值:
-        dict: {"products_summary": [...], "failed_categories": [...]}
+        dict: {"retrieval_results": [...], "failed_categories": [...]}
     """
     user_query = state.get("user_query", "")
     sub_queries = state.get("requirements", {}).get("sub_queries", [])
     queue = _sse_queue or state.get("_sse_queue")
 
     if not sub_queries:
-        return {"products_summary": [], "failed_categories": []}
+        return {"retrieval_results": [], "failed_categories": []}
 
     # Step 1: LLM 需求筛选
     filtered_subs = await _filter_sub_queries(sub_queries, user_query, llm)
@@ -275,7 +289,7 @@ async def retrieval_node(
             key = group_key_list[i] if i < len(group_key_list) else "unknown"
             safe_results.append({
                 "category": "", "sub_category": key,
-                "products_summary": [], "product_ids": [],
+                "skus": [], "product_ids": [],
                 "reasoning_text": "", "error": str(r),
             })
         else:
@@ -302,10 +316,10 @@ async def retrieval_node(
                     }
                 })
 
-    # Step 5: 聚合 products_summary
-    products_summary, failed_categories = _aggregate_results(safe_results)
+    # Step 5: 聚合 retrieval_results
+    retrieval_results, failed_categories = _aggregate_results(safe_results)
 
     return {
-        "products_summary": products_summary,
+        "retrieval_results": retrieval_results,
         "failed_categories": [f["sub_category"] for f in failed_categories],
     }

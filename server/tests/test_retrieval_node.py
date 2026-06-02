@@ -44,12 +44,12 @@ def test_group_sub_queries_fallback_to_default():
 
 
 def test_aggregate_results_success():
-    """成功的品类结果应汇总到 products_summary。"""
+    """成功的品类结果应汇总到 retrieval_results。"""
     results = [
-        {"category": "面部护肤", "sub_category": "防晒霜", "products_summary": [
+        {"category": "面部护肤", "sub_category": "防晒霜", "skus": [
             {"product_id": "p1", "sku_id": "sk1", "title": "安热沙", "price": 198}
         ], "error": None},
-        {"category": "服饰", "sub_category": "墨镜", "products_summary": [
+        {"category": "服饰", "sub_category": "墨镜", "skus": [
             {"product_id": "p2", "sku_id": "sk2", "title": "雷朋", "price": 599}
         ], "error": None},
     ]
@@ -61,10 +61,10 @@ def test_aggregate_results_success():
 def test_aggregate_results_with_failures():
     """失败的品类应在 failed_categories 中，成功的正常汇总。"""
     results = [
-        {"category": "面部护肤", "sub_category": "防晒霜", "products_summary": [
+        {"category": "面部护肤", "sub_category": "防晒霜", "skus": [
             {"product_id": "p1", "sku_id": "sk1", "title": "安热沙", "price": 198}
         ], "error": None},
-        {"category": "服饰", "sub_category": "墨镜", "products_summary": [], "error": "LLM timeout"},
+        {"category": "服饰", "sub_category": "墨镜", "skus": [], "error": "LLM timeout"},
     ]
     summary, failed = _aggregate_results(results)
     assert len(summary) == 1  # 只有成功的
@@ -108,7 +108,7 @@ async def test_retrieval_node_basic():
         async_session_factory=mock_session_factory,
         _sse_queue=None,
     )
-    assert "products_summary" in result
+    assert "retrieval_results" in result
     assert "failed_categories" in result
 
 
@@ -126,14 +126,14 @@ async def test_retrieval_node_inline_sse_sends_products_and_reasoning():
     safe_results = [
         {
             "category": "防晒", "sub_category": "防晒霜",
-            "products_summary": [{"product_id": "p1", "sku_id": "s1", "title": "安热沙", "price": 198}],
+            "skus": [{"product_id": "p1", "sku_id": "s1", "title": "安热沙", "price": 198}],
             "product_ids": [{"product_id": "p1", "sku_id": "s1", "category": "防晒", "sub_category": "防晒霜"}],
             "reasoning_text": "安热沙推荐理由",
             "error": None,
         },
         {
             "category": "服饰", "sub_category": "墨镜",
-            "products_summary": [{"product_id": "p2", "sku_id": "s2", "title": "雷朋", "price": 599}],
+            "skus": [{"product_id": "p2", "sku_id": "s2", "title": "雷朋", "price": 599}],
             "product_ids": [{"product_id": "p2", "sku_id": "s2", "category": "服饰", "sub_category": "墨镜"}],
             "reasoning_text": "雷朋推荐理由",
             "error": None,
@@ -182,7 +182,7 @@ async def test_retrieval_node_inline_sse_skips_failed_categories():
     safe_results = [
         {
             "category": "", "sub_category": "防晒霜",
-            "products_summary": [], "product_ids": [],
+            "skus": [], "product_ids": [],
             "reasoning_text": "", "error": "timeout",
         },
     ]

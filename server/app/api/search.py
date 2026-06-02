@@ -285,7 +285,7 @@ async def _agent_event_stream(
         "is_scenario": False,
         "requirements": {},
         "scenario_description": None,
-        "products_summary": [],
+        "retrieval_results": [],
         "chat_reply": "",
         "next_options": [],
         "failed_categories": [],

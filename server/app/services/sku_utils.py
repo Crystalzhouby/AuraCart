@@ -8,6 +8,7 @@ SKU 工具函数模块。
 - _truncate_texts: 按 source 优先级排序后截断匹配文本列表
 - _get_skus: 将 SKUHit 列表填充为扁平 SKU 字典
 """
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.product import Product
@@ -15,6 +16,8 @@ from app.models.sku import Sku
 from app.models.product_review import ProductReview
 from app.services.retriever import SKUHit
 from app.config import settings
+
+logger = structlog.get_logger("agent.retrieval")
 
 # source → 优先级（数值越小优先级越高），供 _truncate_texts 排序
 _SOURCE_PRIORITY = {"faq": 0, "marketing": 1, "user_review": 2}
@@ -89,7 +92,7 @@ async def _get_skus(
     sku_ids = [h.sku_id for h in skuhits]
 
     # 批量查询 SKU + JOIN product + LEFT JOIN product_review，一次 SQL 完成
-    rows = await db.execute(
+    stmt = (
         select(
             Product.product_id, Product.title, Product.brand,
             Product.category, Product.sub_category, Product.base_price,
@@ -104,6 +107,10 @@ async def _get_skus(
             Product.is_active == True,
         )
     )
+    logger.info("_get_skus SQL",
+                sql=str(stmt.compile(compile_kwargs={"literal_binds": True})),
+                sku_ids=sku_ids[:20])
+    rows = await db.execute(stmt)
 
     # 按 sku_id 聚合：LEFT JOIN 会导致同一 SKU 出现多行（每个 product_review 一行）
     row_by_sku: dict[str, dict] = {}

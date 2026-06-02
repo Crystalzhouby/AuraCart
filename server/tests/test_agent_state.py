@@ -18,7 +18,7 @@ def test_agent_state_default_values():
         intent="",
         is_scenario=False,
         requirements={"sub_queries": []},
-        products_summary=[],
+        retrieval_results=[],
         chat_reply="",
         next_options=[],
         failed_categories=[],
@@ -29,7 +29,7 @@ def test_agent_state_default_values():
     assert state["intent"] == ""
     assert state["is_scenario"] is False
     assert state["requirements"] == {"sub_queries": []}
-    assert state["products_summary"] == []
+    assert state["retrieval_results"] == []
     assert state["chat_reply"] == ""
     assert state["next_options"] == []
     assert state["failed_categories"] == []
@@ -44,7 +44,7 @@ def test_agent_state_sse_queue_injection():
         intent="",
         is_scenario=False,
         requirements={"sub_queries": []},
-        products_summary=[],
+        retrieval_results=[],
         chat_reply="",
         next_options=[],
         failed_categories=[],
@@ -63,7 +63,7 @@ def test_agent_state_sse_queue_in_annotations():
         intent="",
         is_scenario=False,
         requirements={"sub_queries": []},
-        products_summary=[],
+        retrieval_results=[],
         chat_reply="",
         next_options=[],
         failed_categories=[],
@@ -83,7 +83,7 @@ async def test_sse_queue_put_get():
         intent="",
         is_scenario=False,
         requirements={"sub_queries": []},
-        products_summary=[],
+        retrieval_results=[],
         chat_reply="",
         next_options=[],
         failed_categories=[],

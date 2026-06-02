@@ -19,7 +19,7 @@ class AgentState(TypedDict):
         is_scenario: True=场景化需求, False=明确商品需求。
         requirements: {"sub_queries": [...]}，SubQuery 列表的容器。
         scenario_description: 场景原文，仅 Scenario 路径填写。
-        products_summary: 各品类检索结果的轻量摘要聚合。
+        retrieval_results: 各品类检索结果（完整 SKU 含 matched_texts）。
         chat_reply: Chit-Chat 输出文本。
         next_options: Option Gen 输出的下一步选项列表。
         failed_categories: 检索失败的品类列表。
@@ -32,7 +32,7 @@ class AgentState(TypedDict):
     is_scenario: bool
     requirements: dict
     scenario_description: str | None
-    products_summary: list[dict]
+    retrieval_results: list[dict]
     chat_reply: str
     next_options: list[str]
     failed_categories: list[str]

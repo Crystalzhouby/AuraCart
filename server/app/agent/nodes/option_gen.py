@@ -1,7 +1,8 @@
 """
 Option Gen 节点 — 推荐选项生成。
 
-从 AgentState 读取 products_summary，纯 LLM 调用生成 2-4 条下一步推荐选项。
+从 AgentState 读取 retrieval_results（含商品基础信息 + matched_texts），
+    纯 LLM 调用生成 2-4 条下一步推荐选项。
 零 DB 访问。
 """
 import json
@@ -23,7 +24,7 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
         dict: {"next_options": [...]}
     """
     requirements = json.dumps(state.get("requirements", {}), ensure_ascii=False)
-    products_summary = json.dumps(state.get("products_summary", []), ensure_ascii=False)
+    retrieval_results = json.dumps(state.get("retrieval_results", []), ensure_ascii=False)
     conversation_history = json.dumps(state.get("conversation_history", []), ensure_ascii=False)
     scenario_description = state.get("scenario_description") or "无"
     failed_categories = state.get("failed_categories", [])
@@ -32,7 +33,7 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
     prompt = (
         OPTION_GEN_SYSTEM
         .replace("{requirements}", requirements)
-        .replace("{products_summary}", products_summary)
+        .replace("{retrieval_results}", retrieval_results)
         .replace("{conversation_history}", conversation_history)
         .replace("{scenario_description}", scenario_description)
         .replace("{failed_categories}", failed_categories_str)
