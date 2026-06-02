@@ -11,6 +11,32 @@ LLM 服务模块
 """
 
 from openai import AsyncOpenAI
+import structlog
+
+logger = structlog.get_logger("services.llm")
+
+
+def _truncate_messages(messages: list[dict], max_len: int = 2000) -> list[dict]:
+    """截断 messages 中每条 content 字段，防止日志爆炸。
+
+    仅处理 str 类型的 content（多模态 content 保持不变）。
+    返回浅拷贝后的列表，不修改原始对象。
+
+    参数:
+        messages: 待截断的消息列表。
+        max_len: content 最大字符数。
+
+    返回值:
+        截断后的消息列表（浅拷贝）。
+    """
+    result: list[dict] = []
+    for msg in messages:
+        copy = dict(msg)
+        content = copy.get("content")
+        if isinstance(content, str) and len(content) > max_len:
+            copy["content"] = content[:max_len] + "...<truncated>"
+        result.append(copy)
+    return result
 
 
 class LLMService:
@@ -53,6 +79,11 @@ class LLMService:
         返回值：
             str：模型响应消息的完整文本内容。
         """
+        logger.debug("LLM chat request",
+            model=self.model,
+            temperature=temperature if temperature is not None else self.temperature,
+            messages=_truncate_messages(messages),
+        )
         resp = await self._client.chat.completions.create(
             model=self.model,
             messages=messages,
@@ -76,6 +107,11 @@ class LLMService:
             str：来自流式响应的增量文本内容块。
                 空内容块（例如 delta.content 为 None 时）将被跳过。
         """
+        logger.debug("LLM chat stream request",
+            model=self.model,
+            temperature=temperature if temperature is not None else self.temperature,
+            messages=_truncate_messages(messages),
+        )
         stream = await self._client.chat.completions.create(
             model=self.model,
             messages=messages,
