@@ -2,7 +2,8 @@
 
 整体采用 **LangGraph 工作流架构**，Agent 之间通过状态图（StateGraph）组织，
 共享 `AgentState` 作为状态通道。Memory 作为集中式会话记忆（append-only），
-由 Intent Extraction 和 Scenario Gen 分别写入，Product Retrieval 负责读取和 LLM 筛选。
+由 Product Retrieval 在检索完成后统一写入（避免 requirements 与 conversation_history
+在检索节点重复注入）。Product Retrieval 负责读取和 LLM 筛选。
 
 (1)  **意图路由与查询分类 (Intent Router)**
 
@@ -24,7 +25,7 @@
 的 QueryParser 共用同一份提示词。**具备品类标记能力**——在能确定品类时为 SubQuery 标注
 `category`/`sub_category` 字段，使 explicit 路径的 SubQuery 与 Scenario Gen 路径保持数据契约一致，
 Product Retrieval 可按 sub_category 分组而非全部归入 default 组。
-输出 SubQuery 列表写入 Memory。
+输出 `requirements.sub_queries` 到 Product Retrieval（Memory 写入延迟到检索完成后）。
 
 > **设计决策**：本节点不再输出 `topic_shift` 标志。话题切换的判断完全交由
 > Product Retrieval 的轻量级 LLM 筛选步骤处理，避免僵化的规则式判断
@@ -43,11 +44,12 @@ SubQuery 列表的全流程：
 2. **SubQuery 拆解**：直接在输出中按品类分组，每条 SubQuery 标注 `category` 和 `sub_category`
    （取值参考 category 查找表）
 
-输出：`scenario_description`（原始场景描述，供 Option Gen 使用）+ `requirements.sub_queries`。
+输出：`scenario_description`（原始场景描述，供 Option Gen 使用）+ `requirements.sub_queries`
+（Memory 写入延迟到 Product Retrieval 检索完成后统一处理）。
 
 (4)  **商品检索 (Product Retrieval)**
 
-从 Memory 读取完整 SubQuery 列表（含历史），执行多步操作：
+从 state 读取 SubQuery 列表（含历史），执行多步操作：
 
 - **LLM 需求筛选**：使用轻量级提示词，从 Memory 历史需求中筛选与当前用户查询相关的需求子集。
   输入窗口与 Memory 截断阈值一致（**2000 token**），不依赖 `topic_shift` 等规则式标志，
@@ -60,33 +62,38 @@ SubQuery 列表的全流程：
 - **独立 DB session**：每个并行任务通过 `async_session()` 创建**独立 AsyncSession**，
   从连接池获取独立连接，确保真正并发执行。连接池 `pool_size` ≥ `max_category_concurrency` + 3
   （默认 ≥ 8，预留 buffer 应对并发请求），`max_overflow` = 5。
-  共享 session 将导致 `InvalidRequestError`。
-- **渐进式返回**：每完成一个品类的检索+推荐理由生成，即通过 SSE 发送该品类结果；
+- **品类顺序式 SSE 返回**：各并行品类任务完成后由 `retrieval_node` 统一按品类顺序发送
+  products 和 reasoning SSE 事件（而非各品类独立流式返回）。
   **products 事件仅返回 `[{product_id, sku_id, category, sub_category}]`**。
-  前端通过新的 batch API（`/api/products/batch`、`/api/products/image/batch`、
-  `/api/sku/batch`）批量获取卡片所需的标题/价格/图片，大幅减少 HTTP 请求数。
-  推荐理由生成时 Generator 内部通过独立 session 按需 SQL 查询商品详细信息。
-- **提取 products_summary**：每品类检索完成后，从 Generator 已查询的商品详情中提取
-  轻量摘要（product_id / sku_id / title / price / category / sub_category），
-  聚合写入 `AgentState.products_summary`，供 Option Gen 使用（无需再次查库）。
+  前端通过 batch API（`/api/products/batch`、`/api/products/image/batch`、
+  `/api/sku/batch`）批量获取卡片所需的标题/价格/图片。
+- **增强日志**：每个品类检索前打印 sub_queries + 检索数量，检索后打印 SKU 数量，
+  推荐理由生成后打印前 200 字符预览。
+- **输出 retrieval_results**：聚合各品类检索结果（含完整 SKU 详情 + product_review
+  matched_texts），写入 `AgentState.retrieval_results`，供 Option Gen 使用。
+- **检索完成后写入 Memory**：在 Step 5（聚合）之后，将当前轮 `requirements` 追加到
+  `conversation_history`。通过 LangGraph `add` reducer 实现自动累加，
+  节点只返回新增条目 `[new_entry]`。
 
-输出：检索商品标识（按品类分组，渐进式返回）、推荐理由文本（流式 token）；
-`products_summary` 写入 AgentState 供 Option Gen 使用。
+输出：检索商品标识（按品类分组，品类顺序式返回）、推荐理由文本（流式 token）；
+`retrieval_results` 写入 AgentState 供 Option Gen 使用。
 
 (5)  **推荐选项生成 (Option Gen)**
 
 在 Product Retrieval **所有品类返回后执行一次**。
-从 **`AgentState.products_summary`** 读取全部商品的轻量摘要作为生成上下文，
-**无需访问数据库**。基于当前用户需求、全部已检索商品摘要、对话历史以及
+从 **`AgentState.retrieval_results`** 读取全部商品的检索结果（含完整 SKU 详情 +
+product_review matched_texts），**无需访问数据库**（商品基础信息和评价内容均已包含在
+`retrieval_results` 中）。基于当前用户需求、全部已检索商品（含评价原文）、对话历史以及
 （若触发场景路径）原始场景描述，生成 2-4 条下一步推荐选项。
 选项可灵活针对不同推荐品类的商品。
 战略上生成互补品推荐、替代品探索、属性细化、预算调整四类选项。
 输出追加到最终回复中。
 
 > **设计决策**：Option Gen 不再通过内部 SQL 查询商品详情。
-> Product Retrieval 各品类任务在检索完成时已获取全部商品详情（Generator 内部），
-> 顺手提取轻量摘要写入 AgentState，Option Gen 直接读取——零额外 DB 开销，
-> 数据一致性有保障（同一批查询结果），代码更简洁。
+> Product Retrieval 在检索阶段已将全部 SKU 详情（`_get_skus()` 返回的完整数据，
+> 含 title/price/properties 及 matched_texts / product_review 评价内容）聚合到
+> `retrieval_results` 中。Option Gen 直接读取——零额外 DB 开销，
+> 且评价原文（product_review）直接注入 LLM prompt，选项质量更高。
 
 (6)  **闲聊 (Chit-Chat)**
 
@@ -100,6 +107,11 @@ SubQuery 列表的全流程：
 每个元素仅存储 `{sub_queries}`（非完整对话轮次），按 token 数截断（阈值 **2000 token**，
 与 LLM 筛选输入窗口一致）。Token 计数采用简易估算 `len(json.dumps(history)) / 4`，无需额外依赖。
 
+**写入时机**：Product Retrieval 在检索完成后（Step 6）将当前 `requirements` 追加到
+`conversation_history`。Intent Extraction 和 Scenario Gen **不再直接写入 Memory**——
+它们仅返回 `requirements` 给 Product Retrieval，由后者在检索完成后统一写入。
+这避免了 `requirements` 和 `conversation_history` 同时传入检索节点时发生重复。
+
 **核心策略 — append-only + 写时截断 + 下游 LLM 筛选**：
 - Memory 本身不做删除或重置，所有历史需求持续保留。
 - 截断在**每次 append 后立即执行**（写时截断），允许截断不完整的需求组
@@ -110,8 +122,8 @@ SubQuery 列表的全流程：
   筛选输入窗口 2000 token（与截断阈值一致）。
 - 不依赖 `topic_shift` 等规则式判断——LLM 天然理解"跑鞋"与"运动袜"的跨品类关联。
 
-Memory 与 Intent Extraction / Scenario Gen 为写入关系，
-Memory 与 Product Retrieval 为只读 + LLM 筛选关系。
+Memory 与 Intent Extraction / Scenario Gen 为**只读**关系（读取历史用于需求合并），
+Memory 与 Product Retrieval 为**读写**关系（读取 + LLM 筛选 → 检索完成后写入）。
 
 ### Agent 间 SubQuery 数据契约
 
@@ -170,7 +182,7 @@ WHERE category IS NOT NULL AND sub_category IS NOT NULL;
 | Intent Router | 默认 `intent="recommend"`, `is_scenario=false` |
 | Intent Extraction | 回退为 `[SubQuery(text=user_query, strategy="semantic")]` |
 | Scenario Gen | 视为误判，回退到 Intent Extraction 做 explicit 分解 |
-| Product Retrieval | LLM 筛选失败 → 使用 Memory 全部 2000 token 历史；单品类检索失败 → 品类任务内 try/except，返回 `error` 字段（不抛异常），`failed_categories` 汇总记录，其他品类继续；全部失败 → 用原始 `user_query` 做语义检索兜底；失败品类不写入 products_summary |
+| Product Retrieval | LLM 筛选失败 → 使用 Memory 全部 2000 token 历史；单品类检索失败 → 品类任务内 try/except，返回 `error` 字段（不抛异常），`failed_categories` 汇总记录，其他品类继续；全部失败 → 用原始 `user_query` 做语义检索兜底；失败品类不写入 retrieval_results |
 | Option Gen | 跳过，回复末尾不追加选项 |
 | Chit-Chat | 返回硬编码兜底消息 |
 
@@ -187,14 +199,15 @@ graph TD
     router -->|"intent=recommend<br/>is_scenario=false"| extract["📋 意图提取<br/>Intent Extraction<br/>含品类标记能力"]
     router -->|"intent=recommend<br/>is_scenario=true"| scenario["🎯 场景需求生成与整合<br/>Scenario Gen<br/>品类参考: category_lookup表"]
 
-    memory_r[("🧠 Memory<br/>会话记忆<br/>2000 token 写时截断<br/>截断: 仅日志记录")] -->|"读取历史需求"| extract
-    extract -->|"需求提取完成<br/>写入Memory"| memory_r
+    memory_r[("🧠 Memory<br/>会话记忆<br/>2000 token 写时截断<br/>截断: 仅日志记录")] -->|"读取历史需求<br/>(只读)"| extract
+    memory_r -->|"读取历史需求<br/>(只读)"| scenario
 
-    scenario -->|"一次性端到端<br/>场景分析+SubQuery拆解<br/>写入Memory"| memory_r
+    extract -->|"requirements<br/>(不写入Memory)"| retrieve["🔍 商品检索<br/>Product Retrieval"]
+    scenario -->|"requirements + scenario_description<br/>(不写入Memory)"| retrieve
 
-    memory_r -->|"读取需求<br/>+ LLM筛选(2000 token)<br/>+ 按sub_category并行(max=5)<br/>独立DB session<br/>pool_size≥max+3"| retrieve["🔍 商品检索<br/>Product Retrieval"]
-    retrieve -->|"渐进式返回 SSE:<br/>[{product_id,sku_id,category,sub_category}]<br/>+ reasoning<br/>+ products_summary→State"| END((END))
-    retrieve -->|"全部品类完成后<br/>products_summary→State"| options["✨ 推荐选项生成<br/>Option Gen<br/>读AgentState<br/>无需DB访问"]
+    retrieve -->|"检索完成后<br/>追加写入Memory<br/>(Step 6)"| memory_r
+    retrieve -->|"品类顺序式 SSE:<br/>[{product_id,sku_id,category,sub_category}]<br/>+ reasoning<br/>+ retrieval_results→State"| END((END))
+    retrieve -->|"全部品类完成后<br/>retrieval_results→State"| options["✨ 推荐选项生成<br/>Option Gen<br/>读AgentState<br/>无需DB访问"]
     options --> END
 
     chat --> END
@@ -208,12 +221,12 @@ graph TD
 | 2 | Intent Router | `intent == "chat"` | Chit-Chat | 识别为闲聊意图 |
 | 3 | Intent Router | `intent == "recommend"`, `is_scenario == false` | Intent Extraction | 明确商品需求，进入显式分解路径（含品类标记） |
 | 4 | Intent Router | `intent == "recommend"`, `is_scenario == true` | Scenario Gen | 场景化需求，进入场景路径（品类参考 category_lookup 表） |
-| 5 | Memory | Intent Extraction 读取 | Intent Extraction | 提取需求前读取历史需求，辅助合并判断 |
-| 6 | Intent Extraction | 需求提取完成 | Memory（写入） | SubQuery 列表写入会话记忆（写时截断 2000 token，截断仅日志记录） |
-| 7 | Scenario Gen | 场景分析 + SubQuery 拆解完成 | Memory（写入） | SubQuery 列表（带 category/sub_category）写入 |
-| 8 | Memory | Product Retrieval 读取 | Product Retrieval | 读取历史 + LLM 筛选(2000 token) + 按 sub_category 分组并行检索(max=5, 独立 session, pool_size≥max+3) |
-| 9 | Product Retrieval | 所有品类检索完成 | Option Gen | 渐进式 SSE 返回（ID + reasoning）+ products_summary 写入 AgentState |
-| 10 | Option Gen | 始终 | END | 读 AgentState.products_summary → 输出跨品类选项（无需 DB） |
+| 5 | Memory | Intent Extraction / Scenario Gen 读取 | Intent Extraction / Scenario Gen | 提取需求前读取历史需求，辅助合并判断（只读） |
+| 6 | Intent Extraction | 需求提取完成 | Product Retrieval | 输出 requirements（不写入 Memory）→ 进入检索 |
+| 7 | Scenario Gen | 场景分析 + SubQuery 拆解完成 | Product Retrieval | 输出 requirements + scenario_description（不写入 Memory）→ 进入检索 |
+| 8 | Product Retrieval | 检索完成后（Step 6） | Memory（写入） | 将当前 requirements 追加写入 conversation_history |
+| 9 | Product Retrieval | 所有品类检索完成 | Option Gen | 品类顺序式 SSE 返回（ID + reasoning）+ retrieval_results 写入 AgentState |
+| 10 | Option Gen | 始终 | END | 读 AgentState.retrieval_results → 输出跨品类选项（无需 DB） |
 | 11 | Chit-Chat | 始终 | END | 输出闲聊回复 |
 
 ## (3) Agent 协作设计要点
@@ -227,13 +240,13 @@ graph TD
   品类列表从 category_lookup 表动态注入提示词。
 - **两条路径在 Memory 处汇合**：无论走哪条路径，最终都产出统一的 SubQuery 列表写入 Memory，
   Product Retrieval 从 Memory 读取（含 LLM 筛选）后执行检索。
-- **Memory ↔ Intent Extraction 读写闭环**：Extraction 执行前从 Memory 读取历史需求；
-  执行后写入。Memory 采用 append-only + 写时截断策略（2000 token），
-  截断仅在日志记录。
-- **Memory → Scenario Gen 只写**：Scenario Gen 从 Router 接收输入，写入 Memory，不从 Memory 读取。
-- **Memory → Product Retrieval 只读 + LLM 筛选**：检索 Agent 读取完整历史，
+- **Memory ↔ Intent Extraction / Scenario Gen 只读**：Extraction 和 Scenario Gen 执行前
+  从 Memory 读取历史需求辅助合并判断，但**不直接写入 Memory**。写入延迟到
+  Product Retrieval 检索完成后统一执行，避免 requirements 与 conversation_history 重复。
+- **Memory → Product Retrieval 读写闭环**：检索 Agent 读取完整历史，
   使用轻量级 LLM 调用筛选相关需求子集（输入窗口 2000 token），
-  按 sub_category 分组并行渐进式检索。
+  按 sub_category 分组并行检索。检索完成后将当前 requirements 追加写入 Memory。
+  Memory 采用 append-only + 写时截断策略（2000 token），截断仅在日志记录。
 - **并行检索 + 独立 session**：多品类并行执行，最大并发数 5（config.yaml 可配，启动时加载），
   超出时分批并发。每个并行任务通过 `async_session()` 创建独立 `AsyncSession`，
   从连接池获取独立连接，避免共享 session 导致的 `InvalidRequestError`。
@@ -242,9 +255,10 @@ graph TD
   前端通过 `/api/products/batch`、`/api/products/image/batch`、`/api/sku/batch`
   三个 batch API 批量获取标题/价格/图片，将请求数从最多 45 次降至 3 次。
   Generator 内部通过独立 session 按需 SQL 查询。
-- **Option Gen 零 DB 访问**：Product Retrieval 每品类检索完成后提取轻量摘要
-  （product_id/sku_id/title/price/category/sub_category）写入
-  `AgentState.products_summary`。Option Gen 直接从 State 读取，无需 session。
+- **Option Gen 零 DB 访问**：Product Retrieval 检索完成后将完整 SKU 详情
+  （含 title/price/properties 及 product_review matched_texts）聚合写入
+  `AgentState.retrieval_results`。Option Gen 直接从 State 读取，
+  商品基础信息和评价原文均已包含，无需 session。
 - **LangGraph 条件边**：Intent Router 使用两级 `add_conditional_edges` 实现三路分叉
   （chat / recommend+explicit / recommend+scenario）。
 - **无 topic_shift**：不依赖规则式话题切换检测，完全由 Product Retrieval 的 LLM 筛选步骤
@@ -260,8 +274,8 @@ graph TD
 | **Intent Router** | `user_query`, `conversation_history` | `intent`, `is_scenario` | 条件边 → Chit-Chat 或 Intent Extraction 或 Scenario Gen |
 | **Intent Extraction** | `user_query`, `conversation_history`（从 Memory 读） | `requirements: {sub_queries: [{..., category, sub_category}]}` | Memory（写入）→ Product Retrieval |
 | **Scenario Gen** | `user_query`, `conversation_history`, `category_list`（从 category_lookup 表读） | `scenario_description: str`, `requirements: {sub_queries: [{..., category, sub_category}]}` | Memory（写入）→ Product Retrieval；scenario_description → Option Gen |
-| **Product Retrieval** | `requirements.sub_queries`（从 Memory 读）, `user_query` | `products: [{product_id, sku_id, category, sub_category}]`（SSE 渐进式返回）, `reasoning: str`（流式 token）, `products_summary: [{product_id, sku_id, title, price, category, sub_category}]`（写入 AgentState） | END（用户可见，前端调 batch API 取详情）+ Option Gen（全部品类完成后，读 products_summary） |
-| **Option Gen** | `requirements`, `products_summary`（从 AgentState 读）, `conversation_history`, `scenario_description: str\|null` | `next_options: [str]` | END（追加到回复末尾） |
+| **Product Retrieval** | `requirements.sub_queries`（从 state 读）, `conversation_history`（从 Memory 读）, `user_query` | `products: [{product_id, sku_id, category, sub_category}]`（品类顺序式 SSE 返回）, `reasoning: str`（流式 token）, `retrieval_results: [{product_id, sku_id, title, price, ..., matched_texts}]`（写入 AgentState）, `conversation_history`（检索完成后追加写入 Memory） | END（用户可见，前端调 batch API 取详情）+ Option Gen（全部品类完成后，读 retrieval_results） |
+| **Option Gen** | `requirements`, `retrieval_results`（从 AgentState 读）, `conversation_history`, `scenario_description: str\|null` | `next_options: [str]` | END（追加到回复末尾） |
 | **Chit-Chat** | `user_query`, `conversation_history` | `chat_reply: str` | END（用户可见） |
 
 ## 3.1 Intent Router（意图路由与查询分类）
@@ -507,40 +521,48 @@ graph TD
 - user_query: str                        # 当前用户提问
 ```
 
-### 内部流程
+### 内部流程（6 步流水线）
 
 ```text
-Memory 完整历史（截断阈值 2000 token，写时截断，仅日志记录）
-  → [LLM 需求筛选：输入窗口 2000 token，根据 user_query 从历史中筛选相关 SubQuery]
-  → [按 sub_category 分组（回退: sub_category → category → default）]
-  → [并行检索（max_concurrency=5，config.yaml 可配，启动时加载，运行时不动态调整）]：
-      对每组品类（并行执行，超出并发数则分批）：
-        async with async_session() as db:    ← 独立 session（pool_size≥max+3, max_overflow=5）
-          1. Retriever.retrieve(品类 SubQuery 组)
-          2. _get_skus(db, ranked)           ← 使用独立 session
-          3. Generator.generate()            ← 内部可通过独立 session 按需补充查询
-          4. 提取 products_summary:           ← 从 _get_skus 结果中提取轻量摘要
-             [{product_id, sku_id, title, price, category, sub_category}, ...]
-          5. SSE: products([{product_id, sku_id, category, sub_category}])
-             + reasoning(token stream)
-          6. session 自动 close()，连接归还池
-  → [聚合各品类 products_summary → 写入 AgentState.products_summary]
-  → 所有品类完成 → SSE done（含 failed_categories）
-  → 触发 Option Gen（读 AgentState.products_summary，无需 DB）
+Step 1: [LLM 需求筛选] — 输入窗口 2000 token，根据 user_query 从历史中筛选相关 SubQuery
+Step 2: [按 sub_category 分组] — 回退: sub_category → category → default
+Step 3: [并行检索（max_concurrency=5）]：
+    对每组品类（并行执行，超出并发数则分批）：
+      async with async_session() as db:    ← 独立 session（pool_size≥max+3, max_overflow=5）
+        1. Retriever.retrieve(品类 SubQuery 组)    ← 检索前 logger.info(sub_queries, count)
+        2. _get_skus(db, ranked)                   ← 检索后 logger.info(sku_count)
+        3. Generator.generate()                    ← 生成后 logger.info(reasoning_preview[:200])
+        4. 返回: {category, sub_category, skus, product_ids, reasoning_text, error}
+           skus 包含完整 SKU 详情 + matched_texts（product_review 内容）
+Step 4: [品类顺序式 SSE] — retrieval_node 按 groups 顺序串行发送:
+    event: products  → data: [{product_id, sku_id, category, sub_category}, ...]
+    event: reasoning → data: {token, category, sub_category}
+Step 5: [聚合 retrieval_results] — asyncio.gather 结果收集后串行聚合
+Step 6: [写入 Memory] — 将当前 requirements 追加到 conversation_history
+        （通过 LangGraph add reducer，节点只返回 [new_entry]）
 ```
 
 ### 输出规约
 
 ```
-SSE 事件（渐进式，每品类一组）:
+SSE 事件（品类顺序式，由 retrieval_node 统一发送）:
   event: products  → data: [{"product_id":"p001","sku_id":"sk001","category":"面部护肤","sub_category":"防晒霜"}, ...]
   event: reasoning → data: {"token":"这款","category":"面部护肤","sub_category":"防晒霜"} (逐 token，附带品类路由键)
 
 写入 AgentState:
-  products_summary: [{"product_id":"p001","sku_id":"sk001","title":"安热沙小金瓶","price":198,"category":"面部护肤","sub_category":"防晒霜"}, ...]
+  retrieval_results: [{
+    "product_id": "p001", "sku_id": "sk001",
+    "title": "安热沙小金瓶", "price": 198,
+    "category": "面部护肤", "sub_category": "防晒霜",
+    "properties": {...},
+    "matched_texts": [{"source": "marketing", "content": "..."}, ...]
+  }, ...]
+
+写入 Memory（Step 6）:
+  conversation_history: [..., {"sub_queries": [...]}]  (仅新增条目，add reducer 拼接)
 
 SSE 事件（全部完成后）:
-  event: done → data: {"total_categories": N, "failed_categories": [{"category": "...", "sub_category": "...", "error": "..."}]}
+  event: done → data: {"total_categories": N, "failed_categories": [...]}
 ```
 
 > **前端渲染**：收到 products 事件后，通过 `/api/products/batch`、
@@ -589,11 +611,11 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
 - 品类数 > 最大并发数时，分批次并发
 - 连接池 `pool_size` ≥ `max_category_concurrency` + 3（默认 ≥ 8），`max_overflow` = 5
 - 每完成一个品类即发送 SSE 事件，前端渐进式渲染
-- 每品类完成后提取轻量摘要，`asyncio.gather(*tasks)` 收集后**串行聚合**写入 `AgentState.products_summary`
-- 品类任务内部 try/except，始终返回结构化结果 `{category, sub_category, products_summary, error}`；
-  失败时 `error` 字段记录异常信息，"品类无结果"时 `error=None, products_summary=[]`
+- 每品类完成后提取轻量摘要，`asyncio.gather(*tasks)` 收集后**串行聚合**写入 `AgentState.retrieval_results`
+- 品类任务内部 try/except，始终返回结构化结果 `{category, sub_category, retrieval_results, error}`；
+  失败时 `error` 字段记录异常信息，"品类无结果"时 `error=None, retrieval_results=[]`
 
-### products_summary 数据结构
+### retrieval_results 数据结构
 
 ```json
 [
@@ -603,14 +625,20 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
     "title": "安热沙小金瓶防晒霜",
     "price": 198.0,
     "category": "面部护肤",
-    "sub_category": "防晒霜"
+    "sub_category": "防晒霜",
+    "properties": {"volume": "60ml", "spf": "50+"},
+    "matched_texts": [
+      {"source": "marketing", "content": "安热沙经典小金瓶..."},
+      {"source": "user_review", "content": "用户张三评分5分，评价：..."}
+    ]
   }
 ]
 ```
 
-> **字段说明**：仅包含 Option Gen 生成选项所需的最小字段集。
-> 每品类检索完成后从 `_get_skus()` 结果中直接提取，零额外查询。
-> 各品类摘要聚合后写入 `AgentState.products_summary`。
+> **字段说明**：`retrieval_results` 由 `_get_skus()` 返回的完整 SKU 数据聚合而成，
+> 包含商品基础信息（title/price/properties）+ `matched_texts`
+> （即 RRF 排名 Top-K 商品在语义检索/关键词检索阶段命中的 product_review 内容）。
+> Option Gen 直接读取，商品信息和评价原文均已包含，无需 DB 查询。
 
 ### 推荐理由生成提示词（复用现有 GENERATOR_SYSTEM 并扩展）
 
@@ -650,15 +678,16 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
 ## 3.5 Option Gen（推荐选项生成）
 
 > **触发时机**：在所有品类检索完成后执行一次。
-> **数据来源**：从 `AgentState.products_summary` 读取全部商品的轻量摘要，
-> **无需访问数据库**。Product Retrieval 已在检索阶段获取全部商品详情并提取摘要。
+> **数据来源**：从 `AgentState.retrieval_results` 读取全部商品的完整检索结果（含商品基础信息
+> + product_review matched_texts），**无需访问数据库**。
 
 ### 输入规约
 
 ```
 - requirements: dict              # 当前用户需求（整合后的 SubQuery 摘要）
-- products_summary: list          # 从 AgentState 读取的商品摘要
-                                  # [{product_id, sku_id, title, price, category, sub_category}, ...]
+- retrieval_results: list         # 从 AgentState 读取的检索结果
+                                  # [{product_id, sku_id, title, price, category, sub_category,
+                                  #   properties, matched_texts: [{source, content}]}, ...]
 - conversation_history: list      # Memory 历史记录
 - scenario_description: str|null  # 若触发了 Scenario Gen，传入原始场景描述
 ```
@@ -706,16 +735,17 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
 ## 原始场景描述（如有）
 {scenario_description}
 
-## 已推荐商品摘要
-{products_summary}
+## 已推荐商品信息（含评价内容）
+{retrieval_results}
 
 ## 对话历史
 {conversation_history}
 ```
 
-> **关键变化**：`{products_summary}` 直接来自 AgentState，包含 product_id/sku_id/title/price/
-> category/sub_category。Option Gen 不再执行 SQL 查询，数据由 Product Retrieval
-> 在检索阶段提取并传递。这消除了 Option Gen 对数据库的依赖，简化了 session 管理。
+> **关键变化**：`{retrieval_results}` 直接来自 AgentState，包含完整 SKU 数据
+> （title/price/properties）和 product_review matched_texts（评价原文）。
+> Option Gen 不再执行 SQL 查询，商品信息和评价内容均由 Product Retrieval 在检索阶段
+> 注入 AgentState。评价原文直接进入 LLM prompt，帮助生成更精准的下一步选项。
 
 ---
 
@@ -770,19 +800,21 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
             {text:"蓝牙耳机", strategy:"keyword", category:"数码电子", sub_category:"蓝牙耳机"},
             {text:"", strategy:"structured_filter", field:"price", operator:"lt", value:200}
           ]
-  → Memory: 写入后写时截断（2000 token，截断仅日志记录）
+  → 不写入 Memory（延迟到 Product Retrieval 检索完成后）
 
 ━━━ ③ Product Retrieval ━━━
-  Input:  sub_queries（从 Memory 读取）, user_query
-  Logic:  LLM 筛选（首轮跳过）
-          → sub_category="蓝牙耳机" → 单独一组（无需并发）
-          → async_session() → Retriever.retrieve() → _get_skus() → Generator.generate()
-          → 提取 products_summary: [{p001,sk001,"漫步者...",199,"数码电子","蓝牙耳机"},...]
-          → SSE: products([{product_id,sku_id,category:"数码电子",sub_category:"蓝牙耳机"}])
-            → reasoning(token stream)
+  Input:  sub_queries, conversation_history=[], user_query
+  Logic:  Step 1: LLM 筛选（首轮跳过）
+          Step 2: sub_category="蓝牙耳机" → 单独一组
+          Step 3: async_session() → Retriever.retrieve() → _get_skus() → Generator.generate()
+            日志: 检索前 sub_queries + count, 检索后 sku_count, 生成后 reasoning_preview
+          Step 4: 品类顺序式 SSE: products([{p001,sk001},{p002,sk002},{p003,sk003}])
+                  → reasoning(token stream)
+          Step 5: 聚合 retrieval_results（含完整 SKU + matched_texts）
+          Step 6: 追加 requirements 到 conversation_history
   Output: SSE products: [{p001,sk001},{p002,sk002},{p003,sk003}],
           SSE reasoning: "为您找到 3 款 200 元以内的蓝牙耳机..."
-  AgentState.products_summary: [{p001,sk001,"漫步者...",199,...},...]
+  AgentState.retrieval_results: [{p001,sk001,"漫步者...",199,...,matched_texts:[...]},...]
 
 ━━━ ④ 前端 ━━━
   收到 products → 调 /api/products/batch?ids=p001,p002,p003
@@ -792,8 +824,8 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
   → 渲染商品卡片（标题/价格/图片）
 
 ━━━ ⑤ Option Gen ━━━
-  Input:  requirements, products_summary（从 AgentState 读）, scenario_description=null
-  Logic:  读 AgentState → 无需 DB → LLM 生成选项
+  Input:  requirements, retrieval_results（从 AgentState 读，含 matched_texts）, scenario_description=null
+  Logic:  读 AgentState → 无需 DB → LLM 生成选项（评价原文注入 prompt）
   Output: next_options=["需要关注降噪功能吗？", "想看看 100 元以内的入门款吗？"]
 
 ━━━ 最终回复 ━━━
@@ -813,15 +845,16 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
   Output: requirements.sub_queries=[
             {text:"跑鞋", strategy:"keyword", category:"运动户外", sub_category:"跑鞋"}
           ]
-  → Memory: 写入，2000 token 写时截断（截断仅日志记录）
+  → 不写入 Memory（延迟到 Product Retrieval 检索完成后）
 
 ━━━ ③ Product Retrieval ━━━
-  Input:  sub_queries, user_query
+  Input:  sub_queries, conversation_history=[], user_query
   Logic:  LLM 筛选（首轮无历史）→ sub_category="跑鞋" → 独立 session 检索
-          → 提取 products_summary 写入 AgentState
+          → 品类顺序式 SSE → 聚合 retrieval_results 写入 AgentState
+          → Step 6: 追加 requirements 到 conversation_history
   Output: SSE products: [{p010,sk010,...}] → reasoning...
 
-━━━ ⑤ Option Gen ━━━（读 AgentState.products_summary）
+━━━ ⑤ Option Gen ━━━（读 AgentState.retrieval_results，含 matched_texts）
   Output: next_options=["需要限定预算范围吗？", "偏好哪个品牌？"]
 ```
 
@@ -839,12 +872,13 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
             {text:"跑鞋", strategy:"keyword", category:"运动户外", sub_category:"跑鞋"},
             {text:"轻量化设计", strategy:"semantic"}
           ]
-  → Memory: append，写后截断（当前 2 组远低于 2000 token）
+  → 不写入 Memory
 
 ━━━ ③ Product Retrieval ━━━
   Input:  2 组 sub_queries（均在 2000 token 窗口内）
   Logic:  LLM 筛选 → 全部相关 → 独立 session 检索
-          → sub_category="跑鞋" → 提取 products_summary
+          → sub_category="跑鞋" → 品类顺序式 SSE → 聚合 retrieval_results
+          → Step 6: 追加 requirements 到 conversation_history
   Output: SSE products: [{p011,sk011}] → reasoning...
 ```
 
@@ -853,14 +887,14 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
 ```text
 ━━━ ①② 同前 ━━━
   Output: requirements.sub_queries=[{跑鞋}, {轻量化}, {price<500}]
-  → Memory: append（3 组均在 2000 token 内）
+  → 不写入 Memory
 
 ━━━ ③ Product Retrieval ━━━
   Input:  3 组 sub_queries（2000 token 窗口内）
   Logic:  LLM 筛选 → 全部相关 → 安踏 C202（¥399, 180g）完美匹配
-          → 提取 products_summary
+          → 品类顺序式 SSE → 聚合 retrieval_results → Step 6 写入 Memory
 
-━━━ ⑤ Option Gen ━━━（读 AgentState.products_summary，无需 DB）
+━━━ ⑤ Option Gen ━━━（读 AgentState.retrieval_results，无需 DB）
   Output: next_options=["需要搭配跑步袜吗？", "想了解更高端的专业竞速款吗？"]
 ```
 
@@ -896,18 +930,17 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
             {text:"凉鞋", strategy:"keyword", category:"服饰", sub_category:"凉鞋"},
             {text:"防滑舒适 速干", strategy:"semantic", category:"服饰", sub_category:"凉鞋"}
           ]（2 大类 × 5 细类 × 2-3 条 ≈ 11 条）
-  → Memory: 写入，2000 token 写时截断（截断仅日志记录）
+  → 不写入 Memory（延迟到 Product Retrieval 检索完成后）
 
 ━━━ ③ Product Retrieval ━━━
   Input:  sub_queries（11 条，带 category + sub_category）, user_query
-  Logic:  LLM 筛选（首轮无历史 → 全部保留）
-          → 按 sub_category 分组（5 组）：
-            防晒霜(3条) / 墨镜(2条) / 沙滩裤(2条) / 遮阳帽(2条) / 凉鞋(2条)
-          → 并行检索（5 组 ≤ max_concurrency=5，全部并发）：
-            每个任务: async_session() → Retriever.retrieve() → _get_skus() → Generator.generate()
-                     → 提取 products_summary
+  Logic:  Step 1: LLM 筛选（首轮无历史 → 全部保留）
+  Step 2: 按 sub_category 分组（5 组）
+          Step 3: 并行检索（5 组 ≤ max_concurrency=5，全部并发）：
+            每个任务: 日志记录（检索前/检索后/生成后）
+            async_session() → Retriever.retrieve() → _get_skus() → Generator.generate()
           → 连接池: 5 个并行 session + 主请求可能 1 个 → pool_size≥8 足够
-  SSE 事件流（按实际完成顺序渐进返回）:
+  Step 4: 品类顺序式 SSE（按 groups 顺序串行发送）:
     event: products  → [{"product_id":"p001","sku_id":"sk001","category":"面部护肤","sub_category":"防晒霜"}, ...]
     event: reasoning → {"token":"针","category":"面部护肤","sub_category":"防晒霜"}
     event: products  → [{"product_id":"p010","sku_id":"sk010","category":"服饰","sub_category":"墨镜"}, ...]
@@ -915,7 +948,7 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
     ...（其余 3 品类按完成顺序）
     event: done → {"total_categories":5, "failed_categories":[]}
 
-  AgentState.products_summary: [
+  AgentState.retrieval_results: [
     {p001,sk001,"安热沙小金瓶",198,"面部护肤","防晒霜"},
     {p002,sk002,"资生堂蓝胖子",239,"面部护肤","防晒霜"},
     {p010,sk010,"雷朋飞行员",599,"服饰","墨镜"},
@@ -931,14 +964,14 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
   → 按 category 分区渲染商品卡片 + reasoning 文本
 
 ━━━ ⑤ Option Gen（所有品类完成后执行）━━━
-  Input:  requirements, products_summary（从 AgentState 读，15 条摘要）, scenario_description
-  Logic:  读 AgentState → 无需 DB → LLM 分析 5 品类商品 → 推断缺失品类（泳衣、晒后修复）
+  Input:  requirements, retrieval_results（从 AgentState 读，含 matched_texts）, scenario_description
+  Logic:  读 AgentState → 无需 DB → LLM 分析 5 品类商品 + 评价原文 → 推断缺失品类（泳衣、晒后修复）
   Output: next_options=["需要推荐泳衣吗？", "需要搭配晒后修复产品吗？"]
 ```
 
 > 若品类数超过 5（如 8 品类），第一批 5 组并发执行，剩余 3 组在第一批有完成时自动补入。
 > 单品类失败不影响其他品类，失败信息在 done 事件的 `failed_categories` 中体现，
-> 失败品类的商品不会出现在 products_summary 中。
+> 失败品类的商品不会出现在 retrieval_results 中。
 
 ## 4.4 三场景对比总结
 
@@ -948,8 +981,9 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
 | 路径 | Explicit | Explicit | Scenario |
 | Scenario Gen | 不触发 | 不触发 | 触发，品类参考 category_lookup 表，一次性端到端 |
 | SubQuery 结构 | 带 category/sub_category（Extraction 标记） | 带 category/sub_category（Extraction 标记） | 带 category + sub_category（来自查找表） |
-| Memory | 1 组，2000 token 写时截断 | 3 组 append，2000 token 写时截断 | 1 组 11 条，2000 token 写时截断 |
+| Memory | 检索完成后由 Product Retrieval 写入 | 检索完成后由 Product Retrieval 写入 | 检索完成后由 Product Retrieval 写入 |
 | Memory 截断记录 | 仅日志 | 仅日志 | 仅日志 |
+| Memory 写入者 | Product Retrieval（Step 6） | Product Retrieval（Step 6） | Product Retrieval（Step 6） |
 | LLM 筛选 | 首轮跳过 | 3 组全部相关 | 首轮跳过 |
 | 分组粒度 | sub_category="蓝牙耳机"（单组） | sub_category="跑鞋"（单组） | 按 sub_category 分为 5 组 |
 | 检索策略 | 单组，独立 session | 单组，独立 session | 5 组并行（max=5），各自独立 session |
@@ -957,6 +991,58 @@ LLM 筛选后，Product Retrieval 将 SubQuery 按品类分组（三级回退）
 | 连接池 | pool_size≥8, max_overflow=5 | pool_size≥8 | pool_size≥8, 5并发+主请求=6, 2 buffer |
 | SSE products | [{product_id, sku_id, category, sub_category}] | 同左 | 同左 × 5 |
 | 前端详情 | /api/products/batch 等 3 个 batch API | 同左 | 同左，3 次请求，按 category 分区渲染 |
-| reasoning | 单段流式 | 单段流式 | 5 段流式（每品类一段，交错发送） |
-| products_summary | 写入 AgentState | 写入 AgentState | 聚合写入 AgentState（15 条） |
-| Option Gen | 读 AgentState，无需 DB | 读 AgentState，无需 DB | 读 AgentState，无需 DB，跨品类灵活选项 |
+| reasoning | 单段流式 | 单段流式 | 5 段流式（品类顺序式，由 retrieval_node 统一发送） |
+| retrieval_results | 写入 AgentState（含 matched_texts） | 写入 AgentState（含 matched_texts） | 聚合写入 AgentState（15 条，含 matched_texts） |
+| Option Gen | 读 AgentState，无需 DB | 读 AgentState，无需 DB | 读 AgentState，无需 DB，评价原文注入 prompt |
+
+
+# 5 多会话支持
+
+## 5.1 问题
+
+当前系统只支持单一会话（全局 Memory），不同用户/不同会话的对话历史混在一起。
+
+## 5.2 设计
+
+引入 `conversation_id` 作为会话隔离标识：
+
+### API 变更
+
+- **新增 `GET /api/conversation/`**：创建新会话，返回唯一 `conversation_id`
+- **修改 `POST /api/search`**：请求体新增 `conversation_id` 参数，响应的 done 事件中返回 `conversation_id`
+
+### Memory 隔离
+
+Memory 根据 `conversation_id` 分别存储和检索：
+
+```
+Memory Store: {conversation_id → [history_entries]}
+
+- 写入：Product Retrieval Step 6 → 以 conversation_id 为 key 追加
+- 读取：Intent Extraction / Scenario Gen / Product Retrieval → 以 conversation_id 为 key 检索
+```
+
+### 数据流
+
+```mermaid
+sequenceDiagram
+    participant FE as 前端
+    participant API as /api/search
+    participant Graph as LangGraph
+
+    FE->>API: GET /api/conversation/
+    API-->>FE: {conversation_id: "conv_xxx"}
+
+    FE->>API: POST /api/search {query, conversation_id}
+    API->>Graph: AgentState(conversation_id="conv_xxx", ...)
+    Graph->>Graph: Memory 按 conversation_id 读写
+    Graph-->>API: SSE events + conversation_id
+    API-->>FE: SSE done {conversation_id: "conv_xxx", ...}
+```
+
+### 设计要点
+
+- 每个 `conversation_id` 对应独立的 Memory 空间，互不干扰
+- `GET /api/conversation/` 无副作用，仅生成新 ID 并返回
+- 旧客户端（不传 `conversation_id`）向后兼容：系统自动分配临时 ID（行为同旧版单会话）
+- Memory 截断策略不变（2000 token 写时截断，仅日志记录），但截断范围限定在当前 conversation_id 内
