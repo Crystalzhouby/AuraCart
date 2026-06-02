@@ -14,7 +14,7 @@ import structlog
 
 from app.config import settings
 from app.services.retriever import Retriever, SubQuery
-from app.services.sku_utils import _get_skus
+from app.services.sku_utils import _truncate_texts
 from app.rag.merger import Merger
 from app.rag.generator import Generator
 from app.agent.prompts.relevance_filter_prompt import RELEVANCE_FILTER_SYSTEM
@@ -180,8 +180,20 @@ async def _category_task(
                     "error": None,
                 }
 
-            # 4. 获取 SKU 详情
-            skus = await _get_skus(db, ranked)
+            # 4. 从 hit_metadata 组装 SKU 数据（不再查询 DB）
+            hit_metadata = retrieve_result.get("hit_metadata", {})
+            skus = []
+            for hit in ranked:
+                data = hit_metadata.get(hit.sku_id)
+                if data is None:
+                    continue  # 极端情况：SKUHit 对应的 metadata 缺失，跳过
+                raw_texts = data.get("matched_texts", [])
+                data["matched_texts"] = _truncate_texts(
+                    raw_texts,
+                    settings.search.max_match_texts_per_sku,
+                    settings.search.max_match_chars_per_sku,
+                )
+                skus.append(data)
 
             # 5. 构建 product_ids（供 retrieval_node 统一发送 SSE）
             product_ids = [
