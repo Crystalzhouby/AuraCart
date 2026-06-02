@@ -89,6 +89,7 @@ class SearchResponse(BaseModel):
     sub_queries: list[dict]
     products: list[dict]
     reasoning: str | None
+    conversation_id: str | None = None
 
 
 class SSEProduct(BaseModel):

@@ -11,10 +11,11 @@
 """
 import json
 import asyncio
+import structlog
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
-import structlog
 from app.database import get_db, engine
 from app.config import settings
 from app.schemas.product import SearchResponse
@@ -80,6 +81,7 @@ async def search(
     request: Request,
     q: str = Query(..., min_length=1, description="搜索查询字符串"),
     stream: bool = Query(True, description="是否开启 SSE 流式回答，默认 True"),
+    conversation_id: str | None = Query(None, description="会话ID，用于多轮对话记忆"),
     db: AsyncSession = Depends(get_db),
     emb: EmbeddingService = Depends(get_embedding_service),
     llm: LLMService = Depends(get_llm_service),
@@ -202,6 +204,7 @@ async def search(
 
             return SearchResponse(
                 query=q, sub_queries=subs, products=products, reasoning=reasoning,
+                conversation_id=conversation_id,
             )
         except Exception as e:
             pipeline_log.info("搜索异常", error=str(e))
@@ -211,6 +214,7 @@ async def search(
                 pass
             return SearchResponse(
                 query=q, sub_queries=[], products=[], reasoning=None,
+                conversation_id=conversation_id,
             )
 
     # ---- 流式模式 (SSE) — Agent 工作流 ----
@@ -234,6 +238,7 @@ async def search(
                 graph=agent_graph,
                 queue=queue,
                 total_timeout=settings.timeout.total_request,
+                conversation_id=conversation_id,
             ):
                 yield event
 
@@ -260,27 +265,67 @@ async def _agent_event_stream(
     graph,
     queue: asyncio.Queue,
     total_timeout: float = 60.0,
+    conversation_id: str | None = None,
 ):
     """LangGraph Agent 工作流的 SSE 事件消费循环。
 
     启动 graph.ainvoke 作为后台任务，消费 Queue 中的 SSE 事件，
-    在完成后发送 next_options。
+    在完成后发送 next_options。若传入 conversation_id，则从 DB
+    加载历史记忆注入初始状态，并在图执行完成后写回。
 
     参数:
         user_query: 用户查询字符串。
         graph: 编译后的 LangGraph StateGraph。
         queue: 节点间传递 SSE 事件的 asyncio.Queue。
         total_timeout: 总体超时（秒），默认 60s。
+        conversation_id: 可选会话 ID，用于多轮对话记忆持久化。
 
     Yields:
         dict: SSE 事件 {"event": str, "data": str}。
     """
     from app.agent.state import AgentState
 
+    stream_log = structlog.get_logger("agent_stream")
+
+    # ---- 加载会话记忆 ----
+    initial_history: list[dict] = []
+    if conversation_id:
+        try:
+            from app.database import async_session
+            from sqlalchemy import select
+            from app.models.conversation import Conversation
+
+            async with async_session() as session:
+                result = await session.execute(
+                    select(Conversation.memory).where(
+                        Conversation.conversation_id == conversation_id
+                    )
+                )
+                row = result.scalar_one_or_none()
+                if row is not None:
+                    # asyncpg JSONB → Python list[dict] 自动反序列化
+                    initial_history = row
+                    stream_log.debug(
+                        "会话记忆已加载",
+                        conversation_id=conversation_id,
+                        rounds=len(initial_history),
+                    )
+                else:
+                    stream_log.warning(
+                        "会话不存在，降级为空记忆",
+                        conversation_id=conversation_id,
+                    )
+        except Exception as e:
+            stream_log.warning(
+                "加载会话记忆失败，降级为空记忆",
+                conversation_id=conversation_id,
+                error=str(e),
+            )
+
     # 构建初始状态
     initial_state: AgentState = {
         "user_query": user_query,
-        "conversation_history": [],
+        "conversation_history": initial_history,
         "intent": "recommend",
         "is_scenario": False,
         "requirements": {},
@@ -327,11 +372,16 @@ async def _agent_event_stream(
                 continue
 
             # 序列化事件数据为 JSON 字符串
-            data_str = json.dumps(event["data"], ensure_ascii=False)
-            yield {"event": event["event"], "data": data_str}
-
+            data = event["data"]
             if event["event"] == "done":
                 done_received = True
+                # 注入 conversation_id 到 done 事件
+                if isinstance(data, dict):
+                    data["conversation_id"] = conversation_id
+            data_str = json.dumps(data, ensure_ascii=False)
+            yield {"event": event["event"], "data": data_str}
+
+            if done_received:
                 break
 
     except asyncio.CancelledError:
@@ -356,15 +406,54 @@ async def _agent_event_stream(
             if not graph_task.done():
                 graph_task.cancel()
 
-        # 发送 next_options（从 graph 最终状态读取）
+        # 从 graph 最终状态读取并持久化记忆
+        final_state = None
         if done_received and graph_task.done() and not graph_task.cancelled():
             try:
                 final_state = graph_task.result()
-                if final_state and final_state.get("next_options"):
-                    yield {
-                        "event": "next_options",
-                        "data": json.dumps(final_state["next_options"], ensure_ascii=False),
-                    }
+            except Exception:
+                pass
+
+        # ---- 持久化会话记忆 ----
+        if conversation_id and final_state:
+            try:
+                from app.database import async_session
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+                from app.models.conversation import Conversation
+
+                memory = final_state.get("conversation_history", [])
+                async with async_session() as session:
+                    stmt = pg_insert(Conversation).values(
+                        conversation_id=conversation_id,
+                        memory=memory,
+                    ).on_conflict_do_update(
+                        constraint="conversation_pkey",
+                        set_={
+                            "memory": memory,
+                            "updated_at": sa.func.now(),
+                        },
+                    )
+                    await session.execute(stmt)
+                    await session.commit()
+                    stream_log.debug(
+                        "会话记忆已保存",
+                        conversation_id=conversation_id,
+                        rounds=len(memory),
+                    )
+            except Exception as e:
+                stream_log.warning(
+                    "保存会话记忆失败",
+                    conversation_id=conversation_id,
+                    error=str(e),
+                )
+
+        # 发送 next_options（从 graph 最终状态读取）
+        if final_state and final_state.get("next_options"):
+            try:
+                yield {
+                    "event": "next_options",
+                    "data": json.dumps(final_state["next_options"], ensure_ascii=False),
+                }
             except Exception:
                 pass
 
