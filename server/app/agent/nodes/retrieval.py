@@ -4,8 +4,8 @@ Product Retrieval 节点 — 最复杂节点。
 5 步流水线：
 1. LLM 需求筛选（2000 token 窗口）
 2. 按 sub_category 分组（三级回退）
-3. 并行检索（asyncio.Semaphore，独立 session）
-4. 渐进式 SSE（products + reasoning 事件）
+3. 并行检索 + Generator 流式生成（asyncio.Semaphore，独立 session）
+4. 品类顺序式 SSE 发送（products + reasoning 事件，由 retrieval_node 统一发送）
 5. 聚合 products_summary + failed_categories
 """
 import asyncio
@@ -110,11 +110,10 @@ async def _category_task(
     async_session_factory,
     emb_service,
     llm,
-    queue,
 ) -> dict:
     """单个品类的检索任务（在独立 session 中执行）。
 
-    返回结构化结果: {category, sub_category, products_summary, error}
+    返回结构化结果: {category, sub_category, products_summary, product_ids, reasoning_text, error}
     """
     category = sub_queries[0].get("category", "") if sub_queries else ""
     sub_category = group_key if group_key != "default" else ""
@@ -157,20 +156,20 @@ async def _category_task(
                     "category": category,
                     "sub_category": sub_category,
                     "products_summary": [],
+                    "product_ids": [],
+                    "reasoning_text": "",
                     "error": None,
                 }
 
             # 4. 获取 SKU 详情
             skus = await _get_skus(db, ranked)
 
-            # 5. 发送 products SSE 事件
+            # 5. 构建 product_ids（供 retrieval_node 统一发送 SSE）
             product_ids = [
                 {"product_id": s["product_id"], "sku_id": s["sku_id"],
                  "category": category, "sub_category": sub_category}
                 for s in skus
             ]
-            if queue:
-                await queue.put({"event": "products", "data": product_ids})
 
             # 6. 提取 products_summary
             summary = [
@@ -202,13 +201,14 @@ async def _category_task(
             except Exception as gen_err:
                 logger.warning(f"Generator 异常: {category}/{sub_category}", error=str(gen_err))
 
-            # 缓冲 token，由主流程统一按品类顺序发送
+            # 缓冲 token，拼接为完整文本后由 retrieval_node 统一按品类顺序发送 SSE
             return {
                 "category": category,
                 "sub_category": sub_category,
                 "products_summary": summary,
+                "product_ids": product_ids,
+                "reasoning_text": "".join(tokens),
                 "error": None,
-                "reasoning_tokens": tokens,
             }
 
     except Exception as e:
@@ -217,54 +217,10 @@ async def _category_task(
             "category": category,
             "sub_category": sub_category,
             "products_summary": [],
+            "product_ids": [],
+            "reasoning_text": "",
             "error": str(e),
-            "reasoning_tokens": [],
         }
-
-
-async def _send_reasoning_sequential(
-    safe_results: list[dict],
-    group_keys: list[str],
-    queue,
-) -> None:
-    """按品类顺序串行发送 reasoning token（品类顺序式 — Q1 方案B）。
-
-    各品类任务将 token 缓存在 reasoning_tokens 中，
-    此函数按 group_keys 顺序将它们整体发送到 SSE 队列。
-
-    参数:
-        safe_results: 品类任务返回的结构化结果列表。
-        group_keys: groups 字典的键列表（决定发送顺序）。
-        queue: SSE 事件队列。
-    """
-    if not queue:
-        return
-
-    # 建立 sub_category → result 的映射，便于按 group_keys 顺序访问
-    result_map = {}
-    for r in safe_results:
-        sc = r.get("sub_category", "")
-        result_map[sc] = r
-
-    for key in group_keys:
-        r = result_map.get(key, {})
-        if r.get("error"):
-            continue  # 失败品类跳过
-        tokens: list[str] = r.get("reasoning_tokens", [])
-        if not tokens:
-            continue
-
-        category = r.get("category", "")
-        sub_category = r.get("sub_category", "")
-        full_text = "".join(tokens)
-        await queue.put({
-            "event": "reasoning",
-            "data": {
-                "token": full_text,
-                "category": category,
-                "sub_category": sub_category,
-            }
-        })
 
 
 async def retrieval_node(
@@ -305,7 +261,7 @@ async def retrieval_node(
     async def _bounded_task(key, subs):
         async with semaphore:
             return await _category_task(
-                key, subs, user_query, async_session_factory, emb_service, llm, queue
+                key, subs, user_query, async_session_factory, emb_service, llm
             )
 
     tasks = [_bounded_task(key, subs) for key, subs in groups.items()]
@@ -319,14 +275,32 @@ async def retrieval_node(
             key = group_key_list[i] if i < len(group_key_list) else "unknown"
             safe_results.append({
                 "category": "", "sub_category": key,
-                "products_summary": [], "error": str(r),
-                "reasoning_tokens": [],
+                "products_summary": [], "product_ids": [],
+                "reasoning_text": "", "error": str(r),
             })
         else:
             safe_results.append(r)
 
-    # Step 4: 品类顺序式发送 reasoning（Q1 方案B）
-    await _send_reasoning_sequential(safe_results, group_key_list, queue)
+    # Step 4: 品类顺序式发送 products + reasoning（Q1 方案B）
+    if queue:
+        for r in safe_results:
+            if r.get("error"):
+                continue
+            # 发送 products 事件
+            product_ids = r.get("product_ids", [])
+            if product_ids:
+                await queue.put({"event": "products", "data": product_ids})
+            # 发送 reasoning 事件
+            reason = r.get("reasoning_text", "")
+            if reason:
+                await queue.put({
+                    "event": "reasoning",
+                    "data": {
+                        "token": reason,
+                        "category": r.get("category", ""),
+                        "sub_category": r.get("sub_category", ""),
+                    }
+                })
 
     # Step 5: 聚合 products_summary
     products_summary, failed_categories = _aggregate_results(safe_results)

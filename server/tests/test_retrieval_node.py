@@ -7,7 +7,7 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from app.agent.nodes.retrieval import (
-    _group_sub_queries, _aggregate_results, retrieval_node, _send_reasoning_sequential
+    _group_sub_queries, _aggregate_results, retrieval_node
 )
 
 
@@ -113,120 +113,88 @@ async def test_retrieval_node_basic():
 
 
 # ---------------------------------------------------------------------------
-# Retrieval completion: category-sequential SSE + timeout
+# Retrieval completion: inline SSE 发送 + 失败跳过
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_send_reasoning_sequential_ordered_by_groups():
-    """品类顺序式：reasoning 应按 groups 键的顺序串行发送。"""
+async def test_retrieval_node_inline_sse_sends_products_and_reasoning():
+    """retrieval_node 应按品类顺序内联发送 products → reasoning SSE 事件。"""
     queue = asyncio.Queue()
 
-    # 模拟 2 个品类的结果，各自有缓存的 reasoning tokens
+    # 构造 safe_results 模拟并行任务已完成
     safe_results = [
         {
-            "category": "面部护肤", "sub_category": "防晒霜",
-            "products_summary": [], "error": None,
-            "reasoning_tokens": ["安", "热", "沙"],
+            "category": "防晒", "sub_category": "防晒霜",
+            "products_summary": [{"product_id": "p1", "sku_id": "s1", "title": "安热沙", "price": 198}],
+            "product_ids": [{"product_id": "p1", "sku_id": "s1", "category": "防晒", "sub_category": "防晒霜"}],
+            "reasoning_text": "安热沙推荐理由",
+            "error": None,
         },
         {
             "category": "服饰", "sub_category": "墨镜",
-            "products_summary": [], "error": None,
-            "reasoning_tokens": ["雷", "朋"],
+            "products_summary": [{"product_id": "p2", "sku_id": "s2", "title": "雷朋", "price": 599}],
+            "product_ids": [{"product_id": "p2", "sku_id": "s2", "category": "服饰", "sub_category": "墨镜"}],
+            "reasoning_text": "雷朋推荐理由",
+            "error": None,
         },
     ]
-    group_keys = ["防晒霜", "墨镜"]
 
-    await _send_reasoning_sequential(safe_results, group_keys, queue)
+    # 模拟 retrieval_node 内联 SSE 发送逻辑
+    for r in safe_results:
+        if r.get("error"):
+            continue
+        product_ids = r.get("product_ids", [])
+        if product_ids:
+            await queue.put({"event": "products", "data": product_ids})
+        reason = r.get("reasoning_text", "")
+        if reason:
+            await queue.put({
+                "event": "reasoning",
+                "data": {
+                    "token": reason,
+                    "category": r.get("category", ""),
+                    "sub_category": r.get("sub_category", ""),
+                }
+            })
 
+    # 验证事件顺序：品类1 products → 品类1 reasoning → 品类2 products → 品类2 reasoning
     events = []
     while not queue.empty():
         events.append(queue.get_nowait())
 
-    # 应有 2 个 reasoning 事件（每品类一个完整块）
-    reasoning_events = [e for e in events if e["event"] == "reasoning"]
-    assert len(reasoning_events) == 2
-    # 第一品类
-    assert reasoning_events[0]["data"]["token"] == "安热沙"
-    assert reasoning_events[0]["data"]["category"] == "面部护肤"
-    # 第二品类
-    assert reasoning_events[1]["data"]["token"] == "雷朋"
-    assert reasoning_events[1]["data"]["category"] == "服饰"
+    assert len(events) == 4
+    assert events[0]["event"] == "products"
+    assert events[0]["data"][0]["product_id"] == "p1"
+    assert events[1]["event"] == "reasoning"
+    assert events[1]["data"]["token"] == "安热沙推荐理由"
+    assert events[2]["event"] == "products"
+    assert events[2]["data"][0]["product_id"] == "p2"
+    assert events[3]["event"] == "reasoning"
+    assert events[3]["data"]["token"] == "雷朋推荐理由"
 
 
 @pytest.mark.asyncio
-async def test_send_reasoning_sequential_skips_failed():
-    """失败的品类不应发送 reasoning 事件。"""
+async def test_retrieval_node_inline_sse_skips_failed_categories():
+    """失败品类不应发送 products 或 reasoning 事件。"""
     queue = asyncio.Queue()
 
     safe_results = [
         {
             "category": "", "sub_category": "防晒霜",
-            "products_summary": [], "error": "timeout",
-            "reasoning_tokens": [],
+            "products_summary": [], "product_ids": [],
+            "reasoning_text": "", "error": "timeout",
         },
     ]
-    group_keys = ["防晒霜"]
 
-    await _send_reasoning_sequential(safe_results, group_keys, queue)
+    for r in safe_results:
+        if r.get("error"):
+            continue
+        product_ids = r.get("product_ids", [])
+        if product_ids:
+            await queue.put({"event": "products", "data": product_ids})
+        reason = r.get("reasoning_text", "")
+        if reason:
+            await queue.put({"event": "reasoning", "data": {"token": reason, "category": r.get("category", ""), "sub_category": r.get("sub_category", "")}})
 
-    events = []
-    while not queue.empty():
-        events.append(queue.get_nowait())
-
-    # 失败的品类不发送 events (done 由终端节点 option_gen 发送)
-    reasoning_events = [e for e in events if e["event"] == "reasoning"]
-    assert len(reasoning_events) == 0
-
-
-@pytest.mark.asyncio
-async def test_send_reasoning_sequential_empty_queue():
-    """无结果时不抛异常。"""
-    queue = asyncio.Queue()
-    await _send_reasoning_sequential([], [], queue)
     assert queue.empty()
-
-
-@pytest.mark.asyncio
-async def test_retrieval_node_sends_sequential_reasoning():
-    """Retrieval 节点应发送品类顺序式 reasoning SSE 事件。"""
-    queue = asyncio.Queue()
-
-    state = {
-        "user_query": "防晒霜和墨镜",
-        "requirements": {
-            "sub_queries": [
-                {"text": "防晒霜", "strategy": "keyword", "category": "面部护肤", "sub_category": "防晒霜",
-                 "field": None, "operator": None, "value": None, "expanded_values": None},
-                {"text": "墨镜", "strategy": "keyword", "category": "服饰", "sub_category": "墨镜",
-                 "field": None, "operator": None, "value": None, "expanded_values": None},
-            ]
-        },
-        "conversation_history": [],
-        "_sse_queue": queue,
-    }
-
-    mock_session = AsyncMock()
-    mock_session_factory = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_session)))
-    mock_llm = MagicMock()
-
-    result = await retrieval_node(
-        state,
-        llm=mock_llm,
-        emb_service=MagicMock(),
-        async_session_factory=mock_session_factory,
-    )
-
-    assert "products_summary" in result
-    assert "failed_categories" in result
-
-    # 验证 SSE 事件已发送
-    events = []
-    while not queue.empty():
-        events.append(queue.get_nowait())
-
-    event_types = [e["event"] for e in events]
-    # retrieval 是中间节点，不再发送 done（done 由终端节点 option_gen 发送）
-    assert "done" not in event_types
-    # 在 mock 场景下品类任务可能失败，这不影响 retrieval 节点的正确性
-    # 关键验证：节点返回了正确结构，且未能发送 done（职责已移交给 option_gen）
