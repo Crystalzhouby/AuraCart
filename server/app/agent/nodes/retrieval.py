@@ -319,7 +319,23 @@ async def retrieval_node(
     # Step 5: 聚合 retrieval_results
     retrieval_results, failed_categories = _aggregate_results(safe_results)
 
+    # Step 6: 检索完成后，将当前 requirements 写入 conversation_history
+    # （从 extraction 和 scenario_gen 移至此，避免 requirements 与 history 重复）
+    # 注意：conversation_history 使用 LangGraph add reducer，
+    # 节点只返回本次新增的条目 [new_entry]，由 reducer 负责拼接。
+    from app.agent.memory import count_tokens
+    requirements = state.get("requirements", {})
+    conversation_history = state.get("conversation_history", [])
+    new_entry = requirements if requirements else {}
+    full_after = conversation_history + [new_entry]
+    estimated_tokens = count_tokens(full_after)
+    if estimated_tokens > settings.search.memory_max_tokens:
+        logger.info("Memory 追加后超限（不截断，由后续读取侧处理）",
+                    estimated_tokens=estimated_tokens,
+                    max_tokens=settings.search.memory_max_tokens)
+
     return {
         "retrieval_results": retrieval_results,
         "failed_categories": [f["sub_category"] for f in failed_categories],
+        "conversation_history": [new_entry] if requirements else [],
     }

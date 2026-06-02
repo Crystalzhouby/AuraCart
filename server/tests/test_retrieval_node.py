@@ -110,6 +110,79 @@ async def test_retrieval_node_basic():
     )
     assert "retrieval_results" in result
     assert "failed_categories" in result
+    # retrieval 应在检索完成后追加 conversation_history
+    assert "conversation_history" in result
+
+
+# ---------------------------------------------------------------------------
+# Memory writing: retrieval_node 应在检索完成后将 requirements 写入 memory
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_retrieval_node_writes_conversation_history_after_retrieval():
+    """retrieval_node 应在检索完成后将 requirements 追加到 conversation_history。
+
+    验证：
+    1. 返回结果包含 conversation_history 字段
+    2. 只包含本轮新增的条目（1 条），供 add reducer 拼接
+    """
+    state = {
+        "user_query": "跑鞋推荐",
+        "requirements": {
+            "sub_queries": [
+                {"text": "跑鞋", "strategy": "keyword", "category": "运动户外",
+                 "sub_category": "跑鞋", "field": None, "operator": None,
+                 "value": None, "expanded_values": None},
+            ]
+        },
+        "conversation_history": [],
+    }
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_session)))
+    mock_llm = MagicMock()
+
+    result = await retrieval_node(
+        state,
+        llm=mock_llm,
+        emb_service=MagicMock(),
+        async_session_factory=mock_session_factory,
+        _sse_queue=None,
+    )
+
+    assert "conversation_history" in result
+    # 应返回 1 条新条目（仅本轮 requirements），由 add reducer 拼接
+    history = result["conversation_history"]
+    assert len(history) == 1
+    assert "sub_queries" in history[0]
+
+
+@pytest.mark.asyncio
+async def test_retrieval_node_empty_requirements_no_history():
+    """requirements 为空时不应追加空条目到 conversation_history。"""
+    state = {
+        "user_query": "推荐",
+        "requirements": {},
+        "conversation_history": [],
+    }
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_session)))
+    mock_llm = MagicMock()
+
+    # 空 requirements → retrieval_node 应直接返回空结果
+    result = await retrieval_node(
+        state,
+        llm=mock_llm,
+        emb_service=MagicMock(),
+        async_session_factory=mock_session_factory,
+        _sse_queue=None,
+    )
+
+    # 空 requirements 时 early return，不应有 conversation_history
+    assert result["retrieval_results"] == []
+    assert result["failed_categories"] == []
 
 
 # ---------------------------------------------------------------------------

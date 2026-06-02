@@ -37,8 +37,12 @@ async def test_extraction_basic():
 
 
 @pytest.mark.asyncio
-async def test_extraction_includes_conversation_history_append():
-    """Extraction 应追加 conversation_history。"""
+async def test_extraction_no_longer_appends_conversation_history():
+    """Extraction 不应再追加 conversation_history（已移至 retrieval_node）。
+
+    验证 extraction 的返回结果中不包含 conversation_history 字段，
+    避免当前 requirements 在 state 中被重复注入。
+    """
     mock_llm = MagicMock()
     mock_llm.chat_stream.return_value = _async_gen(json.dumps([
         {"text": "跑鞋", "strategy": "keyword",
@@ -52,8 +56,9 @@ async def test_extraction_includes_conversation_history_append():
     }
     result = await extraction_node(state, llm=mock_llm)
 
-    assert "conversation_history" in result
-    assert len(result["conversation_history"]) == 1
+    # Extraction 不再返回 conversation_history，避免与 requirements 重复
+    assert "conversation_history" not in result
+    assert "requirements" in result
 
 
 @pytest.mark.asyncio
@@ -76,8 +81,11 @@ async def test_extraction_fallback_on_llm_error():
 
 
 @pytest.mark.asyncio
-async def test_extraction_uses_config_driven_max_tokens():
-    """Extraction 应使用 settings.search.memory_max_tokens 而非硬编码 2000。"""
+async def test_extraction_no_longer_truncates_history():
+    """Extraction 不应再调用 truncate_by_tokens（已移至 retrieval_node）。
+
+    验证 extraction 不再执行 conversation_history 的截断逻辑。
+    """
     mock_llm = MagicMock()
     mock_llm.chat_stream.return_value = _async_gen(json.dumps([
         {"text": "跑鞋", "strategy": "keyword",
@@ -90,18 +98,12 @@ async def test_extraction_uses_config_driven_max_tokens():
         "conversation_history": [],
     }
 
-    # 直接 mock settings 以注入特定 max_tokens 值
-    mock_settings = MagicMock()
-    mock_settings.search.memory_max_tokens = 500
+    with patch("app.agent.memory.truncate_by_tokens") as mock_truncate:
+        result = await extraction_node(state, llm=mock_llm)
 
-    with patch("app.agent.nodes.extraction.settings", mock_settings):
-        with patch("app.agent.memory.truncate_by_tokens") as mock_truncate:
-            mock_truncate.return_value = [{"sub_queries": [{"text": "跑鞋"}]}]
-            await extraction_node(state, llm=mock_llm)
-
-            assert mock_truncate.called
-            kwargs = mock_truncate.call_args.kwargs
-            assert kwargs.get("max_tokens") == 500
+    # Extraction 不再调用截断
+    mock_truncate.assert_not_called()
+    assert "requirements" in result
 
 
 # ---------------------------------------------------------------------------
@@ -159,11 +161,9 @@ async def test_extraction_injects_history_context():
         ],
     }
 
-    with patch("app.agent.memory.truncate_by_tokens") as mock_truncate:
-        mock_truncate.return_value = state["conversation_history"] + [
-            {"sub_queries": [{"text": "墨镜", "strategy": "keyword"}]}
-        ]
-        result = await extraction_node(state, llm=mock_llm)
+    result = await extraction_node(state, llm=mock_llm)
 
     assert "requirements" in result
     assert len(result["requirements"]["sub_queries"]) == 1
+    # conversation_history 不再由 extraction 追加
+    assert "conversation_history" not in result

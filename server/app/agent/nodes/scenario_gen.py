@@ -139,14 +139,10 @@ async def scenario_gen_node(state: dict, llm: LLMService, category_list: str = "
             "sub_category": validated_sub_category,
         })
 
-    # 追加到 conversation_history + 截断
-    new_entry = {"sub_queries": subs_dicts}
-    new_history = conversation_history + [new_entry]
-    from app.agent.memory import truncate_by_tokens
-    new_history = truncate_by_tokens(new_history, max_tokens=settings.search.memory_max_tokens, logger=logger)
-
+    # 注意：conversation_history 的更新移至 retrieval_node，
+    # 在检索完成后才将当前 requirements 写入 memory，避免
+    # requirements 与 conversation_history 重复注入到检索节点。
     return {
         "scenario_description": scenario_description,
         "requirements": {"sub_queries": subs_dicts},
-        "conversation_history": new_history,
     }

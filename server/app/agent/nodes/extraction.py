@@ -97,15 +97,9 @@ async def extraction_node(state: dict, llm: LLMService) -> dict:
         for sq in sub_queries
     ]
 
-    # 追加到 conversation_history
-    new_entry = {"sub_queries": subs_dicts}
-    new_history = conversation_history + [new_entry]
-
-    # 写时截断（使用配置驱动的 token 上限）
-    from app.agent.memory import truncate_by_tokens
-    new_history = truncate_by_tokens(new_history, max_tokens=settings.search.memory_max_tokens, logger=logger)
-
+    # 注意：conversation_history 的更新移至 retrieval_node，
+    # 在检索完成后才将当前 requirements 写入 memory，避免
+    # requirements 与 conversation_history 重复注入到检索节点。
     return {
         "requirements": {"sub_queries": subs_dicts},
-        "conversation_history": new_history,
     }
