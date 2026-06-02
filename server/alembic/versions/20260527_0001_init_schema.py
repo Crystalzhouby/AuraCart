@@ -24,6 +24,7 @@ import sqlalchemy as sa
 from alembic import op
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects.postgresql import TSVECTOR
 
 
 # ---------------------------------------------------------------------------
@@ -251,9 +252,9 @@ def upgrade() -> None:
         sa.Column("metadata", postgresql.JSONB(), nullable=True),
         sa.Column(
             "content_tsv",
-            sa.Text(),
+            TSVECTOR(),
             nullable=True,
-            server_default=sa.text("''"),
+            server_default=sa.text("''::tsvector"),
         ),
         sa.Column(
             "created_at",

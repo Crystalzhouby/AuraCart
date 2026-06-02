@@ -13,8 +13,8 @@ ProductReview ORM 模型
 全文搜索，实现混合（语义 + 关键词）检索。
 """
 
-from sqlalchemy import String, DateTime, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import String, DateTime, Text, text
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
@@ -49,9 +49,9 @@ class ProductReview(Base):
     extra_data : dict | None
         补充的结构化元数据，以 JSONB 持久化。该列在数据库中物理名称为
         ``metadata``（通过 ``name`` 参数指定）。可为空。
-    content_tsv : str | None
-        预计算的全文搜索分词（tsvector），用于 PostgreSQL FTS。
-        默认为空字符串。可为空。
+    content_tsv : TSVECTOR
+        PostgreSQL 原生 tsvector 类型，预计算全文搜索分词。
+        默认为 ``''::tsvector``。可为空。
     created_at : datetime
         行创建时间戳，由数据库服务器自动设置。
     updated_at : datetime
@@ -86,7 +86,7 @@ class ProductReview(Base):
     # 预计算的 tsvector 分词使 PostgreSQL 的 ``@@`` 运算符能够
     # 对评价内容执行关键词查询。
     content_tsv: Mapped[str | None] = mapped_column(
-        Text, nullable=True, server_default=""
+        TSVECTOR(), nullable=True, server_default=text("''::tsvector")
     )
 
     # -- 生命周期 ------------------------------------------------------------

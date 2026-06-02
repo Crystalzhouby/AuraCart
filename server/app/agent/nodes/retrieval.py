@@ -262,6 +262,8 @@ async def retrieval_node(
 
     if not sub_queries:
         return {"retrieval_results": [], "failed_categories": []}
+    
+    logger.info("Retrieval 节点开始", user_query=user_query, sub_query_count=len(sub_queries), category=sub_queries[0].get("category", "") if sub_queries else "")
 
     # Step 1: LLM 需求筛选
     filtered_subs = await _filter_sub_queries(sub_queries, user_query, llm)
