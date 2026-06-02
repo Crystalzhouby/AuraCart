@@ -18,7 +18,11 @@
 
 (2)  **意图提取 (Intent Extraction)**
 
-仅处理明确商品需求路径（`is_scenario=false`）。负责从用户提问中提取结构化 SubQuery 列表，
+仅处理明确商品需求路径（`is_scenario=false`）。负责从用户提问中提取用户的查询意图，结构化 SubQuery 列表，
+     SubQuery(text="IPhone",       strategy="keyword"),
+     SubQuery(text="防晒效果好",      strategy="semantic"),
+     SubQuery(text="价格低于200",   strategy="structured_filter")
+
 复用现有 QueryParser 的查询分解能力（strategy: semantic/keyword/structured_filter）。
 **使用扩展后的 `QUERY_PARSE_SYSTEM`**（`app/rag/prompt.py`）——在现有提示词基础上新增
 `category`/`sub_category` 输出字段 + 品类标记指引 + 需求合并逻辑，与现有 `/api/search`
@@ -26,10 +30,6 @@
 `category`/`sub_category` 字段，使 explicit 路径的 SubQuery 与 Scenario Gen 路径保持数据契约一致，
 Product Retrieval 可按 sub_category 分组而非全部归入 default 组。
 输出 `requirements.sub_queries` 到 Product Retrieval（Memory 写入延迟到检索完成后）。
-
-> **设计决策**：本节点不再输出 `topic_shift` 标志。话题切换的判断完全交由
-> Product Retrieval 的轻量级 LLM 筛选步骤处理，避免僵化的规则式判断
-> 导致跨品类关联需求（如"跑鞋"→"运动袜"）被误判为不相关。
 
 (3)  **场景需求生成与整合 (Scenario Gen)**（合并原 Scenario Integration）
 
@@ -59,6 +59,47 @@ SubQuery 列表的全流程：
   **各组并行执行检索**（Retriever → Generator）。最大并发数 5（`config.yaml` 中
   `search.max_category_concurrency` 可配，启动时加载，运行时不动态调整），
   品类数超出时自动分批并发。
+  检索语句示例：
+  ```sql
+  # 关键词检索
+  SELECT 
+      s.sku_id, 
+      p.product_id, 
+      pr.content
+      (CASE pr.source 
+          WHEN 'marketing'   THEN 1.0 
+          WHEN 'faq'         THEN 1.0 
+          WHEN 'user_review' THEN 0.7 
+          ELSE 1.0 
+      END * ts_rank(pr.content_tsv, plainto_tsquery('chinese', '防晒霜'))
+      ) AS score 
+  FROM product_review pr 
+  JOIN product p ON p.product_id = pr.product_id AND p.is_active = TRUE 
+  JOIN sku s ON s.product_id = p.product_id AND s.is_active = TRUE 
+  GROUP BY s.sku_id, p.product_id 
+  ORDER BY score DESC 
+  LIMIT 20;
+
+  # 语义检索
+  SELECT 
+      s.sku_id, 
+      p.product_id, 
+      pr.content
+      SUM(CASE pr.source 
+              WHEN 'marketing'   THEN 1.0 
+              WHEN 'faq'         THEN 1.0 
+              WHEN 'user_review' THEN 0.7 
+              ELSE 1.0 
+          END * (1 - (pr.embedding <=> '[0.09198962897062302, -0.02875818870961666, -0.031089933589100838, -0.0019602661]'))
+      ) AS score 
+  FROM product_review pr 
+  JOIN product p ON p.product_id = pr.product_id AND p.is_active = TRUE 
+  JOIN sku s ON s.product_id = p.product_id AND s.is_active = TRUE 
+  GROUP BY s.sku_id, p.product_id 
+  ORDER BY score DESC 
+  LIMIT 20;
+  ```
+
 - **独立 DB session**：每个并行任务通过 `async_session()` 创建**独立 AsyncSession**，
   从连接池获取独立连接，确保真正并发执行。连接池 `pool_size` ≥ `max_category_concurrency` + 3
   （默认 ≥ 8，预留 buffer 应对并发请求），`max_overflow` = 5。
@@ -82,9 +123,7 @@ SubQuery 列表的全流程：
 
 在 Product Retrieval **所有品类返回后执行一次**。
 从 **`AgentState.retrieval_results`** 读取全部商品的检索结果（含完整 SKU 详情 +
-product_review matched_texts），**无需访问数据库**（商品基础信息和评价内容均已包含在
-`retrieval_results` 中）。基于当前用户需求、全部已检索商品（含评价原文）、对话历史以及
-（若触发场景路径）原始场景描述，生成 2-4 条下一步推荐选项。
+检索到的product_review，即matched_texts），**无需访问数据库**（商品基础信息和评价内容均已包含在`retrieval_results` 中）。基于当前用户需求、全部已检索商品（含评价原文）、对话历史以及（若触发场景路径）原始场景描述，生成 2-4 条下一步推荐选项。
 选项可灵活针对不同推荐品类的商品。
 战略上生成互补品推荐、替代品探索、属性细化、预算调整四类选项。
 输出追加到最终回复中。
