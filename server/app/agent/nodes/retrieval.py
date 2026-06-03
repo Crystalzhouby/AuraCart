@@ -10,6 +10,7 @@ Product Retrieval 节点 — 最复杂节点。
 """
 import asyncio
 import json
+import traceback
 import structlog
 
 from app.config import settings
@@ -238,7 +239,8 @@ async def _category_task(
             }
 
     except Exception as e:
-        logger.error(f"品类检索失败: {category}/{sub_category}", error=str(e))
+        logger.error(f"品类检索失败: {category}/{sub_category}",
+                     error=str(e), traceback=traceback.format_exc())
         return {
             "category": category,
             "sub_category": sub_category,

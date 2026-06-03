@@ -7,7 +7,7 @@ Intent Extraction 节点 — 明确商品需求路径。
 import json
 import structlog
 from app.config import settings
-from app.rag.prompt import QUERY_PARSE_SYSTEM
+from app.rag.prompt import build_parse_prompt
 from app.services.llm import LLMService
 
 logger = structlog.get_logger("agent.extraction")
@@ -46,12 +46,21 @@ def _format_history_context(conversation_history: list[dict]) -> str:
     return f"{header}\n{body}"
 
 
-async def extraction_node(state: dict, llm: LLMService) -> dict:
+async def extraction_node(
+    state: dict,
+    llm: LLMService,
+    category_list: str = "",
+    valid_categories: set | None = None,
+) -> dict:
     """Intent Extraction 节点函数。
 
     参数:
         state: AgentState 字典。
         llm: LLMService 实例。
+        category_list: 按 category 分组的品类清单字符串，
+            由 fetch_category_context() 生成。默认 "" 表示不注入。
+        valid_categories: 合法 (category, sub_category) 对集合，
+            用于后校验。默认 None 表示跳过后校验。
 
     返回值:
         dict: {"requirements": {"sub_queries": [...]}, "conversation_history": [...]}
@@ -59,11 +68,11 @@ async def extraction_node(state: dict, llm: LLMService) -> dict:
     user_query = state.get("user_query", "")
     conversation_history = state.get("conversation_history", [])
 
-    # 组装提示词：QUERY_PARSE_SYSTEM + 历史需求上下文 + 用户查询
+    # 组装提示词：品类约束提示词 + 历史需求上下文 + 用户查询
     history_context = _format_history_context(conversation_history)
-    system_prompt = QUERY_PARSE_SYSTEM
+    system_prompt = build_parse_prompt(category_list)
     if history_context:
-        system_prompt = QUERY_PARSE_SYSTEM + "\n\n" + history_context
+        system_prompt = system_prompt + "\n\n" + history_context
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -85,6 +94,11 @@ async def extraction_node(state: dict, llm: LLMService) -> dict:
         logger.warning("Extraction LLM 调用失败，使用 fallback", error=str(e))
         from app.services.retriever import SubQuery
         sub_queries = [SubQuery(text=user_query, strategy="semantic")]
+
+    # 后校验：确保 LLM 输出的品类值严格合法
+    if valid_categories:
+        from app.services.category_lookup_service import validate_categories
+        sub_queries = validate_categories(sub_queries, valid_categories)
 
     # 转为可序列化字典列表
     subs_dicts = [

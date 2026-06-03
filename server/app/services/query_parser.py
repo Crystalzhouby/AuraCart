@@ -14,10 +14,12 @@
 """
 
 import json
+import structlog
 from app.services.retriever import SubQuery
 from app.services.llm import LLMService
-from app.rag.prompt import QUERY_PARSE_SYSTEM
+from app.rag.prompt import build_parse_prompt
 
+logger = structlog.get_logger("query_parser")
 
 __all__ = ["QueryParser", "SubQuery"]
 
@@ -40,22 +42,33 @@ class QueryParser:
         """
         self.llm = llm
 
-    async def parse(self, user_query: str) -> list[SubQuery]:
+    async def parse(
+        self,
+        user_query: str,
+        category_list: str = "",
+        valid_categories: set[tuple[str, str]] | None = None,
+    ) -> list[SubQuery]:
         """
         将用户的自然语言查询解析为结构化的子查询。
 
         将查询与系统提示一同发送给 LLM，并将 JSON 响应
-        解析为 SubQuery 对象。
+        解析为 SubQuery 对象。若传入 category_list，则将其注入提示词
+        以约束 LLM 只输出合法品类值。
 
         参数：
             user_query (str)：原始用户查询字符串。
+            category_list (str)：按 category 分组的品类清单，
+                由 fetch_category_context() 生成。默认 "" 表示不注入。
+            valid_categories (set|None)：合法 (category, sub_category) 对集合，
+                用于后校验。默认 None 表示跳过后校验。
 
         返回值：
             list[SubQuery]：解析后的子查询列表，每个子查询指定
                             文本、策略、否定标记和可选过滤条件。
         """
+        system_prompt = build_parse_prompt(category_list)
         messages = [
-            {"role": "system", "content": QUERY_PARSE_SYSTEM},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_query},
         ]
 
@@ -65,7 +78,14 @@ class QueryParser:
         async for token in self.llm.chat_stream(messages, temperature=0.1):
             parts.append(token)
         response = "".join(parts)
-        return self._parse_response(response)
+        sub_queries = self._parse_response(response)
+
+        # 后校验：确保 LLM 输出的品类值严格合法
+        if valid_categories:
+            from app.services.category_lookup_service import validate_categories
+            sub_queries = validate_categories(sub_queries, valid_categories)
+
+        return sub_queries
 
     def _parse_response(self, llm_output: str) -> list[SubQuery]:
         """

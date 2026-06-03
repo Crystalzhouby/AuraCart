@@ -118,16 +118,26 @@ async def search(
     )
     generator = Generator(llm=llm)
 
-    async def _run_pipeline(q: str) -> dict:
+    async def _run_pipeline(q: str, db: AsyncSession) -> dict:
         """执行 RAG 管线阶段 1-3，流式/非流式共用。"""
         pipeline_log = structlog.get_logger("search")
         result: dict = {}
+
+        # ---- 加载品类列表 ----
+        category_list = ""
+        valid_categories = None
+        try:
+            from app.services.category_lookup_service import fetch_category_context
+            category_list, valid_categories = await fetch_category_context(db)
+        except Exception:
+            pass
 
         # ---- 阶段 1: 查询解析 (LLM) ----
         pipeline_log.info("阶段1: 查询解析开始", raw_query=q)
         try:
             sub_queries = await asyncio.wait_for(
-                parser.parse(q), timeout=settings.timeout.query_parse
+                parser.parse(q, category_list=category_list, valid_categories=valid_categories),
+                timeout=settings.timeout.query_parse,
             )
         except asyncio.TimeoutError:
             pipeline_log.info("阶段1: 查询解析超时，回退为语义检索")
@@ -173,7 +183,7 @@ async def search(
     if not stream:
         pipeline_log = structlog.get_logger("search")
         try:
-            result = await _run_pipeline(q)
+            result = await _run_pipeline(q, db)
             products = result["products"]
             subs = result["sub_queries"]
 

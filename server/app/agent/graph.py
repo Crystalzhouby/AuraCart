@@ -96,7 +96,20 @@ def build_graph(llm, emb_service, async_session_factory, category_list_provider=
 
     async def _extraction(state: AgentState) -> dict:
         logger.debug("extraction 输入", state=_preview(state))
-        result = await extraction_node(state, llm=llm)
+        # 加载品类上下文（提示词注入 + 后校验用）
+        category_list = ""
+        valid_categories = None
+        try:
+            from app.services.category_lookup_service import fetch_category_context
+            async with async_session_factory() as session:
+                category_list, valid_categories = await fetch_category_context(session)
+        except Exception as e:
+            logger.warning("extraction 品类加载失败，降级为无约束", error=str(e))
+        result = await extraction_node(
+            state, llm=llm,
+            category_list=category_list,
+            valid_categories=valid_categories,
+        )
         logger.debug("extraction 输出", result=_preview(result))
         return result
 
