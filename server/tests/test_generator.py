@@ -409,17 +409,16 @@ class TestGeneratorPrompt:
     """验证 GENERATOR_SYSTEM 包含预期的行为约束规则。"""
 
     def test_rule_8_cover_all_products(self):
-        """规则 8: 必须为每一个商品都说明推荐理由。"""
+        """规则 3（硬约束）: 必须为每一个商品都说明推荐理由。"""
         from app.rag.prompt import GENERATOR_SYSTEM
-        assert "必须为结果列表中的每一个商品都说明推荐理由" in GENERATOR_SYSTEM
-        assert "不能只推荐其中一个" in GENERATOR_SYSTEM
+        assert "必须为结果列表中每一个商品说明推荐理由" in GENERATOR_SYSTEM
         # SKU 合并说明也在同一规则中
-        assert "如果多个SKU属于同一商品，合并介绍" in GENERATOR_SYSTEM
+        assert "同商品多 SKU 的，合并介绍后简要说明各 SKU 规格差异和价格" in GENERATOR_SYSTEM
 
     def test_rule_9_address_all_intents(self):
-        """规则 9: 逐条回应用户关心的每个需求。"""
+        """规则 4（硬约束）: 逐条回应用户关心的每个需求。"""
         from app.rag.prompt import GENERATOR_SYSTEM
-        assert "逐条回应每个需求是否满足" in GENERATOR_SYSTEM
+        assert "用户有多条评价类需求时，逐条回应是否满足" in GENERATOR_SYSTEM
         # 缺少数据时的降级行为
         assert "目前商品信息中未提及" in GENERATOR_SYSTEM
 
