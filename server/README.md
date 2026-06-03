@@ -92,7 +92,7 @@ python scripts/import_data.py ../ecommerce_agent_dataset/data
 cd server
 
 python run.py                          # 默认 INFO 日志, 端口 8000
-python run.py --log DEBUG              # DEBUG 日志级别
+python run.py --log DEBUG              # 输出 DEBUG级别 日志
 python run.py --port 8080              # 指定端口
 python run.py --reload                 # 开发模式热重载
 ```

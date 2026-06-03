@@ -1,2 +1,0 @@
-需要修改一下流式返回检索到的商品信息和推荐理由的逻辑，不要分品类独立流式返回了，_category_task函数只根据sub_queries检索商品信息，即(product_id,sku_id)，并根据检索到的product_review生成推荐理由reason，最后将(product_id,sku_id,reason)返回到retrieval_node中，接下来，retrieval_node以品类为组顺序返回每个品类推荐的商品信息，（product_id，sku_id），以及推荐理由reason。
-没必要现在每个品类都独自SSE返回。
