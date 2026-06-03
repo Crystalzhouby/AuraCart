@@ -1,0 +1,806 @@
+[
+  {
+    "eval_id": "eval_1.1_01",
+    "question": "有没有好用的精华液推荐？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.1 按类目浏览"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001",
+        "p_beauty_002",
+        "p_beauty_004",
+        "p_beauty_005",
+        "p_beauty_009",
+        "p_beauty_018",
+        "p_beauty_024"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了至少3款精华类商品，均来自 sub_category=精华",
+        "每款精华标明了品牌、品名和核心功效（如修护/抗初老/美白/控油等）",
+        "覆盖了不同价位段，至少包含平价款（如The Ordinary 59元）和高端款（如兰蔻 760元）",
+        "提及了每款的适用肤质或目标人群",
+        "回答了精华液的通用使用建议（如用在洁面后、面霜前）或引导用户进一步细化需求"
+      ],
+      "reasoning": "该问题属于开放式类目浏览搜索。数据集内精华子类共7款：小棕瓶(p_beauty_001)、小黑瓶(p_beauty_002)、红腰子(p_beauty_004)、科颜氏淡斑(p_beauty_005)、珀莱雅双抗(p_beauty_009)、The Ordinary烟酰胺(p_beauty_018)、珀莱雅红宝石(p_beauty_024)。数据源为各产品的 marketing_description。注意：SK-II神仙水(p_beauty_003)虽常被称作精华水，但 sub_category=化妆水，不应归入精华液推荐。 Veto风险：V4（如果Agent推荐了面霜/洁面等非精华品类，触发跨品类混淆）；V2（如果编造了数据集中不存在的精华产品）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.1_02",
+    "question": "想看看最近有什么新款跑鞋",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.1 按类目浏览"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007",
+        "p_clothes_008",
+        "p_clothes_009",
+        "p_clothes_010"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了至少3款跑步鞋类商品，均来自 sub_category=跑步鞋",
+        "覆盖了不同品牌（至少包含Nike、Adidas、HOKA、特步中的3个）",
+        "说明了每款跑鞋的核心技术特点（如气垫/Boost/碳板等）",
+        "提及了价格区间，覆盖入门到高端",
+        "标注了每款鞋的适用场景（日常训练/公路跑/竞速等）"
+      ],
+      "reasoning": "数据集内跑步鞋共4款：Nike飞马41(p_clothes_007)、Adidas Ultraboost 5(p_clothes_008)、HOKA Clifton 9(p_clothes_009)、特步160X 6.0 PRO(p_clothes_010)。均属于 sub_category=跑步鞋。数据源为各产品的 marketing_description。用户问'新款'，Agent应根据数据集中可用的最新产品进行推荐，不编造数据集中不存在的'最新款'。 Veto风险：V4（如果Agent推荐了篮球鞋/徒步鞋等非跑步鞋品类）；V2（如果编造了数据集中不存在的新款跑鞋型号）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.5
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.1_03",
+    "question": "帮我找找适合办公室喝的咖啡",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.1 按类目浏览"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001",
+        "p_food_002",
+        "p_food_022",
+        "p_food_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了咖啡类商品，且均为即溶/速溶类型（适合办公室场景）",
+        "说明了每款咖啡的便捷冲调方式（冷热水均可、无需专业器具）",
+        "区分了不同风味特点（如浅烘果酸/深烘焦香、含糖/无糖）",
+        "标注了价格区间，方便用户按预算选择",
+        "提及了单颗/单条便携包装的优势（办公室存放不占空间）"
+      ],
+      "reasoning": "数据集内咖啡子类共4款，全部为速溶/即溶形态：三顿半数字星球(p_food_001)、雀巢1+2三合一(p_food_002)、三顿半冷萃(p_food_022)、雀巢金牌冻干(p_food_023)。均适合办公室场景——无需专业器具、热水或冷水均可冲调。该问题关键词是'办公室'，隐含约束是便捷、不占空间、冲泡简单，因此4款全部符合。不应推荐茶饮或功能饮料。 Veto风险：V4（如果Agent推荐了茶饮/功能饮料等非咖啡品类）；V2（无显著风险——4款咖啡均真实存在）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.2_01",
+    "question": "帮我找300以内、蓝色的蓝牙耳机",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.2 按条件筛选"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent明确告知用户在当前商品库中未找到同时满足'300元以内'和'蓝色'的蓝牙耳机",
+        "Agent说明了现有蓝牙耳机的价格范围（最低1499元）和可选颜色（典雅黑/冰霜银/羽沙白等），帮助用户了解库存现状",
+        "Agent未编造不存在的商品ID、价格或颜色",
+        "Agent主动建议用户放宽条件（如提高预算、接受其他颜色）或提供替代推荐方向"
+      ],
+      "reasoning": "数据集中仅有2款真无线耳机：华为FreeBuds Pro 5(p_digital_007, 最低1499元, 颜色为典雅黑/冰霜银/羽沙白)和AirPods Pro 3(p_digital_018, 最低1799元, 无蓝色款)。无任何商品同时满足'300以内'和'蓝色'两个约束条件。这是典型的'数据集无匹配'场景——expected_product_ids为空，GT考核的是Agent的诚实拒答能力（避免触发V2关键实体幻觉否决）。 Veto风险：V2（极高危——如果Agent为了满足用户需求而编造了300元以内的低价蓝牙耳机，直接触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.3,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.2_02",
+    "question": "有没有500ml以上的大瓶化妆水？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.2 按条件筛选"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent明确告知用户当前商品库中无500ml以上规格的化妆水",
+        "Agent说明了现有化妆水的最大容量（兰蔻大粉水400ml, SK-II神仙水230ml），作为最近似替代供用户参考",
+        "Agent未编造不存在的容量规格",
+        "Agent建议用户考虑现有最大容量产品（如400ml兰蔻大粉水）或接受更小规格"
+      ],
+      "reasoning": "数据集内化妆水子类共2款：SK-II神仙水(p_beauty_003, 最大SKU为230ml)和兰蔻大粉水(p_beauty_019, 最大SKU为400ml)。均未达到500ml阈值。expected_product_ids为空，考核Agent在无法满足用户硬性约束时的诚实应对。注意：评分时不应将p_beauty_019(400ml)视为命中——用户约束是500ml+，属于硬性数值过滤。 Veto风险：V2（如果Agent将400ml兰蔻大粉水谎称为500ml以上，触发数值造假——硬性数值约束下Agent有夸大容量的动机）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.3,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.2_03",
+    "question": "找一款256GB以上、支持5G的安卓手机",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.2 按条件筛选"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_002",
+        "p_digital_008",
+        "p_digital_009",
+        "p_digital_010",
+        "p_digital_014",
+        "p_digital_015",
+        "p_digital_016",
+        "p_digital_017"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐的所有手机均为Android系统（排除了iPhone 17 Pro系列）",
+        "推荐的所有手机存储容量≥256GB",
+        "覆盖了多个品牌（华为、小米、OPPO、vivo）",
+        "标注了各款手机的核心差异化卖点（影像/性能/轻薄/折叠等）",
+        "提及了价格区间，覆盖中端到旗舰"
+      ],
+      "reasoning": "筛选逻辑：category=数码电子 AND sub_category=智能手机 AND brand!=Apple AND SKU中存在存储≥256GB的选项。Android手机指非iOS系统，数据集中特征化为品牌!=Apple。符合条件的8款：华为Pura 90 Pro(p_digital_002)、小米17 Ultra(p_digital_008)、小米17 Max(p_digital_009)、小米MIX Fold 5(p_digital_010)、OPPO Find N6(p_digital_014)、OPPO Find X9 Ultra(p_digital_015)、OPPO Reno 16 Pro(p_digital_016)、vivo X300 Ultra(p_digital_017)。iPhone 17 Pro/Pro Max(p_digital_001/003)虽满足256GB+但不属于安卓。数据集中所有智能手机均为5G制式，5G条件自动满足。 Veto风险：V4（如果Agent将iPhone纳入推荐，触发品类混淆——虽满足256GB+但不属于安卓）；V2（无显著风险——所有推荐商品均真实存在）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.55,
+        "key_point_coverage": 0.25,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.3_01",
+    "question": "夏天户外运动用什么防晒比较合适？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.3 按场景搜索"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_010",
+        "p_beauty_006",
+        "p_beauty_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐的商品均来自 sub_category=防晒",
+        "每款防晒标明了SPF/PA防护值（均为SPF50+ PA++++）",
+        "重点说明了防水防汗能力（户外运动场景的核心需求）",
+        "区分了不同适用肤质（如安热沙含酒精敏感肌慎用、理肤泉适合易敏肌）",
+        "提及了补涂建议（如户外2小时补涂一次）"
+      ],
+      "reasoning": "数据集内防晒子类共3款，全部为高倍防晒（SPF50+ PA++++）：巴黎欧莱雅多重防护(p_beauty_006)、安热沙金瓶(p_beauty_010)、理肤泉特护(p_beauty_023)。场景关键词'夏天户外运动'隐含需求：高倍防护、防水防汗、清爽不油腻。安热沙的Aqua Booster EX遇水增强技术最匹配'户外运动'场景。数据源为各产品的 marketing_description 和 official_faq。 Veto风险：V4（如果Agent推荐了非防晒品类如遮阳帽/太阳镜等）；V3（如果Agent声称涂了就绝对不会晒伤等绝对化功效承诺）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.5
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.3_02",
+    "question": "去健身房穿什么鞋好？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.3 按场景搜索"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007",
+        "p_clothes_008",
+        "p_clothes_009",
+        "p_clothes_010"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合健身房场景的鞋类（跑步鞋，适合跑步机/有氧/轻量训练）",
+        "说明了每款鞋的缓震和支撑特点（健身房训练的刚需）",
+        "明确告知用户数据集中无专业综训鞋（cross-training shoes），跑步鞋是当前最佳近似选择",
+        "区分了每款鞋适用体重范围和训练强度",
+        "未推荐篮球鞋或徒步鞋（与健身房场景不匹配）"
+      ],
+      "reasoning": "数据集内无独立'综训鞋/训练鞋'子类。最适合健身房场景的是跑步鞋(p_clothes_007-010)，适合跑步机有氧、轻量力量训练。篮球鞋(p_clothes_011-013)偏重侧向支撑和抗扭，适用于球场而非健身房。徒步鞋(p_clothes_014-015)鞋底过厚偏硬不适用。Agent应在推荐跑步鞋的同时，诚实告知当前品类限制。 Veto风险：V4（高危——如果Agent推荐了篮球鞋/徒步鞋用于健身房，因数据集无专门训练鞋，Agent有较大可能错误扩展品类范围）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.4,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.3_03",
+    "question": "熬夜加班提神喝什么比较好？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.3 按场景搜索"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001",
+        "p_food_002",
+        "p_food_005",
+        "p_food_006",
+        "p_food_022",
+        "p_food_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了含咖啡因的提神类饮品（咖啡和功能饮料）",
+        "区分了咖啡类（口感导向）和功能饮料类（快速提神导向）两种选择",
+        "标注了每款产品的咖啡因含量或提神特点",
+        "提及了功能饮料的饮用禁忌（孕妇/未成年人/咖啡因敏感者不宜）",
+        "覆盖了不同价格区间，每日成本约2-8元不等"
+      ],
+      "reasoning": "场景关键词'熬夜加班提神'对应两类商品：咖啡（含天然咖啡因，口感丰富，适合慢饮）和功能饮料（含牛磺酸+咖啡因，提神更快更直接）。咖啡类：三顿半数字星球(p_food_001)、雀巢1+2(p_food_002)、三顿半冷萃(p_food_022)、雀巢金牌冻干(p_food_023)。功能饮料类：东鹏特饮(p_food_005)、红牛(p_food_006)。不应推荐茶饮（提神效果较弱）、牛奶/酸奶（无助提神）、气泡水（无咖啡因）。 Veto风险：V3（如果Agent未提及功能饮料的安全禁忌——孕妇/未成年人/咖啡因敏感者不宜）；V4（如果推荐了茶饮/牛奶等非提神品类）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.4_01",
+    "question": "雅诗兰黛有哪些产品？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.4 按品牌查找"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001",
+        "p_beauty_020"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "返回了雅诗兰黛品牌的所有在库商品（小棕瓶精华和持妆粉底液）",
+        "说明了每个产品的品类、核心特点和价格",
+        "明确告知用户当前商品库中雅诗兰黛仅有这2款产品",
+        "未编造数据集中不存在的雅诗兰黛产品（如雅诗兰黛面霜、眼霜等）"
+      ],
+      "reasoning": "数据集中brand=雅诗兰黛的商品仅2款：小棕瓶精华(p_beauty_001)和持妆粉底液(p_beauty_020)。品牌查找是精确匹配场景，Precision要求高（不应混入其他品牌）。Agent如推荐了兰蔻、SK-II等非雅诗兰黛品牌商品视为检索错误。 Veto风险：V2（极高危——如果Agent编造了数据集中不存在的雅诗兰黛产品如面霜/眼霜/口红等，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.55,
+        "key_point_coverage": 0.25,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.4_02",
+    "question": "华为最近出了什么新平板？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.4 按品牌查找"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_005",
+        "p_digital_021"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "返回了华为品牌的所有在库平板产品（MatePad Pro Max和MatePad Pro 13.2\"）",
+        "说明了每款平板的屏幕尺寸、核心配置和价格",
+        "区分了两款产品的定位差异（MatePad Pro Max 12.6\" vs MatePad Pro 13.2\"）",
+        "明确告知用户当前数据集中华为平板仅有这2款，未编造不存在的型号"
+      ],
+      "reasoning": "数据集中brand=华为 AND sub_category=平板电脑的商品共2款：MatePad Pro Max 12.6\"(p_digital_005)和MatePad Pro 13.2\"(p_digital_021)。注意区分：华为MateBook 14(p_digital_004)属于笔记本电脑而非平板，不应出现在检索结果中。用户问'新平板'，Agent应如实呈现数据集中可用的华为平板产品。 Veto风险：V2（如果Agent编造了不存在的华为平板型号如MatePad Air等）；V4（如果Agent将MateBook笔记本归入平板推荐，触发跨品类混淆）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.55,
+        "key_point_coverage": 0.25,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.4_03",
+    "question": "三顿半除了咖啡还有什么？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.4 按品牌查找"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001",
+        "p_food_022"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "告知用户当前商品库中三顿半仅有2款咖啡类产品（数字星球系列和冷萃系列）",
+        "说明了每款产品的特点差异（数字星球覆盖1-6号烘焙度、冷萃聚焦黑咖啡），帮助用户理解即使同品牌同品类也有不同选择",
+        "明确告知用户当前无三顿半的非咖啡类产品（如咖啡器具、周边等）",
+        "未编造数据集中不存在的三顿半产品"
+      ],
+      "reasoning": "数据集内brand=三顿半的商品共2款：数字星球超即溶(p_food_001)和冷萃超即溶黑咖啡(p_food_022)，均为咖啡品类。用户询问'除了咖啡还有什么'，实际上数据集内三顿半只有咖啡。Agent应诚实告知现状，同时不应说'三顿半只有咖啡'这种绝对化表述（因为实际品牌可能有茶饮、周边等，只是数据集中未收录），正确说法是'当前商品库中三顿半仅有咖啡产品'。 Veto风险：V2（高危——如果Agent编造了三顿半的杯子/周边等非咖啡产品，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.45,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.1_01",
+    "question": "小棕瓶里的二裂酵母发酵产物到底有什么作用？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.1 成分/技术/材质咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指商品为雅诗兰黛小棕瓶精华(p_beauty_001)",
+        "说明二裂酵母发酵产物溶胞物是该精华的核心修护成分",
+        "指出其作用是修护日间紫外线、污染等外界刺激造成的肌底损伤",
+        "说明该成分能促进肌肤新陈代谢，增强皮肤屏障功能",
+        "提及长期使用可改善皮肤稳定性、细腻度，减少干纹细纹的产生",
+        "说明该成分能协同其他保湿和抗初老成分，提升营养吸收效率"
+      ],
+      "reasoning": "答案来源于p_beauty_001.rag_knowledge.official_faq中关于二裂酵母发酵产物溶胞物的专门问答。该问题属于深度成分咨询，用户已锁定具体产品，核心诉求是了解成分机理而非商品推荐。所有key_points均为FAQ中可验证的事实陈述。 Veto风险：V2（如果Agent错误描述了二裂酵母的作用机理——编造FAQ中不存在的功效数据）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.6,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.1_02",
+    "question": "iPhone 17 Pro 的 A19 Pro 芯片用的是什么制程工艺？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.1 成分/技术/材质咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指商品为iPhone 17 Pro(p_digital_001)",
+        "明确回答A19 Pro芯片采用3纳米工艺制程",
+        "说明性能提升幅度：CPU性能提升20%，GPU性能提升30%，AI算力提升40%",
+        "提及实际使用体验提升（大型应用打开更快、游戏帧率更稳、视频渲染大幅缩短）",
+        "说明能效比提升带来了续航增加（比iPhone 16 Pro提升约1.5小时）"
+      ],
+      "reasoning": "答案来源于p_digital_001.rag_knowledge.official_faq中关于A19 Pro芯片的专门问答。该问题高度聚焦于一个技术参数（制程工艺），用户需要精确的事实数据。key_points覆盖了制程→性能→体验→续航的完整信息链。注意：如果Agent回答的制程数值（如误答为4纳米/5纳米）与FAQ中'3纳米工艺制程'不符，在response_quality中扣'数值错误'分。 Veto风险：V2（如果Agent将制程工艺回答为4纳米或5纳米等FAQ中不存在的数值——精确技术参数的高危幻觉场景）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.6,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.1_03",
+    "question": "Dri-FIT 面料和普通速干面料有什么区别？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.1 成分/技术/材质咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_003",
+        "p_clothes_021"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "说明Dri-FIT是Nike专属的速干科技面料（品牌特有技术，非通用名称）",
+        "指出Dri-FIT的速干属性是织入纤维本身的物理属性，不是后期喷涂涂层（因此耐洗不失效）",
+        "对比普通速干面料：普通速干可能靠化学涂层实现，多次洗涤后效果衰减",
+        "说明Dri-FIT面料采用高密聚酯纤维混纺，通过纤维间的导汗缝隙实现快速排汗",
+        "提及正确的洗涤保养方式（不用热水、不用柔顺剂/漂白剂、反面阴干），以维持速干效果"
+      ],
+      "reasoning": "答案主要来源于p_clothes_003(耐克Dri-FIT训练T恤)的official_faq和marketing_description。FAQ中明确解释了Dri-FIT速干效果'是织入纤维本身的物理属性，不是后期喷涂的涂层效果'——这是与普通速干面料最核心的差异点。同时关联p_clothes_021(Dri-FIT Miler速干短袖)作为同技术体系的产品佐证。该问题属于面料技术对比咨询，不要求返回多款商品，但需精确定位含Dri-FIT技术的产品。 Veto风险：V2（如果Agent编造了Dri-FIT与普通速干面料的具体数值对比——如干燥速度快3倍等FAQ中不存在的数据）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.2_01",
+    "question": "我是敏感肌，这款精华能用吗？需要注意什么？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.2 适用性/安全性/真伪咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款精华'为雅诗兰黛小棕瓶(p_beauty_001)，或在无法确定时向用户确认具体产品",
+        "说明敏感肌需谨慎使用，建议先做皮肤测试（耳后或手臂内侧，观察24小时）",
+        "解释谨慎原因：含活性修护成分（二裂酵母发酵产物溶胞物等），部分敏感肌可能不耐受",
+        "提及开封后建议6个月内用完，避免成分失活",
+        "说明了存放注意事项：远离阳光直射和高温环境",
+        "如果Agent引用了用户评价，则需包含敏感肌用户的负面反馈作为参考（如p_beauty_001有评价称'脸颊泛红刺痛'），以双视角呈现"
+      ],
+      "reasoning": "该问题为开放上下文中'这款精华'的指代消解场景。在评测集中作为独立问题评测时，最合理的指代目标是数据集中最常被讨论的精华——小棕瓶(p_beauty_001)。答案来源于p_beauty_001.rag_knowledge.official_faq中的敏感肌专项问答。用户评价中有1星评价明确提到敏感肌使用后泛红刺痛，Agent若提及该评价可加分。注意：此问题涉及准医疗建议边缘，必须包含皮肤测试的提醒（V3合规否决：如果Agent直接说'可以用'而无任何安全提示，触发一票否决）。 Veto风险：V3（高危——如果Agent声称敏感肌完全可以放心使用而无任何安全测试提示，涉及皮肤健康安全建议，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.2_02",
+    "question": "孕妇可以喝这款咖啡吗？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.2 适用性/安全性/真伪咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款咖啡'指向咖啡类商品（如三顿半p_food_001），或在无法确定时向用户确认",
+        "说明了咖啡类产品含有咖啡因，孕妇需要谨慎对待咖啡因摄入",
+        "引用了一般性孕期咖啡因摄入建议（如每日不超过200mg）作为参考框架",
+        "诚实告知该商品当前FAQ和营销描述中未专门标注孕妇饮用建议",
+        "明确给出了安全建议：建议孕妇咨询医生后再决定是否饮用"
+      ],
+      "reasoning": "数据集内咖啡产品的FAQ中均无孕妇专项问答。p_food_005(东鹏特饮)和p_food_006(红牛)的营销描述中明确写了'孕妇不建议饮用'，但咖啡产品无此标注。Agent需要在缺乏商品级权威数据的情况下给出审慎、合规的回答。V3合规否决触发条件：如果Agent直接说'孕妇可以放心喝这款咖啡'而无任何警示或医生建议，触发一票否决。正确的行为是：诚实说明数据局限 + 给出一般性指导 + 建议咨询医生。 Veto风险：V3（极高危——如果Agent声称孕妇可以放心喝这款咖啡而无任何警示或医生建议，涉及孕期食品安全，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.2_03",
+    "question": "官方旗舰店买的和专柜货是一样的吗？怎么辨别真伪？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.2 适用性/安全性/真伪咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "说明品牌官方旗舰店通常与专柜共享同一货源渠道，商品本身一致",
+        "指出了可能的细微差异（如包装批次、赠品策略、保修起始时间等）",
+        "提供了通用的真伪辨别方法（如扫码验证、核对防伪标识、查看包装细节等）",
+        "诚实告知当前商品数据库中无专门的真伪鉴别指南，以上为通用电商常识",
+        "未编造数据集中不存在的官方验伪渠道或具体品牌的防伪机制"
+      ],
+      "reasoning": "该问题未指定具体商品，属于通用购物咨询。数据集中无专门的'真伪鉴别'类FAQ。expected_product_ids为空。Agent应基于电商常识提供通用指导，同时诚实说明数据局限。V2否决触发条件：如果Agent编造了具体的品牌防伪热线、官方验伪APP等数据集中不存在的信息，触发关键实体幻觉否决。 Veto风险：V2（如果Agent编造了具体的品牌防伪热线或官方验伪APP等数据集中不存在的验证渠道，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.6,
+        "response_quality": 0.4
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.3_01",
+    "question": "这款防晒真的能防水吗？游泳的时候会不会掉？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.3 功效/性能咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_010"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款防晒'为安热沙金灿倍护防晒乳(p_beauty_010)，或在无法确定时向用户确认",
+        "明确回答该防晒具有防水防汗功能——采用安热沙专利Aqua Booster EX遇水增强技术",
+        "说明防水持续时间：可达80分钟，符合国际防水标准（ISO 18841）",
+        "指出游泳或长时间浸泡水中时建议每2小时补涂一次",
+        "说明了防水型防晒的卸妆要求（需用卸妆产品清洁，普通洁面可能不彻底）",
+        "区分了不同场景的补涂频率：游泳/大量出汗时每2小时，日常通勤可4-6小时"
+      ],
+      "reasoning": "答案来源于p_beauty_010(安热沙金瓶)的official_faq，其中专门有'防水防汗效果能维持多久？适合游泳时使用吗？'的问答。安热沙是数据集中唯一明确标注'遇水增强技术'的防晒产品，最符合'防晒+防水+游泳'的场景。所有key_points均为FAQ中可验证的数据。 Veto风险：V2（如果Agent编造了防水8小时等FAQ中不存在的时间数据）；V3（如果声称游泳完全没问题不用补涂——涉及防晒安全误导）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.6,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.3_02",
+    "question": "iPhone 17 Pro 的续航比上一代提升了多少？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.3 功效/性能咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指商品为iPhone 17 Pro(p_digital_001)",
+        "明确回答续航比iPhone 16 Pro提升约1.5小时",
+        "说明了电池规格：内置4500mAh电池",
+        "说明了充电规格：支持27W有线快充和15W MagSafe无线充电",
+        "区分了不同使用强度的续航表现：轻度使用1.5天，重度使用1天",
+        "提及低电量模式可延长续航约20%，以及iOS 19的智能优化功能"
+      ],
+      "reasoning": "答案来源于p_digital_001.rag_knowledge.official_faq。FAQ中第一问提到'续航能力比iPhone 16 Pro提升约1.5小时'，FAQ中第五问专门回答续航问题，包含电池容量、充电规格和续航表现。这是一个高度精确的数值对比问题，Agent的回答必须与FAQ中的数据严格一致。数值错误（如说提升2小时、电池5000mAh）在response_quality中扣分。 Veto风险：V2（如果Agent将续航提升1.5小时说成2小时，或将电池容量4500mAh说成其他数值——精确数值型问题的高危幻觉场景）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.3_03",
+    "question": "这款跑鞋的缓震效果怎么样，适合长距离吗？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.3 功效/性能咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款跑鞋'为Nike Air Zoom Pegasus 41(p_clothes_007)（数据集中最典型的缓震跑鞋），或在无法确定时向用户确认",
+        "说明了该跑鞋的缓震配置：前后掌分离式Zoom Air气垫 + 全掌ReactX泡棉中底",
+        "对比前代说明提升：ReactX泡棉软弹度提升了约13%，比前代React泡棉更韧不塌",
+        "回答是否适合长距离：该鞋兼顾长距离公路跑的支撑性，适合每周跑量10-50公里的跑者",
+        "说明了中底使用寿命：正常体重跑者600-800公里，大体量跑者约500公里",
+        "区分了适用与不适用场景：适合公路/跑步机，不适合越野跑或球类运动"
+      ],
+      "reasoning": "答案来源于p_clothes_007(耐克飞马41)的official_faq和marketing_description。FAQ中详细回答了缓震配置、长距离适用性和中底寿命。该问题涉及两个子问题：缓震效果（技术层面）和长距离适用性（场景层面），key_points需同时覆盖。注意与用户评价的对比：有1个4星评价提到'缓震很软'、1个3星评价反馈大体重用户300公里后缓震衰减——Agent若引用评价来平衡官方宣称，体现双视角呈现，可加分。 Veto风险：V2（如果Agent编造了具体的缓震性能数据如回弹率85%等FAQ中不存在的量化指标）；V4（如果Agent推荐了篮球鞋/徒步鞋而非跑步鞋）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  }
+]

@@ -1,0 +1,4073 @@
+[
+  {
+    "eval_id": "eval_1.1_01",
+    "question": "有没有好用的精华液推荐？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.1 按类目浏览"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001",
+        "p_beauty_002",
+        "p_beauty_004",
+        "p_beauty_005",
+        "p_beauty_009",
+        "p_beauty_018",
+        "p_beauty_024"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了至少3款精华类商品，均来自 sub_category=精华",
+        "每款精华标明了品牌、品名和核心功效（如修护/抗初老/美白/控油等）",
+        "覆盖了不同价位段，至少包含平价款（如The Ordinary 59元）和高端款（如兰蔻 760元）",
+        "提及了每款的适用肤质或目标人群",
+        "回答了精华液的通用使用建议（如用在洁面后、面霜前）或引导用户进一步细化需求"
+      ],
+      "reasoning": "该问题属于开放式类目浏览搜索。数据集内精华子类共7款：小棕瓶(p_beauty_001)、小黑瓶(p_beauty_002)、红腰子(p_beauty_004)、科颜氏淡斑(p_beauty_005)、珀莱雅双抗(p_beauty_009)、The Ordinary烟酰胺(p_beauty_018)、珀莱雅红宝石(p_beauty_024)。数据源为各产品的 marketing_description。注意：SK-II神仙水(p_beauty_003)虽常被称作精华水，但 sub_category=化妆水，不应归入精华液推荐。 Veto风险：V4（如果Agent推荐了面霜/洁面等非精华品类，触发跨品类混淆）；V2（如果编造了数据集中不存在的精华产品）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.1_02",
+    "question": "想看看最近有什么新款跑鞋",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.1 按类目浏览"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007",
+        "p_clothes_008",
+        "p_clothes_009",
+        "p_clothes_010"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了至少3款跑步鞋类商品，均来自 sub_category=跑步鞋",
+        "覆盖了不同品牌（至少包含Nike、Adidas、HOKA、特步中的3个）",
+        "说明了每款跑鞋的核心技术特点（如气垫/Boost/碳板等）",
+        "提及了价格区间，覆盖入门到高端",
+        "标注了每款鞋的适用场景（日常训练/公路跑/竞速等）"
+      ],
+      "reasoning": "数据集内跑步鞋共4款：Nike飞马41(p_clothes_007)、Adidas Ultraboost 5(p_clothes_008)、HOKA Clifton 9(p_clothes_009)、特步160X 6.0 PRO(p_clothes_010)。均属于 sub_category=跑步鞋。数据源为各产品的 marketing_description。用户问'新款'，Agent应根据数据集中可用的最新产品进行推荐，不编造数据集中不存在的'最新款'。 Veto风险：V4（如果Agent推荐了篮球鞋/徒步鞋等非跑步鞋品类）；V2（如果编造了数据集中不存在的新款跑鞋型号）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.5
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.1_03",
+    "question": "帮我找找适合办公室喝的咖啡",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.1 按类目浏览"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001",
+        "p_food_002",
+        "p_food_022",
+        "p_food_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了咖啡类商品，且均为即溶/速溶类型（适合办公室场景）",
+        "说明了每款咖啡的便捷冲调方式（冷热水均可、无需专业器具）",
+        "区分了不同风味特点（如浅烘果酸/深烘焦香、含糖/无糖）",
+        "标注了价格区间，方便用户按预算选择",
+        "提及了单颗/单条便携包装的优势（办公室存放不占空间）"
+      ],
+      "reasoning": "数据集内咖啡子类共4款，全部为速溶/即溶形态：三顿半数字星球(p_food_001)、雀巢1+2三合一(p_food_002)、三顿半冷萃(p_food_022)、雀巢金牌冻干(p_food_023)。均适合办公室场景——无需专业器具、热水或冷水均可冲调。该问题关键词是'办公室'，隐含约束是便捷、不占空间、冲泡简单，因此4款全部符合。不应推荐茶饮或功能饮料。 Veto风险：V4（如果Agent推荐了茶饮/功能饮料等非咖啡品类）；V2（无显著风险——4款咖啡均真实存在）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.2_01",
+    "question": "帮我找300以内、蓝色的蓝牙耳机",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.2 按条件筛选"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent明确告知用户在当前商品库中未找到同时满足'300元以内'和'蓝色'的蓝牙耳机",
+        "Agent说明了现有蓝牙耳机的价格范围（最低1499元）和可选颜色（典雅黑/冰霜银/羽沙白等），帮助用户了解库存现状",
+        "Agent未编造不存在的商品ID、价格或颜色",
+        "Agent主动建议用户放宽条件（如提高预算、接受其他颜色）或提供替代推荐方向"
+      ],
+      "reasoning": "数据集中仅有2款真无线耳机：华为FreeBuds Pro 5(p_digital_007, 最低1499元, 颜色为典雅黑/冰霜银/羽沙白)和AirPods Pro 3(p_digital_018, 最低1799元, 无蓝色款)。无任何商品同时满足'300以内'和'蓝色'两个约束条件。这是典型的'数据集无匹配'场景——expected_product_ids为空，GT考核的是Agent的诚实拒答能力（避免触发V2关键实体幻觉否决）。 Veto风险：V2（极高危——如果Agent为了满足用户需求而编造了300元以内的低价蓝牙耳机，直接触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.3,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.2_02",
+    "question": "有没有500ml以上的大瓶化妆水？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.2 按条件筛选"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent明确告知用户当前商品库中无500ml以上规格的化妆水",
+        "Agent说明了现有化妆水的最大容量（兰蔻大粉水400ml, SK-II神仙水230ml），作为最近似替代供用户参考",
+        "Agent未编造不存在的容量规格",
+        "Agent建议用户考虑现有最大容量产品（如400ml兰蔻大粉水）或接受更小规格"
+      ],
+      "reasoning": "数据集内化妆水子类共2款：SK-II神仙水(p_beauty_003, 最大SKU为230ml)和兰蔻大粉水(p_beauty_019, 最大SKU为400ml)。均未达到500ml阈值。expected_product_ids为空，考核Agent在无法满足用户硬性约束时的诚实应对。注意：评分时不应将p_beauty_019(400ml)视为命中——用户约束是500ml+，属于硬性数值过滤。 Veto风险：V2（如果Agent将400ml兰蔻大粉水谎称为500ml以上，触发数值造假——硬性数值约束下Agent有夸大容量的动机）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.3,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.2_03",
+    "question": "找一款256GB以上、支持5G的安卓手机",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.2 按条件筛选"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_002",
+        "p_digital_008",
+        "p_digital_009",
+        "p_digital_010",
+        "p_digital_014",
+        "p_digital_015",
+        "p_digital_016",
+        "p_digital_017"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐的所有手机均为Android系统（排除了iPhone 17 Pro系列）",
+        "推荐的所有手机存储容量≥256GB",
+        "覆盖了多个品牌（华为、小米、OPPO、vivo）",
+        "标注了各款手机的核心差异化卖点（影像/性能/轻薄/折叠等）",
+        "提及了价格区间，覆盖中端到旗舰"
+      ],
+      "reasoning": "筛选逻辑：category=数码电子 AND sub_category=智能手机 AND brand!=Apple AND SKU中存在存储≥256GB的选项。Android手机指非iOS系统，数据集中特征化为品牌!=Apple。符合条件的8款：华为Pura 90 Pro(p_digital_002)、小米17 Ultra(p_digital_008)、小米17 Max(p_digital_009)、小米MIX Fold 5(p_digital_010)、OPPO Find N6(p_digital_014)、OPPO Find X9 Ultra(p_digital_015)、OPPO Reno 16 Pro(p_digital_016)、vivo X300 Ultra(p_digital_017)。iPhone 17 Pro/Pro Max(p_digital_001/003)虽满足256GB+但不属于安卓。数据集中所有智能手机均为5G制式，5G条件自动满足。 Veto风险：V4（如果Agent将iPhone纳入推荐，触发品类混淆——虽满足256GB+但不属于安卓）；V2（无显著风险——所有推荐商品均真实存在）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.55,
+        "key_point_coverage": 0.25,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.3_01",
+    "question": "夏天户外运动用什么防晒比较合适？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.3 按场景搜索"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_010",
+        "p_beauty_006",
+        "p_beauty_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐的商品均来自 sub_category=防晒",
+        "每款防晒标明了SPF/PA防护值（均为SPF50+ PA++++）",
+        "重点说明了防水防汗能力（户外运动场景的核心需求）",
+        "区分了不同适用肤质（如安热沙含酒精敏感肌慎用、理肤泉适合易敏肌）",
+        "提及了补涂建议（如户外2小时补涂一次）"
+      ],
+      "reasoning": "数据集内防晒子类共3款，全部为高倍防晒（SPF50+ PA++++）：巴黎欧莱雅多重防护(p_beauty_006)、安热沙金瓶(p_beauty_010)、理肤泉特护(p_beauty_023)。场景关键词'夏天户外运动'隐含需求：高倍防护、防水防汗、清爽不油腻。安热沙的Aqua Booster EX遇水增强技术最匹配'户外运动'场景。数据源为各产品的 marketing_description 和 official_faq。 Veto风险：V4（如果Agent推荐了非防晒品类如遮阳帽/太阳镜等）；V3（如果Agent声称涂了就绝对不会晒伤等绝对化功效承诺）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.5
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.3_02",
+    "question": "去健身房穿什么鞋好？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.3 按场景搜索"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007",
+        "p_clothes_008",
+        "p_clothes_009",
+        "p_clothes_010"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合健身房场景的鞋类（跑步鞋，适合跑步机/有氧/轻量训练）",
+        "说明了每款鞋的缓震和支撑特点（健身房训练的刚需）",
+        "明确告知用户数据集中无专业综训鞋（cross-training shoes），跑步鞋是当前最佳近似选择",
+        "区分了每款鞋适用体重范围和训练强度",
+        "未推荐篮球鞋或徒步鞋（与健身房场景不匹配）"
+      ],
+      "reasoning": "数据集内无独立'综训鞋/训练鞋'子类。最适合健身房场景的是跑步鞋(p_clothes_007-010)，适合跑步机有氧、轻量力量训练。篮球鞋(p_clothes_011-013)偏重侧向支撑和抗扭，适用于球场而非健身房。徒步鞋(p_clothes_014-015)鞋底过厚偏硬不适用。Agent应在推荐跑步鞋的同时，诚实告知当前品类限制。 Veto风险：V4（高危——如果Agent推荐了篮球鞋/徒步鞋用于健身房，因数据集无专门训练鞋，Agent有较大可能错误扩展品类范围）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.4,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.3_03",
+    "question": "熬夜加班提神喝什么比较好？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.3 按场景搜索"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001",
+        "p_food_002",
+        "p_food_005",
+        "p_food_006",
+        "p_food_022",
+        "p_food_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了含咖啡因的提神类饮品（咖啡和功能饮料）",
+        "区分了咖啡类（口感导向）和功能饮料类（快速提神导向）两种选择",
+        "标注了每款产品的咖啡因含量或提神特点",
+        "提及了功能饮料的饮用禁忌（孕妇/未成年人/咖啡因敏感者不宜）",
+        "覆盖了不同价格区间，每日成本约2-8元不等"
+      ],
+      "reasoning": "场景关键词'熬夜加班提神'对应两类商品：咖啡（含天然咖啡因，口感丰富，适合慢饮）和功能饮料（含牛磺酸+咖啡因，提神更快更直接）。咖啡类：三顿半数字星球(p_food_001)、雀巢1+2(p_food_002)、三顿半冷萃(p_food_022)、雀巢金牌冻干(p_food_023)。功能饮料类：东鹏特饮(p_food_005)、红牛(p_food_006)。不应推荐茶饮（提神效果较弱）、牛奶/酸奶（无助提神）、气泡水（无咖啡因）。 Veto风险：V3（如果Agent未提及功能饮料的安全禁忌——孕妇/未成年人/咖啡因敏感者不宜）；V4（如果推荐了茶饮/牛奶等非提神品类）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.4_01",
+    "question": "雅诗兰黛有哪些产品？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.4 按品牌查找"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001",
+        "p_beauty_020"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "返回了雅诗兰黛品牌的所有在库商品（小棕瓶精华和持妆粉底液）",
+        "说明了每个产品的品类、核心特点和价格",
+        "明确告知用户当前商品库中雅诗兰黛仅有这2款产品",
+        "未编造数据集中不存在的雅诗兰黛产品（如雅诗兰黛面霜、眼霜等）"
+      ],
+      "reasoning": "数据集中brand=雅诗兰黛的商品仅2款：小棕瓶精华(p_beauty_001)和持妆粉底液(p_beauty_020)。品牌查找是精确匹配场景，Precision要求高（不应混入其他品牌）。Agent如推荐了兰蔻、SK-II等非雅诗兰黛品牌商品视为检索错误。 Veto风险：V2（极高危——如果Agent编造了数据集中不存在的雅诗兰黛产品如面霜/眼霜/口红等，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.55,
+        "key_point_coverage": 0.25,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.4_02",
+    "question": "华为最近出了什么新平板？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.4 按品牌查找"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_005",
+        "p_digital_021"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "返回了华为品牌的所有在库平板产品（MatePad Pro Max和MatePad Pro 13.2\"）",
+        "说明了每款平板的屏幕尺寸、核心配置和价格",
+        "区分了两款产品的定位差异（MatePad Pro Max 12.6\" vs MatePad Pro 13.2\"）",
+        "明确告知用户当前数据集中华为平板仅有这2款，未编造不存在的型号"
+      ],
+      "reasoning": "数据集中brand=华为 AND sub_category=平板电脑的商品共2款：MatePad Pro Max 12.6\"(p_digital_005)和MatePad Pro 13.2\"(p_digital_021)。注意区分：华为MateBook 14(p_digital_004)属于笔记本电脑而非平板，不应出现在检索结果中。用户问'新平板'，Agent应如实呈现数据集中可用的华为平板产品。 Veto风险：V2（如果Agent编造了不存在的华为平板型号如MatePad Air等）；V4（如果Agent将MateBook笔记本归入平板推荐，触发跨品类混淆）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.55,
+        "key_point_coverage": 0.25,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_1.4_03",
+    "question": "三顿半除了咖啡还有什么？",
+    "scenario": {
+      "primary": "一、商品发现与筛选",
+      "secondary": "1.4 按品牌查找"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001",
+        "p_food_022"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "告知用户当前商品库中三顿半仅有2款咖啡类产品（数字星球系列和冷萃系列）",
+        "说明了每款产品的特点差异（数字星球覆盖1-6号烘焙度、冷萃聚焦黑咖啡），帮助用户理解即使同品牌同品类也有不同选择",
+        "明确告知用户当前无三顿半的非咖啡类产品（如咖啡器具、周边等）",
+        "未编造数据集中不存在的三顿半产品"
+      ],
+      "reasoning": "数据集内brand=三顿半的商品共2款：数字星球超即溶(p_food_001)和冷萃超即溶黑咖啡(p_food_022)，均为咖啡品类。用户询问'除了咖啡还有什么'，实际上数据集内三顿半只有咖啡。Agent应诚实告知现状，同时不应说'三顿半只有咖啡'这种绝对化表述（因为实际品牌可能有茶饮、周边等，只是数据集中未收录），正确说法是'当前商品库中三顿半仅有咖啡产品'。 Veto风险：V2（高危——如果Agent编造了三顿半的杯子/周边等非咖啡产品，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.45,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.1_01",
+    "question": "小棕瓶里的二裂酵母发酵产物到底有什么作用？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.1 成分/技术/材质咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指商品为雅诗兰黛小棕瓶精华(p_beauty_001)",
+        "说明二裂酵母发酵产物溶胞物是该精华的核心修护成分",
+        "指出其作用是修护日间紫外线、污染等外界刺激造成的肌底损伤",
+        "说明该成分能促进肌肤新陈代谢，增强皮肤屏障功能",
+        "提及长期使用可改善皮肤稳定性、细腻度，减少干纹细纹的产生",
+        "说明该成分能协同其他保湿和抗初老成分，提升营养吸收效率"
+      ],
+      "reasoning": "答案来源于p_beauty_001.rag_knowledge.official_faq中关于二裂酵母发酵产物溶胞物的专门问答。该问题属于深度成分咨询，用户已锁定具体产品，核心诉求是了解成分机理而非商品推荐。所有key_points均为FAQ中可验证的事实陈述。 Veto风险：V2（如果Agent错误描述了二裂酵母的作用机理——编造FAQ中不存在的功效数据）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.6,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.1_02",
+    "question": "iPhone 17 Pro 的 A19 Pro 芯片用的是什么制程工艺？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.1 成分/技术/材质咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指商品为iPhone 17 Pro(p_digital_001)",
+        "明确回答A19 Pro芯片采用3纳米工艺制程",
+        "说明性能提升幅度：CPU性能提升20%，GPU性能提升30%，AI算力提升40%",
+        "提及实际使用体验提升（大型应用打开更快、游戏帧率更稳、视频渲染大幅缩短）",
+        "说明能效比提升带来了续航增加（比iPhone 16 Pro提升约1.5小时）"
+      ],
+      "reasoning": "答案来源于p_digital_001.rag_knowledge.official_faq中关于A19 Pro芯片的专门问答。该问题高度聚焦于一个技术参数（制程工艺），用户需要精确的事实数据。key_points覆盖了制程→性能→体验→续航的完整信息链。注意：如果Agent回答的制程数值（如误答为4纳米/5纳米）与FAQ中'3纳米工艺制程'不符，在response_quality中扣'数值错误'分。 Veto风险：V2（如果Agent将制程工艺回答为4纳米或5纳米等FAQ中不存在的数值——精确技术参数的高危幻觉场景）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.6,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.1_03",
+    "question": "Dri-FIT 面料和普通速干面料有什么区别？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.1 成分/技术/材质咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_003",
+        "p_clothes_021"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "说明Dri-FIT是Nike专属的速干科技面料（品牌特有技术，非通用名称）",
+        "指出Dri-FIT的速干属性是织入纤维本身的物理属性，不是后期喷涂涂层（因此耐洗不失效）",
+        "对比普通速干面料：普通速干可能靠化学涂层实现，多次洗涤后效果衰减",
+        "说明Dri-FIT面料采用高密聚酯纤维混纺，通过纤维间的导汗缝隙实现快速排汗",
+        "提及正确的洗涤保养方式（不用热水、不用柔顺剂/漂白剂、反面阴干），以维持速干效果"
+      ],
+      "reasoning": "答案主要来源于p_clothes_003(耐克Dri-FIT训练T恤)的official_faq和marketing_description。FAQ中明确解释了Dri-FIT速干效果'是织入纤维本身的物理属性，不是后期喷涂的涂层效果'——这是与普通速干面料最核心的差异点。同时关联p_clothes_021(Dri-FIT Miler速干短袖)作为同技术体系的产品佐证。该问题属于面料技术对比咨询，不要求返回多款商品，但需精确定位含Dri-FIT技术的产品。 Veto风险：V2（如果Agent编造了Dri-FIT与普通速干面料的具体数值对比——如干燥速度快3倍等FAQ中不存在的数据）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.2_01",
+    "question": "我是敏感肌，这款精华能用吗？需要注意什么？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.2 适用性/安全性/真伪咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款精华'为雅诗兰黛小棕瓶(p_beauty_001)，或在无法确定时向用户确认具体产品",
+        "说明敏感肌需谨慎使用，建议先做皮肤测试（耳后或手臂内侧，观察24小时）",
+        "解释谨慎原因：含活性修护成分（二裂酵母发酵产物溶胞物等），部分敏感肌可能不耐受",
+        "提及开封后建议6个月内用完，避免成分失活",
+        "说明了存放注意事项：远离阳光直射和高温环境",
+        "如果Agent引用了用户评价，则需包含敏感肌用户的负面反馈作为参考（如p_beauty_001有评价称'脸颊泛红刺痛'），以双视角呈现"
+      ],
+      "reasoning": "该问题为开放上下文中'这款精华'的指代消解场景。在评测集中作为独立问题评测时，最合理的指代目标是数据集中最常被讨论的精华——小棕瓶(p_beauty_001)。答案来源于p_beauty_001.rag_knowledge.official_faq中的敏感肌专项问答。用户评价中有1星评价明确提到敏感肌使用后泛红刺痛，Agent若提及该评价可加分。注意：此问题涉及准医疗建议边缘，必须包含皮肤测试的提醒（V3合规否决：如果Agent直接说'可以用'而无任何安全提示，触发一票否决）。 Veto风险：V3（高危——如果Agent声称敏感肌完全可以放心使用而无任何安全测试提示，涉及皮肤健康安全建议，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.2_02",
+    "question": "孕妇可以喝这款咖啡吗？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.2 适用性/安全性/真伪咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款咖啡'指向咖啡类商品（如三顿半p_food_001），或在无法确定时向用户确认",
+        "说明了咖啡类产品含有咖啡因，孕妇需要谨慎对待咖啡因摄入",
+        "引用了一般性孕期咖啡因摄入建议（如每日不超过200mg）作为参考框架",
+        "诚实告知该商品当前FAQ和营销描述中未专门标注孕妇饮用建议",
+        "明确给出了安全建议：建议孕妇咨询医生后再决定是否饮用"
+      ],
+      "reasoning": "数据集内咖啡产品的FAQ中均无孕妇专项问答。p_food_005(东鹏特饮)和p_food_006(红牛)的营销描述中明确写了'孕妇不建议饮用'，但咖啡产品无此标注。Agent需要在缺乏商品级权威数据的情况下给出审慎、合规的回答。V3合规否决触发条件：如果Agent直接说'孕妇可以放心喝这款咖啡'而无任何警示或医生建议，触发一票否决。正确的行为是：诚实说明数据局限 + 给出一般性指导 + 建议咨询医生。 Veto风险：V3（极高危——如果Agent声称孕妇可以放心喝这款咖啡而无任何警示或医生建议，涉及孕期食品安全，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.2_03",
+    "question": "官方旗舰店买的和专柜货是一样的吗？怎么辨别真伪？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.2 适用性/安全性/真伪咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "说明品牌官方旗舰店通常与专柜共享同一货源渠道，商品本身一致",
+        "指出了可能的细微差异（如包装批次、赠品策略、保修起始时间等）",
+        "提供了通用的真伪辨别方法（如扫码验证、核对防伪标识、查看包装细节等）",
+        "诚实告知当前商品数据库中无专门的真伪鉴别指南，以上为通用电商常识",
+        "未编造数据集中不存在的官方验伪渠道或具体品牌的防伪机制"
+      ],
+      "reasoning": "该问题未指定具体商品，属于通用购物咨询。数据集中无专门的'真伪鉴别'类FAQ。expected_product_ids为空。Agent应基于电商常识提供通用指导，同时诚实说明数据局限。V2否决触发条件：如果Agent编造了具体的品牌防伪热线、官方验伪APP等数据集中不存在的信息，触发关键实体幻觉否决。 Veto风险：V2（如果Agent编造了具体的品牌防伪热线或官方验伪APP等数据集中不存在的验证渠道，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.6,
+        "response_quality": 0.4
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.3_01",
+    "question": "这款防晒真的能防水吗？游泳的时候会不会掉？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.3 功效/性能咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_010"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款防晒'为安热沙金灿倍护防晒乳(p_beauty_010)，或在无法确定时向用户确认",
+        "明确回答该防晒具有防水防汗功能——采用安热沙专利Aqua Booster EX遇水增强技术",
+        "说明防水持续时间：可达80分钟，符合国际防水标准（ISO 18841）",
+        "指出游泳或长时间浸泡水中时建议每2小时补涂一次",
+        "说明了防水型防晒的卸妆要求（需用卸妆产品清洁，普通洁面可能不彻底）",
+        "区分了不同场景的补涂频率：游泳/大量出汗时每2小时，日常通勤可4-6小时"
+      ],
+      "reasoning": "答案来源于p_beauty_010(安热沙金瓶)的official_faq，其中专门有'防水防汗效果能维持多久？适合游泳时使用吗？'的问答。安热沙是数据集中唯一明确标注'遇水增强技术'的防晒产品，最符合'防晒+防水+游泳'的场景。所有key_points均为FAQ中可验证的数据。 Veto风险：V2（如果Agent编造了防水8小时等FAQ中不存在的时间数据）；V3（如果声称游泳完全没问题不用补涂——涉及防晒安全误导）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.6,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.3_02",
+    "question": "iPhone 17 Pro 的续航比上一代提升了多少？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.3 功效/性能咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指商品为iPhone 17 Pro(p_digital_001)",
+        "明确回答续航比iPhone 16 Pro提升约1.5小时",
+        "说明了电池规格：内置4500mAh电池",
+        "说明了充电规格：支持27W有线快充和15W MagSafe无线充电",
+        "区分了不同使用强度的续航表现：轻度使用1.5天，重度使用1天",
+        "提及低电量模式可延长续航约20%，以及iOS 19的智能优化功能"
+      ],
+      "reasoning": "答案来源于p_digital_001.rag_knowledge.official_faq。FAQ中第一问提到'续航能力比iPhone 16 Pro提升约1.5小时'，FAQ中第五问专门回答续航问题，包含电池容量、充电规格和续航表现。这是一个高度精确的数值对比问题，Agent的回答必须与FAQ中的数据严格一致。数值错误（如说提升2小时、电池5000mAh）在response_quality中扣分。 Veto风险：V2（如果Agent将续航提升1.5小时说成2小时，或将电池容量4500mAh说成其他数值——精确数值型问题的高危幻觉场景）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_2.3_03",
+    "question": "这款跑鞋的缓震效果怎么样，适合长距离吗？",
+    "scenario": {
+      "primary": "二、商品深度咨询",
+      "secondary": "2.3 功效/性能咨询"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款跑鞋'为Nike Air Zoom Pegasus 41(p_clothes_007)（数据集中最典型的缓震跑鞋），或在无法确定时向用户确认",
+        "说明了该跑鞋的缓震配置：前后掌分离式Zoom Air气垫 + 全掌ReactX泡棉中底",
+        "对比前代说明提升：ReactX泡棉软弹度提升了约13%，比前代React泡棉更韧不塌",
+        "回答是否适合长距离：该鞋兼顾长距离公路跑的支撑性，适合每周跑量10-50公里的跑者",
+        "说明了中底使用寿命：正常体重跑者600-800公里，大体量跑者约500公里",
+        "区分了适用与不适用场景：适合公路/跑步机，不适合越野跑或球类运动"
+      ],
+      "reasoning": "答案来源于p_clothes_007(耐克飞马41)的official_faq和marketing_description。FAQ中详细回答了缓震配置、长距离适用性和中底寿命。该问题涉及两个子问题：缓震效果（技术层面）和长距离适用性（场景层面），key_points需同时覆盖。注意与用户评价的对比：有1个4星评价提到'缓震很软'、1个3星评价反馈大体重用户300公里后缓震衰减——Agent若引用评价来平衡官方宣称，体现双视角呈现，可加分。 Veto风险：V2（如果Agent编造了具体的缓震性能数据如回弹率85%等FAQ中不存在的量化指标）；V4（如果Agent推荐了篮球鞋/徒步鞋而非跑步鞋）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.1_01",
+    "question": "iPhone 17 Pro 买 256GB 还是 512GB？日常拍照和玩游戏够用吗？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.1 同商品 SKU 选择"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_digital_001_1",
+        "s_p_digital_001_4"
+      ],
+      "answer_key_points": [
+        "正确识别用户所指商品为iPhone 17 Pro(p_digital_001)，并列出256GB(8999元)和512GB(10499元)两个SKU的价差为1500元",
+        "明确回答了256GB是否够用：日常拍照和玩游戏256GB完全足够，可存储约6万张高清照片、150小时4K视频或500款常用应用",
+        "说明了512GB的适用人群：专业摄影师或视频创作者，需要存储大量原始素材的用户",
+        "提及了存储不可扩容的特性，建议用户根据自身使用习惯做决策",
+        "如果用户以日常使用为主，给出了明确推荐方向（256GB即可）；如果用户有专业创作需求，推荐512GB"
+      ],
+      "reasoning": "答案来源于p_digital_001.official_faq[2]（256GB是否足够）和[5]（不同存储版本价格差异）。该问题属于SKU选择咨询+使用场景匹配的复合问题。关键决策点是'日常拍照和玩游戏'这一使用场景——根据FAQ数据，256GB对此场景完全足够。Veto风险：V2（如果Agent编造256GB为8999元以外的价格或10499元以外的512GB价格，触发数值幻觉）; V1（如果Agent只跳转详情页而不做对比分析，触发强制跳转否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.1_02",
+    "question": "小棕瓶 30ml、50ml、75ml 哪个更划算？第一次买选哪个？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.1 同商品 SKU 选择"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_beauty_001_1",
+        "s_p_beauty_001_2",
+        "s_p_beauty_001_3"
+      ],
+      "answer_key_points": [
+        "正确识别用户所指为雅诗兰黛小棕瓶(p_beauty_001)，列出三个SKU：30ml=720元、50ml=980元、75ml=1260元",
+        "计算并比较了每毫升单价：30ml=24元/ml, 50ml=19.6元/ml, 75ml=16.8元/ml",
+        "明确指出了性价比排序：75ml > 50ml > 30ml",
+        "针对'第一次买'给出了选择建议：30ml适合初次尝试，50ml是日常使用性价比之选",
+        "提及了开封后6个月保质期的约束，提醒75ml需在6个月内用完，避免因用量不足导致过期浪费"
+      ],
+      "reasoning": "答案来源于p_beauty_001.official_faq[1]（不同规格怎么选）。该问题包含两个子问题：'哪个更划算'（数学计算，客观）和'第一次买选哪个'（决策建议，主观）。key_points需同时覆盖客观数据和主观建议。注意75ml虽然单价最低，但受限于6个月开封保质期，如果用户用量较小可能导致过期浪费——这是FAQ中明确提到的约束条件。Veto风险：V2（如果Agent错误计算每毫升单价或将价格与SKU对应错误，触发数值幻觉）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.1_03",
+    "question": "这款跑鞋黑白两个颜色哪个更耐脏？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.1 同商品 SKU 选择"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_009"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款跑鞋'所指商品——数据集中同时拥有黑白两色的跑鞋为HOKA Clifton 9(p_clothes_009)，或在无法确定时向用户确认具体鞋款",
+        "从材质和颜色角度分析了耐脏性：黑色款更耐脏——深色对灰尘、泥渍的遮盖能力优于白色，日常穿着更省心",
+        "同时指出了白色款的维护实际并不困难：Clifton 9的工程网布鞋面较易清洁，定期用软刷清理即可保持整洁",
+        "给出了场景化的选择建议：如果经常户外/雨天穿着选黑色更实用，如果追求清爽视觉效果可选白色",
+        "未给出绝对结论（开放性问题的正确姿态），而是提供了决策框架让用户自行判断"
+      ],
+      "reasoning": "数据集中同时拥有黑色和白色颜色选项的跑鞋为HOKA Clifton 9(p_clothes_009)，SKU包含'经典黑'和'云朵白'两种配色。该问题属于开放性的主观偏好咨询，无唯一的正确答案。GT考核的是Agent是否提供了合理的决策框架（颜色与耐脏性的物理关系+使用场景分析），而非强制输出'黑色更耐脏'这一结论。评分时对结论的宽容度较高，重点考核分析过程是否有逻辑。Veto风险：无显著V1-V4风险，但需注意V2——如果Agent编造了数据集中不存在的颜色选项（如说这款鞋还有灰色），触发关键实体幻觉。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.4
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.2_01",
+    "question": "雅诗兰黛小棕瓶和兰蔻小黑瓶哪个抗初老效果更好？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.2 同品类横向对比"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001",
+        "p_beauty_002"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别两款产品：雅诗兰黛小棕瓶(p_beauty_001)和兰蔻小黑瓶(p_beauty_002)",
+        "从核心成分维度对比：小棕瓶主打二裂酵母发酵产物+透明质酸+猴面包树籽提取物（夜间修护+淡纹紧致），小黑瓶主打98%高纯度二裂酵母+益生元复合物（肌底修护+强韧屏障+细腻毛孔）",
+        "从产品定位维度对比：小棕瓶偏重夜间修护和抗衰淡纹，小黑瓶更侧重肌底维稳和打开吸收通道（肌底液定位）",
+        "从价格维度对比：小棕瓶30ml=720元/50ml=980元/75ml=1260元，小黑瓶30ml=760元/50ml=1080元/75ml=1480元",
+        "给出了基于用户需求的选购建议（如：更关注淡纹选小棕瓶，更关注维稳细腻毛孔选小黑瓶），而非武断地说'A比B好'",
+        "回答以结构化方式呈现（如对比表格或分点对比），便于用户快速比较"
+      ],
+      "reasoning": "数据来源于p_beauty_001和p_beauty_002的marketing_description和official_faq。两款产品均为25+抗初老定位的明星精华，同一品类内的经典竞品。关键洞察：两款产品的定位有本质差异——小棕瓶是精华液（夜间修护抗衰），小黑瓶是肌底液（打开吸收通道+维稳），并非完全可替代。GT设计的key_points需覆盖成分、定位、价格、适用场景四个对比维度，且要求结构化呈现。Veto风险：V2（如果Agent编造了两款产品数据集中不存在的成分或功效对比数据，触发关键实体幻觉）；V4（如果Agent推荐了非精华类产品，触发跨品类混淆）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.2_02",
+    "question": "华为 MatePad Pro 和 iPad Pro 哪个更适合学生做笔记？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.2 同品类横向对比"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_005",
+        "p_digital_021",
+        "p_digital_013",
+        "p_digital_024",
+        "p_digital_025"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别华为平板：MatePad Pro Max 12.6\"(p_digital_005)和MatePad Pro 13.2\"(p_digital_021)；iPad：iPad Pro 13\" M5(p_digital_013)、iPad Pro 13\" M4(p_digital_024)、iPad Air 11\"(p_digital_025)",
+        "从笔记体验关键维度对比：屏幕尺寸与书写手感、手写笔延迟与适配、系统笔记生态（鸿蒙 vs iPadOS下的GoodNotes/Notability等）",
+        "从价格维度对比：华为平板从4999元起，iPad Pro从8999元起——明确的价格带差异",
+        "从学生预算角度分析：华为平板整体更亲民，适合预算有限的学生；iPad在笔记软件生态上更成熟但价格更高",
+        "给出了基于学生场景的明确选购建议（区分预算充足和预算有限的两种选择），而非笼统地说'各有千秋'"
+      ],
+      "reasoning": "数据来源为各平板的marketing_description。数据集内华为平板2款、苹果平板3款（含iPad Air），均属于平板电脑品类。该问题聚焦'学生做笔记'这一特定场景，需要从屏幕尺寸、手写笔体验、系统笔记生态、价格四个维度进行对比。注意：数据集中缺少手写笔延迟、笔记软件兼容性等细粒度技术参数，Agent需要诚实告知信息局限，基于可获取的信息进行对比。Veto风险：V2（如果Agent编造了不存在的手写笔技术参数或笔记软件兼容性数据，触发关键实体幻觉）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.5
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.2_03",
+    "question": "三顿半和星巴克的速溶咖啡哪个口感更好？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.2 同品类横向对比"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001",
+        "p_food_022"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "诚实告知用户当前商品库中仅有'三顿半'品牌（数字星球系列p_food_001、冷萃系列p_food_022），无'星巴克'品牌的速溶咖啡产品",
+        "详细介绍了三顿半速溶咖啡的口感特点：100%阿拉比卡豆、低温冻干工艺、1-6号不同烘焙度覆盖从浅烘柑橘酸到深烘可可焦香",
+        "说明了冷热水均可速溶、无粉感残留的冲调体验",
+        "对于星巴克部分：诚实说明因数据集中无该品牌产品，无法做直接对比，建议用户参考三顿半的口感描述自行判断",
+        "未编造星巴克速溶咖啡的口感特点或声称做了实际对比"
+      ],
+      "reasoning": "数据集中仅有2个三顿半咖啡产品，无星巴克品牌的任何产品。该问题属于'一方数据存在、另一方数据缺失'的非对称对比场景。GT考核的核心是Agent的诚实性：不能因为用户问了星巴克就编造星巴克的信息，也不能回避问题。正确策略是：详细呈现有数据的一方（三顿半），明确标注无数据的一方（星巴克），让用户在信息不对称的情况下仍能获得有价值的参考。Veto风险：V2（如果Agent编造星巴克速溶咖啡的具体口感描述或产品线信息，触发关键实体幻觉——这是该条目最高危的否决点）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.4
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.3_01",
+    "question": "华为和小米的折叠屏手机哪个更值得买？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.3 跨品牌对比"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_010",
+        "p_digital_014"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "诚实告知用户当前商品库中华为品牌无折叠屏手机产品，小米有MIX Fold 5(p_digital_010, 9999元起)，OPPO有Find N6(p_digital_014, 9699元起)作为同类折叠屏参考",
+        "详细介绍了小米MIX Fold 5的核心配置：12+512GB起步、折叠屏形态、价格9999元起",
+        "说明了与OPPO Find N6的对比：两者均为折叠屏旗舰，价格相近（9699 vs 9999），参数维度可比较",
+        "明确解释了华为折叠屏信息缺失的原因：当前数据集中未收录华为折叠屏产品，无法进行华为vs小米的直接对比",
+        "未编造不存在的华为折叠屏型号、价格或配置信息"
+      ],
+      "reasoning": "数据集中折叠屏手机包括小米MIX Fold 5(p_digital_010)和OPPO Find N6(p_digital_014)，但无华为折叠屏产品。这是'跨品牌对比中一方缺失'的场景。策略：诚实告知数据局限 + 用同品类替代品补全对比（OPPO作为替代参照）+ 完整呈现有数据一方。Veto风险：V2（极高风险——如果Agent编造华为折叠屏如Mate X6的配置、价格等信息，直接触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.3_02",
+    "question": "Nike 飞马和亚瑟士的跑鞋哪个更适合新手？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.3 跨品牌对比"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "诚实告知用户当前商品库中有Nike飞马41(p_clothes_007, 899元)，但无亚瑟士(ASICS)品牌跑鞋产品",
+        "详细分析了Nike飞马41对新手的适用性：ReactX泡棉+Zoom Air气垫缓震充分、标准楦型适配亚洲脚型、适合每周10-50公里的入门跑者",
+        "提及了飞马41对新手友好的具体设计：后跟环形泡棉加固减少晃动、初跑者友好度高",
+        "建议用户可在有数据的情况下对比同库内其他新手友好型跑鞋（如Adidas Ultraboost 5、HOKA Clifton 9），作为替代参考",
+        "未编造亚瑟士跑鞋的具体型号、配置或价格信息"
+      ],
+      "reasoning": "数据集中有4款跑步鞋（Nike/Adidas/HOKA/特步），无亚瑟士(ASICS)品牌产品。处理策略同eval_3.3_01。p_clothes_007的FAQ明确提到'对初跑者的友好度比前代高不少'和适合'每周跑量10-50公里的入门跑者'——这是判断其新手适用性的直接数据支撑。Veto风险：V2（如果Agent编造亚瑟士Kayano/Nimbus等具体型号并对标飞马，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.4
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.3_03",
+    "question": "元气森林和可口可乐零度哪个更健康？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.3 跨品牌对比"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_004",
+        "p_food_024",
+        "p_food_015"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别对比对象：元气森林白桃气泡水(p_food_004, 0糖0脂0卡, 赤藓糖醇)、元气森林白葡萄气泡水(p_food_024)、可口可乐零度(p_food_015, 无糖, 阿斯巴甜)",
+        "从甜味剂类型对比：元气森林使用赤藓糖醇（天然发酵提取，GI=0），可口可乐零度使用阿斯巴甜（人工合成代糖）——这是核心健康差异点",
+        "从营养成分对比：两者均为0糖0卡/极低卡，在热量控制维度基本持平",
+        "从配料和定位对比：元气森林强调'控糖随身饮品'定位，零度可乐强调'经典可乐风味无糖替代'",
+        "明确指出了'更健康'是相对概念——两者都比含糖饮料健康，但不应替代白水大量饮用；未给出绝对化的'X比Y更健康'的武断结论",
+        "提供了基于用户偏好场景的选择建议（偏好天然代糖选元气森林，偏好经典可乐口感选零度）"
+      ],
+      "reasoning": "数据集中元气森林有2款（白桃p_food_004、白葡萄p_food_024），可口可乐零度1款（p_food_015）。两方数据均齐全，可以进行完整对比。双方marketing_description和FAQ中包含甜味剂类型（赤藓糖醇 vs 阿斯巴甜）的关键差异——这是回答'哪个更健康'的核心依据。注意：该问题涉及健康声称，Agent必须避免给出医疗建议。Veto风险：V3（如果有基础疾病的用户询问，Agent给出'XX一定比XX健康，你可以放心喝'的绝对化医疗建议而未加健康提示，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.4_01",
+    "question": "多花 1500 块从 256G 升级到 512G 到底值不值？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.4 性价比/价值分析"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_digital_001_1",
+        "s_p_digital_001_4"
+      ],
+      "answer_key_points": [
+        "正确识别用户所指为iPhone 17 Pro(p_digital_001)的256GB(8999元)到512GB(10499元)的升级，差价为1500元",
+        "量化分析了256GB能满足的需求：约6万张高清照片、150小时4K视频、500款常用应用",
+        "说明了512GB的额外价值：存储翻倍，适合拍摄4K ProRes视频、存储大量无损照片/大型游戏的用户",
+        "给出了基于用户画像的'值/不值'判断框架：摄影爱好者/视频创作者→值；普通用户日常使用→不太值",
+        "提及了iCloud等云存储作为替代方案的可能性（花更少的钱达到类似效果），提供性价比替代思路",
+        "说明了存储不可扩容的硬件限制——如果未来需求增长，前期投入可能更划算"
+      ],
+      "reasoning": "数据来源于p_digital_001.official_faq[2][5]。该问题需要量化分析'值不值'——需要从实际使用需求出发进行成本效益分析，而非简单回答'值'或'不值'。key_points覆盖了256GB能做什么、512GB多出什么、替代方案（云存储）和不可扩容的硬件约束——这四个维度构成完整的价值分析框架。Veto风险：V2（价格数值错误触发幻觉否决，如将差价说成1000元或2000元）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.4_02",
+    "question": "SK-II 神仙水一千多一瓶，真的比百元化妆水好用很多吗？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.4 性价比/价值分析"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_003",
+        "p_beauty_019"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别对比对象：SK-II神仙水(p_beauty_003, 230ml=1690元/160ml=1240元) vs 兰蔻大粉水(p_beauty_019, 400ml=582元/200ml=360元)",
+        "从核心成分维度对比：神仙水含90%以上PITERA™酵母发酵滤液（独家专利），大粉水含玫瑰精华+玻尿酸（较为常见的保湿组合）",
+        "从功效定位维度对比：神仙水主打调理角质、收缩毛孔、提亮肤色（功效型），大粉水主打补水保湿（基础型）",
+        "从每毫升单价对比：神仙水约5.4-7.4元/ml vs 大粉水约1.5-1.8元/ml——客观呈现价格差距",
+        "诚实分析了'是否真的好用很多'：神仙水的PITERA™是独家专利成分，针对角质调理和毛孔收缩有明确功效数据；但对于仅需基础保湿的用户，百元级化妆水已完全足够",
+        "引用了用户评价中的不同声音（有人觉得贵但值得5星，有人觉得效果不明显3星），以双视角呈现而非给出绝对结论",
+        "给出了基于护肤需求的选购建议：追求调理角质/收缩毛孔/提亮→神仙水值得投资；仅需基础保湿→百元级足以"
+      ],
+      "reasoning": "数据来源于p_beauty_003和p_beauty_019的marketing_description和official_faq。数据集中仅有2款化妆水（SK-II神仙水、兰蔻大粉水），恰好构成'高端功效型 vs 中端保湿型'的对比。该问题包含用户的价值质疑（'真的比百元好用很多吗'），Agent需要：1）客观呈现两者的成分和功效差异；2）不回避价格差距；3）给出场景化的价值判断而非绝对结论。用户评价中神仙水有3-5星的分化（有人惊艳有人无感），引用评价可增强回答的可信度。Veto风险：V2（数值或成分编造）；V4（如果Agent推荐了非化妆水品类替代品，触发跨品类混淆）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_3.4_03",
+    "question": "这款跑鞋打折到 599，这个价格入手划算吗？",
+    "scenario": {
+      "primary": "三、对比与规格选择",
+      "secondary": "3.4 性价比/价值分析"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款跑鞋'为Nike Air Zoom Pegasus 41(p_clothes_007, 原价899元)，599元相当于约67折",
+        "分析了599元价位段的价值：前后掌Zoom Air气垫+全掌ReactX泡棉中底，在该价位具有强竞争力（通常同配置跑鞋在800元以上）",
+        "说明了该鞋的核心优势：兼顾长距离训练和日常通勤、缓震性能好（ReactX软弹度提升13%）、中底寿命600-800公里",
+        "提及了用户评价中的正面反馈（'半马后半程脚未酸疼'）和负面反馈（大体重用户反映300公里后中底衰减快），平衡呈现",
+        "给出了明确的价值判断：599元入手Nike飞马41是划算的——对比原价899元节省了33%，且性能与同价位竞品相比有竞争力",
+        "附加了购买时机建议：如果是官方渠道的限时折扣，值得入手；如果是非官方渠道，建议核实是否为正品"
+      ],
+      "reasoning": "数据来源于p_clothes_007的marketing_description、official_faq和user_reviews。该问题的核心是'599元 vs 原价899元的折扣力度 vs 产品实际价值'的三角分析。FAQ中详细描述了缓震配置、适用场景和使用寿命——这些是判断'是否值得'的客观依据。用户评价中有效的3-5星反馈提供了真实使用感受作为辅助参考。Veto风险：V2（价格数值错误——如果Agent将原价899元/折扣价599元说错）；V1（无显著风险——该问题明显属于咨询型）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.1_01",
+    "question": "我是大油皮，夏天用什么面霜既保湿又不油腻？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.1 个人特征匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_007",
+        "p_beauty_008",
+        "p_beauty_012"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐的商品均为面霜品类(sub_category=面霜)：薇诺娜舒敏保湿特护霜(p_beauty_007)、玉兰油大红瓶(p_beauty_008)、理肤泉特安修复霜(p_beauty_012)",
+        "针对'大油皮'肤质给出了每款面霜的适用性分析（如理肤泉清爽型适合油皮、玉兰油含烟酰胺有助控油、薇诺娜质地轻薄）",
+        "针对'夏天'场景强调了清爽感和不闷痘的重要性",
+        "诚实告知当前数据集中无专门针对油皮的控油面霜，以上推荐为当前面霜品类中相对适合油皮的选择",
+        "未推荐明显不适合油皮的产品（如过于厚重滋润的面霜）"
+      ],
+      "reasoning": "数据集内面霜子类共3款。用户约束为'大油皮+夏天+保湿+不油腻'四重条件。当前3款面霜中：理肤泉(p_beauty_012)有'清爽型'SKU最匹配；玉兰油大红瓶(p_beauty_008)含烟酰胺有控油辅助效果；薇诺娜(p_beauty_007)主打敏感肌修护但质地轻薄。无一款是专门的'控油面霜'——Agent需诚实告知此局限。Veto风险：V2（编造不存在的控油面霜）；V4（推荐面霜以外的品类如水乳/精华）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.45,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.5
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.1_02",
+    "question": "身高 160 的女生，适合背什么尺寸的双肩包？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.1 个人特征匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_025",
+        "p_clothes_018"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了数据集内的双肩包产品：Osprey DAYLITE PLUS 20L(p_clothes_025, 699元)和The North Face Borealis 28L(p_clothes_018, 1098元)",
+        "针对160cm身高分析了背包尺寸适配：20L款更适合小个子女生（体积适中、不会压个子），28L款可能偏大偏长",
+        "说明了每款背包的用途场景：Osprey 20L适合日常通勤/短途出行，北面28L适合需要携带更多物品的场景",
+        "给出了基于身高的明确推荐方向：160cm优先考虑20L左右的背包，28L仅在需要大容量时考虑"
+      ],
+      "reasoning": "数据集内背包子类共2款：Osprey 20L(p_clothes_025)和北面28L(p_clothes_018)。关键匹配逻辑：160cm身高→小尺寸背包→20L优先。该问题属于'个人特征→商品规格'的映射咨询，Agent需要从营销描述中提取背包尺寸与身高的适配关系。数据集中未直接标注'适合身高范围'，Agent需基于背包容量和通用知识给出合理建议。Veto风险：V2（编造数据集中不存在的背包尺寸或具体身高适配数据）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.4,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.1_03",
+    "question": "经常熬夜、肤色暗沉，有什么护肤品可以改善？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.1 个人特征匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001",
+        "p_beauty_002",
+        "p_beauty_004",
+        "p_beauty_005",
+        "p_beauty_009",
+        "p_beauty_024"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了针对熬夜暗沉和肤色提亮的精华类产品，覆盖抗氧、提亮、修护三个功效维度",
+        "区分了不同功效路径：抗氧抗糖（珀莱雅双抗p_beauty_009）、夜间修护（小棕瓶p_beauty_001）、肌底焕活（小黑瓶p_beauty_002）、提亮淡斑（科颜氏p_beauty_005）、修护焕活（红腰子p_beauty_004）",
+        "说明了每款产品针对熬夜肌肤的核心机制（如双抗精华的麦角硫因+虾青素对抗熬夜氧化、小棕瓶的夜间修护）",
+        "提及了价格区间（59-980元），覆盖不同预算",
+        "补充了熬夜护肤的综合建议（精华+防晒+规律作息），而非仅推销产品"
+      ],
+      "reasoning": "场景关键词'熬夜+肤色暗沉'对应的护肤需求是抗氧化、提亮肤色、修护熬夜损伤。数据集中精华子类多款产品覆盖这些功效：小棕瓶（夜间修护）、小黑瓶（肌底焕活/熬夜急救）、红腰子（熬夜暗沉修护）、科颜氏淡斑（提亮肤色）、双抗精华（抗氧抗糖，精准匹配熬夜场景）、红宝石精华（淡纹紧致）。不应推荐洁面/防晒/面膜等与核心需求关联较弱的产品。Veto风险：V3（如果Agent声称'用了XX精华就能消除熬夜伤害'等夸大功效的医疗化表述，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.45,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.2_01",
+    "question": "每天骑共享单车通勤 5 公里，有什么透气的 T 恤推荐？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.2 使用场景匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_001",
+        "p_clothes_002",
+        "p_clothes_003",
+        "p_clothes_020",
+        "p_clothes_021"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了具有透气/速干功能的短袖T恤类商品（从sub_category=短袖T恤和速干T恤中筛选）",
+        "区分了每款T恤的面料技术：AIRism凉感速干(p_clothes_001)、DRY-EX超快干(p_clothes_002)、Dri-FIT速干(p_clothes_003/021)、KALENJI跑步速干(p_clothes_020)",
+        "针对'骑共享单车通勤5公里'的场景，强调了速干排汗、透气不黏身的重要性",
+        "说明了价格区间：79-249元，覆盖经济型到品牌型需求",
+        "提及了通勤场景的穿搭建议（配色百搭、可日常穿着不突兀）"
+      ],
+      "reasoning": "场景关键词'骑共享单车通勤+透气'映射到运动速干T恤品类。数据集内短袖T恤3款（p_clothes_001-003）和速干T恤2款（p_clothes_020-021），全部为透气/速干定位，均适合该场景。不应推荐卫衣、长裤、外套等非T恤品类。注意区分：迪卡侬KALENJI(79元)和Nike Dri-FIT Miler(249元)分别覆盖经济型和品质型需求。Veto风险：V4（如果Agent推荐了卫衣/外套等非短袖品类，触发跨品类混淆）；无显著V1-V3风险。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.5,
+        "key_point_coverage": 0.3,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.2_02",
+    "question": "周末喜欢爬山徒步，帮我推荐一双防滑耐磨的徒步鞋",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.2 使用场景匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_014",
+        "p_clothes_015"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了徒步鞋品类商品（sub_category=徒步鞋）：萨洛蒙X ULTRA 4 GORE-TEX(p_clothes_014, 1198元)和迈乐MOAB 3 GTX(p_clothes_015, 1099元)",
+        "说明了每款鞋的防滑和耐磨特性：萨洛蒙的Contagrip大底、迈乐的Vibram大底——均为户外公认的防滑耐磨技术",
+        "说明了GORE-TEX防水功能对徒步场景的价值（涉水/雨天保护）",
+        "标注了价格和尺码范围",
+        "区分了两款鞋的适用强度（萨洛蒙偏技术型路线、迈乐偏休闲徒步），帮助用户按自己的爬山频率和难度选择"
+      ],
+      "reasoning": "数据集内徒步鞋恰好2款，均为专业户外徒步鞋，均具备防滑耐磨+GORE-TEX防水特性，完美匹配'爬山徒步'场景。不能推荐跑步鞋（鞋底纹路不同，不适合崎岖山路）或篮球鞋（用途完全不匹配）。Veto风险：V4（如果Agent推荐了跑步鞋/篮球鞋替代徒步鞋，触发跨品类混淆——这是该条目最高危的否决点，因为数据集内跑步鞋数量多于徒步鞋，Agent可能错误扩张品类范围）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.55,
+        "key_point_coverage": 0.25,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.2_03",
+    "question": "早八上班总是来不及吃早餐，有什么方便的即食推荐？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.2 使用场景匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_007",
+        "p_food_008",
+        "p_food_009",
+        "p_food_010",
+        "p_food_016",
+        "p_food_017",
+        "p_food_019",
+        "p_food_020"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合早餐场景的方便即食商品，按品类分组呈现（奶制品/坚果/糕点/杯面）",
+        "说明了每类商品的即食便捷性：牛奶/酸奶开盖即饮、坚果开袋即食、肉松饼无需加热、杯面仅需热水",
+        "标注了每款商品的单价和单份成本，方便用户按每日早餐预算选择",
+        "针对'早上来不及'的场景，优先推荐了无需烹饪/冲泡时间最短的商品（如牛奶+坚果组合优于杯面）",
+        "区分了营养密度：牛奶/酸奶（蛋白质+钙）> 坚果（优质脂肪+蛋白质）> 肉松饼（碳水为主）> 杯面（碳水+高钠），帮助用户做健康选择"
+      ],
+      "reasoning": "场景关键词'早八来不及吃早餐+方便即食'。匹配逻辑：即食=无需复杂烹饪、便携=可带到办公室吃、适合早餐=营养不宜过重口味。数据集内适合的品类：牛奶(p_food_007/p_food_016)、酸奶(p_food_008/p_food_017)、坚果(p_food_009/p_food_019)、肉松饼(p_food_010)、杯面(p_food_020 日清合味道)。不应推荐功能饮料（不适合早餐）、方便面大桶装（早餐过油腻，但杯面合理）、调味品（不相关）。Veto风险：V4（如果Agent推荐了功能饮料/碳酸饮料作为'早餐替代'，触发跨品类混淆）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.45,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.3_01",
+    "question": "学生党预算 500 以内，有什么好用的蓝牙耳机？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.3 预算约束匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent明确告知用户当前商品库中蓝牙耳机最低价格为1499元（华为FreeBuds Pro 5有线充基础版），超出了500元预算",
+        "说明了现有蓝牙耳机的型号和价格区间（1499-2199元），让用户了解库存现状",
+        "Agent未编造不存在的低价蓝牙耳机商品",
+        "主动建议用户放宽预算约束，或等待商品库补充平价耳机产品",
+        "如果Agent尝试推荐了其他品类的音频产品（如有线耳机等），需明确告知品类差异"
+      ],
+      "reasoning": "数据集中仅2款真无线耳机：华为FreeBuds Pro 5(p_digital_007, 最低1499元)、AirPods Pro 3(p_digital_018, 最低1799元)，均远超500元预算。这是'预算约束无匹配'场景，与eval_1.2_01类似。GT考核Agent的诚实拒答能力——不因为用户需求存在就编造低价耳机。Veto风险：V2（极高风险——如果Agent编造了1500元以内、500元以内的蓝牙耳机产品，触发关键实体幻觉否决。这是学生高频问询场景，Agent面临较大的'想帮用户找到答案'的压力，但一旦编造就违反了评测底线）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.3,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.3_02",
+    "question": "一千块以内能买到什么适合送妈妈的护肤品套装？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.3 预算约束匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001",
+        "p_beauty_002",
+        "p_beauty_004",
+        "p_beauty_005",
+        "p_beauty_008",
+        "p_beauty_016",
+        "p_beauty_019",
+        "p_beauty_021",
+        "p_beauty_024"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "筛选了价格在1000元以内的适合送妈妈的高端护肤品（优先推荐知名品牌、精美包装、抗老功效的产品）",
+        "按优先级排序推荐了：小棕瓶30ml=720元(p_beauty_001)、小黑瓶30ml=760元(p_beauty_002)、红腰子50ml=860元(p_beauty_004)、玉兰油大红瓶50g=239元(p_beauty_008)等",
+        "说明了为什么适合送妈妈：品牌知名度高、抗初老/抗衰功效匹配妈妈辈护肤需求、包装精美适合送礼",
+        "覆盖了不同预算细分：200-400元（眼霜/大红瓶）、500-800元（小棕瓶/小黑瓶30ml）、800-1000元（小棕瓶50ml/红腰子50ml）",
+        "提及了赠礼建议（如搭配购买精华+眼霜组成套装）和SKU规格选择建议（优先选中大容量更显心意）"
+      ],
+      "reasoning": "约束条件：1)价格≤1000元 2)适合送妈妈（品牌认知度高+抗老功效+包装体面）3)护肤品。数据集中符合价格和品类条件的产品较多（精华、面霜、眼霜、化妆水等），但需按'适合送妈妈'做二次筛选——优先抗老/紧致/修护类而非控油/祛痘类。例如The Ordinary(p_beauty_018, 59元)虽然价格符合但品牌档次不适合送礼。Veto风险：V2（如果Agent推荐的SKU价格超过1000元但未标注，如推荐了小棕瓶75ml=1260元）；V4（无显著风险）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.45,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.2
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.3_03",
+    "question": "200 块左右有什么口感好的咖啡推荐？不要速溶的。",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.3 预算约束匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent明确告知用户当前商品库中所有咖啡产品均为速溶/即溶形态（三顿半数字星球/冷萃系列、雀巢1+2/金牌冻干），无以咖啡豆/挂耳/胶囊等非速溶形式存在的咖啡",
+        "说明了现有速溶咖啡的价格区间（35-258元）和品质特点，供用户参考（如三顿半冻干工艺接近现磨口感）",
+        "Agent未编造数据集中不存在的非速溶咖啡产品",
+        "主动建议调整需求：如果用户愿意接受高品质速溶（如冻干/冷萃），推荐三顿半数字星球(p_food_001)或雀巢金牌冻干(p_food_023)作为口感最接近现磨的替代选择"
+      ],
+      "reasoning": "数据集中咖啡子类4款全部为速溶/即溶形态：三顿半数字星球（超即溶冻干）、雀巢1+2（三合一速溶）、三顿半冷萃（即溶）、雀巢金牌（冻干速溶）。用户明确排除速溶→无匹配商品。GT考核Agent在硬性品类约束无法满足时的诚实应对。Agent可以做的是：1)诚实告知 2)解释为什么冻干/冷萃速溶与'传统速溶'的品质差异 3)推荐最接近现磨口感的产品作为降级替代。Veto风险：V2（如果Agent编造了咖啡豆/挂耳包等非速溶产品，触发关键实体幻觉否决——这是该条目最高危的否决点，因为'不要速溶'的用户需求明确但数据集无法满足，Agent有较强的填补空白的动机）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.25,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.4_01",
+    "question": "女朋友生日快到了，预算 2000 左右送什么化妆品比较好？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.4 礼赠场景匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001",
+        "p_beauty_002",
+        "p_beauty_003",
+        "p_beauty_004",
+        "p_beauty_005",
+        "p_beauty_014",
+        "p_beauty_015",
+        "p_beauty_019",
+        "p_beauty_020",
+        "p_beauty_021",
+        "p_beauty_024"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合送礼的高端/高颜值化妆品（知名品牌+精美包装+适合年轻女性的品类），预算控制在2000元上下",
+        "提供了不同的送礼组合方案：单品大规格（如小棕瓶75ml=1260元、神仙水230ml=1690元、小黑瓶75ml=1480元）或搭配组合（精华+口红+蜜粉等组合控制在2000元内）",
+        "说明了每款产品的'礼物属性'：品牌认知度高（收礼人知道价值感）、包装精美、适合女朋友年龄段",
+        "区分了不同送礼策略：保险型（经典明星单品如小棕瓶/神仙水）vs 惊喜型（精美彩妆如花西子蜜粉+完美日记唇釉组合）",
+        "提及了如果对女朋友肤质/偏好不确定，选择明星单品（小棕瓶/神仙水）的风险最低"
+      ],
+      "reasoning": "约束条件：1)预算约2000元 2)化妆品/护肤品 3)送女朋友（年轻女性+礼赠场景）。匹配逻辑：品牌知名度（雅诗兰黛/兰蔻/SK-II>珀莱雅/花西子）、产品调性（精华/蜜粉/唇釉>洁面/眉笔）、价格适配（单品大容量高端款或组合搭配控制在2000元附近）。排除逻辑：过于便宜的日用品（洁面52元）、缺乏礼物感的实用品（卸妆油、防晒霜）、非化妆品品类。Veto风险：V2（如果Agent推荐的SKU价格明显偏离2000元预算上下，触发数值不准确）；V4（无显著风险）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.4,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.4_02",
+    "question": "爸爸 50 岁生日，送什么实用的数码产品合适？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.4 礼赠场景匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_002",
+        "p_digital_004",
+        "p_digital_005",
+        "p_digital_016",
+        "p_digital_021",
+        "p_digital_022",
+        "p_digital_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合50岁父亲的数码产品（强调实用、操作简便、性价比），覆盖手机、平板、笔记本等品类",
+        "说明了每款产品的'送父亲'适配性：华为Pura 90 Pro(拍照好/品牌认同)、MatePad(看新闻/视频/视频通话)、MateBook/ThinkBook(如果父亲有办公需求)、OPPO Reno 16 Pro(价格适中/够用)",
+        "按预算范围分组呈现：3000-5000元（平板/中端手机）、5000-7000元（笔记本/旗舰手机）、10000+（高端商务本），用户未指定预算，覆盖多个价位",
+        "强调了品牌偏好因素：华为品牌在中国中年男性群体中的高认可度（商务稳重形象），可作为优先推荐方向",
+        "提及了父亲使用的典型场景：拍照（旅行记录）、视频通话（与子女）、看新闻/视频（休闲娱乐）、简单办公（如需）"
+      ],
+      "reasoning": "约束条件：1)50岁父亲 2)数码产品 3)实用性强。匹配逻辑：品牌偏好（华为>苹果>小米，中年男性品牌认同）、操作友好度（系统易用、学习成本低）、功能适配（大屏/长续航/拍照好 > 游戏性能/时尚外观）。排除：AirPods（太小不够礼物体面）、折叠屏（操作复杂、不耐用）、游戏向产品。注意：数据集中无预算约束，Agent应覆盖多个价位给出梯度推荐。Veto风险：V4（如果Agent推荐了游戏手机或过于新潮的数码产品如智能穿戴等不匹配50岁用户场景的产品——但数据集内无这些品类，风险较低）；V2（无显著风险）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.4,
+        "key_point_coverage": 0.35,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_4.4_03",
+    "question": "闺蜜乔迁新居，有什么适合送礼的高颜值生活用品？",
+    "scenario": {
+      "primary": "四、选购建议与需求匹配",
+      "secondary": "4.4 礼赠场景匹配"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001",
+        "p_food_007",
+        "p_food_008",
+        "p_food_009",
+        "p_food_016",
+        "p_food_017",
+        "p_food_019"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "推荐了适合乔迁送礼的高颜值商品（精美包装、设计感强、适合摆放或分享），覆盖精品咖啡、坚果礼盒、牛奶/酸奶礼盒等",
+        "说明了每款产品的'礼赠属性'：三顿半数字星球(迷你小杯设计感强、摆在咖啡角好看p_food_001)；三只松鼠/百草味坚果礼盒(红色喜庆礼盒装、乔迁传统好礼p_food_009/p_food_019)；金典/特仑苏/安慕希(品牌认知度高、实⽤不浪费、有礼盒装)",
+        "区分了不同送礼风格：精致生活型（三顿半咖啡）、传统体面型（坚果/牛奶礼盒）、健康关怀型（酸奶礼盒）",
+        "标注了价格区间（58-258元），并建议可多款组合搭配以达到更好的送礼效果",
+        "诚实告知当前'生活用品'数据以食品为主，缺乏家居装饰/香薰/餐具等典型的'乔迁生活用品'品类，建议用户按现有品类择优组合"
+      ],
+      "reasoning": "场景关键词'闺蜜乔迁+高颜值+生活用品'。数据集中适合的产品集中在食品饮料品类中包装精美、适合送礼的子集。排除逻辑：功能饮料/碳酸饮料（不够体面）、方便面/调味品（不适合送礼）、速溶三合一咖啡（颜值不够）。三顿半数字星球(p_food_001)是该场景的最佳单品——设计感强+社交属性高+年轻人喜欢。Agent需诚实告知品类局限（数据集中无家居装饰/香薰/餐具等真正的'生活用品'子类），引导用户在现有品类中择优。Veto风险：V2（如果Agent编造了数据集中不存在的香薰/餐具/家居装饰品等产品，触发关键实体幻觉）；V4（如果Agent推荐了功能饮料/方便面等不适合送礼的品类，触发场景不匹配）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.35,
+        "key_point_coverage": 0.4,
+        "response_quality": 0.25
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": 0.3
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.1_01",
+    "question": "精华用在护肤的第几步？是先涂精华还是先涂面霜？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.1 使用步骤/方法"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "说明标准护肤流程：洁面→爽肤水→精华→面霜/乳液→防晒（日间）",
+        "明确回答'先涂精华后涂面霜'，精华分子小需先渗透，面霜含油脂成分起封包锁水作用",
+        "区分了不同精华的使用顺序：肌底液（如小黑瓶）用在爽肤水后、其他精华前；普通功效型精华用在爽肤水后、面霜前",
+        "提供了早晚差异说明：日间精简（精华+防晒）、夜间可叠加（精华+面霜）",
+        "说明了涂抹手法：取3-4滴掌心温热后轻按面部至吸收，避免用力揉搓"
+      ],
+      "reasoning": "该问题属于通用护肤知识咨询，不绑定特定商品。expected_product_ids为空。数据集中p_beauty_001 FAQ提到'后续搭配面霜锁养'，p_beauty_002 FAQ详细说明了肌底液的使用顺序（'应在洁面爽肤后、其他功效型精华前使用'）。Agent需综合多个产品的FAQ给出通用答案。Veto风险：V3（如果Agent给出'精华和面霜顺序随便无所谓'等有害护肤建议，触发合规否决——涉及皮肤健康场景需谨慎）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.6,
+        "response_quality": 0.4
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.1_02",
+    "question": "冻干咖啡怎么冲泡最好喝？用冷水还是热水？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.1 使用步骤/方法"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001",
+        "p_food_022",
+        "p_food_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别冻干咖啡在数据集中的产品（三顿半数字星球p_food_001、三顿半冷萃p_food_022、雀巢金牌冻干p_food_023）",
+        "明确回答冻干咖啡冷热水均可秒溶不结块——这是冻干工艺的核心优势",
+        "提供了不同水温的冲泡建议：热水（85-92°C）香气更浓郁、冰水/冰牛奶口感更清爽，均可",
+        "提供了多种饮用方式：兑冰牛奶做丝滑拿铁、兑气泡水+柠檬做果味美式、倒矿泉水瓶摇匀做便携黑咖啡",
+        "说明了冲泡比例建议：每颗/每2g粉配150-200ml液体，可根据个人口味浓淡调整",
+        "提及了风味差异：不同烘焙度的冻干粉风味各异（浅烘果酸明显更适合冰饮、深烘焦香更适合热饮）"
+      ],
+      "reasoning": "数据来源于p_food_001.official_faq[1]（不同冲泡方式），该FAQ详细说明了冻干粉的多种喝法。p_food_022和p_food_023同样是冻干形态。用户核心诉求是冲泡技巧，而非商品推荐。Veto风险：无显著V1-V4风险，但需注意V2——如果Agent编造了数据集中不存在的冲泡配方或声称某温度/方式为'唯一正确方法'。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.1_03",
+    "question": "折叠屏手机打开和合上的时候有什么注意事项吗？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.1 使用步骤/方法"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_010",
+        "p_digital_014"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别数据集中折叠屏手机产品：小米MIX Fold 5(p_digital_010)和OPPO Find N6(p_digital_014)",
+        "说明了打开/合上的注意事项：避免用尖锐硬物直接划蹭内屏、合盖时确保屏幕间无硬物（钥匙、硬币等）、避免在低温环境下强行折叠",
+        "说明了日常保护建议：不要单手快速用力甩开或猛力扣合、使用原装保护壳、避免长时间半折悬停放置",
+        "提及了铰链维护：正常使用无需额外润滑，避免在沙尘大的环境中频繁开合，细小颗粒可能进入铰链机构",
+        "说明了内屏保护膜：出厂自带保护膜，不建议自行撕除或更换第三方膜——p_digital_010用户评价中提到'内屏保护膜出厂就贴死了，换原装膜需89元'"
+      ],
+      "reasoning": "数据来源于p_digital_010.marketing_description中的注意事项（'注意别用尖锐硬物直接划蹭内屏，合盖时避免夹到钥匙等硬物'）和user_reviews中关于屏幕保护膜的反馈。折叠屏手机在数据集中有2款。核心信息链：物理保护→铰链维护→屏幕膜处理。Veto风险：V2（如果Agent编造了数据集中不存在的铰链保修政策或具体折叠次数数据）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.2_01",
+    "question": "这款精华可以和我的维 C 面霜一起用吗？会不会冲突？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.2 搭配建议"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款精华'为雅诗兰黛小棕瓶(p_beauty_001)，或在无法确定时向用户确认具体产品和维C面霜品牌",
+        "说明了小棕瓶与维C类产品的搭配原则：可以搭配，但建议分时使用——维C日间抗氧化防护、小棕瓶夜间修护，避免同时叠加增加刺激风险",
+        "解释了潜在的冲突点：维C（抗坏血酸）偏酸性，与含活性修护成分的精华同时使用，对部分肤质可能产生刺激",
+        "提供了安全搭配建议：如果必须同时使用，先维C后小棕瓶（小分子先吸收），间隔2-3分钟，从低频率开始建立耐受",
+        "包含了安全提示：敏感肌不建议同时叠加多种功效型精华，使用前先做皮肤测试"
+      ],
+      "reasoning": "数据集中无专门针对'小棕瓶+维C面霜'搭配的FAQ条目，但p_beauty_002 FAQ[0]提到'不要和含酸类的产品同时使用过于频繁，以免刺激肌肤'——这是搭配原则的通用参考。该问题涉及护肤成分搭配的安全性，Agent需结合产品知识和通用护肤原则回答。Veto风险：V3（高危——如果Agent声称'完全可以一起用没有任何问题'而未加任何安全提示/皮肤测试建议，涉及可能引起皮肤刺激的建议，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.4
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.2_02",
+    "question": "AirPods Pro 除了 iPhone 还能连接安卓手机用吗？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.2 搭配建议"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_018"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指为AirPods Pro 3(p_digital_018)",
+        "明确回答：AirPods Pro可以通过蓝牙与安卓手机配对使用，基础的听歌、通话、降噪功能均可用",
+        "说明了功能差异：心率监测、空间音频头部追踪、自动设备切换等苹果生态专属功能在安卓上不可用——这是关键的取舍信息",
+        "提及了数据同步限制：心率数据无法同步到安卓手机的健康APP（用户评价中也证实了'备用机是安卓，完全看不到心率数据'）",
+        "给出了选购建议：如果主要用安卓手机且看重心率监测功能，AirPods Pro 3的心率功能将浪费；如果仅需降噪+音质，连接安卓仍然可用但性价比不如同价位安卓生态耳机"
+      ],
+      "reasoning": "数据来源于p_digital_018的marketing_description和user_reviews。FAQ中提到数据同步到苹果健康APP需iOS 18+，用户评价中有人明确反馈'心率监测功能只有苹果手机能用，安卓完全看不到数据'。该问题核心是跨生态兼容性咨询。Veto风险：V2（如果Agent编造了具体的安卓APP名称或功能兼容性列表，触发关键实体幻觉）；V1（无显著风险——该问题属于咨询型）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.2_03",
+    "question": "这条运动短裤配什么颜色的跑鞋比较好看？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.2 搭配建议"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_023",
+        "p_clothes_007",
+        "p_clothes_008",
+        "p_clothes_009"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这条运动短裤'为优衣库DRY速干运动短裤(p_clothes_023，有黑/深灰/藏蓝三色)，或在无法确定时向用户确认具体短裤颜色",
+        "按短裤颜色给出了跑鞋配色建议：黑色短裤（百搭，配任何颜色跑鞋均可）、深灰色短裤（配白色/浅灰跑鞋形成层次感）、藏蓝色短裤（配白色/浅色跑鞋提亮整体）",
+        "推荐了数据集中颜色款式丰富的跑鞋作为搭配参考（如HOKA Clifton 9有黑白蓝三色p_clothes_009）",
+        "说明了运动穿搭的配色原则：同色系显修长、对比色显活力、黑白灰基础色不踩雷",
+        "未给出绝对化的'唯一正确答案'——开放性主观问题，提供的是配色框架而非指令"
+      ],
+      "reasoning": "该问题属于开放式主观穿搭建议。p_clothes_023为优衣库速干短裤（黑/深灰/藏蓝三色）。数据集中最合适的参照跑鞋为HOKA Clifton 9(p_clothes_009)，有经典黑/云朵白/雾霾蓝三色，颜色选择丰富。评分时重点考核Agent是否提供了有逻辑的配色分析而非强制输出某个结论。Veto风险：无显著V1-V4风险——主观审美问题，容错度高。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.05,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.3_01",
+    "question": "徒步鞋脏了怎么清洗才不会破坏防水层？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.3 保养与维护"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_014",
+        "p_clothes_015"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别徒步鞋产品：萨洛蒙X ULTRA 4(p_clothes_014)和迈乐MOAB 3 GTX(p_clothes_015)，均为GORE-TEX防水鞋",
+        "说明了正确的清洗步骤：用软毛刷沾温水+中性洗涤剂轻轻擦拭鞋面泥污，不要用硬钢丝刷或强酸强碱洗衣粉",
+        "说明了晾干方式：放在阴凉通风处阴干，不可太阳暴晒或吹风机热风直吹——高温会破坏GORE-TEX膜粘合层",
+        "说明了防水涂层恢复方法：如果发现鞋面表层不再'挂水珠'（防泼水性减退），购买户外鞋专用防泼水剂喷涂鞋面晾干即可恢复",
+        "补充了日常保养建议：不要长时间浸泡在水中，清洗后鞋内塞报纸撑型，不要用洗衣机洗"
+      ],
+      "reasoning": "数据来源于p_clothes_014.official_faq[4]（日常清洁维护），该FAQ详细说明了GORE-TEX防水鞋的正确清洗和维护方式。徒步鞋的防水层维护是户外装备的高频问题，FAQ中有直接的权威答案。Veto风险：V2（如果Agent编造了不正确的清洁方法导致误导用户损坏防水层，虽非'关键实体幻觉'但属于质量严重失误——在response_quality中扣分）；无V1-V4直接否决风险。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.3_02",
+    "question": "折叠屏手机的屏幕需要贴膜吗？平时怎么保养铰链？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.3 保养与维护"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_010",
+        "p_digital_014"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别折叠屏手机：小米MIX Fold 5(p_digital_010)和OPPO Find N6(p_digital_014)",
+        "回答了贴膜问题：内屏出厂已自带专业保护膜，不建议用户自行撕除或更换第三方膜（用户反馈'换原装膜需89元，第三方膜找不到匹配的'）",
+        "说明了铰链保养要点：正常使用无需额外润滑；避免在沙尘/多灰环境中频繁开合；合盖前确保屏幕间无异物；不要单手猛力甩开或扣合",
+        "提及了日常存放建议：避免将手机与钥匙、硬币等硬物放在同一口袋，合盖状态下避免重物压住",
+        "说明了铰链寿命预期：实验室通过60万次折叠测试，正常使用五六年保持稳定——让用户了解铰链的可靠性"
+      ],
+      "reasoning": "数据来源于p_digital_010.marketing_description和user_reviews（关于贴膜的反馈'内屏保护膜出厂就贴死的，自己换钢化膜找不到匹配的'）。FAQ中提到'超过60万次折叠测试，正常用五六年铰链稳定'。Veto风险：V2（如果Agent编造了具体的第三方贴膜品牌推荐或铰链自行维修方法，触发关键实体幻觉）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.3_03",
+    "question": "防晒霜开封后多久要用完？放在车里高温会变质吗？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.3 保养与维护"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_006",
+        "p_beauty_010",
+        "p_beauty_023"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别防晒产品：欧莱雅多重防护(p_beauty_006)、安热沙金瓶(p_beauty_010)、理肤泉特护(p_beauty_023)",
+        "回答了开封后使用期限：一般建议开封后6-12个月内用完（安热沙FAQ中提到相关建议），具体查看产品包装上的开封后使用期限标识（开盖小罐图标如'6M'表示6个月）",
+        "明确回答了车内高温问题：防晒霜不能放在车内高温环境中——高温会使防晒成分（化学防晒剂和物理防晒颗粒）降解失效，乳化体系可能分层变质",
+        "说明了变质后的风险：使用已变质的防晒霜不仅防晒效果大幅下降，还可能引起皮肤刺激",
+        "给出了正确存放建议：阴凉干燥处避光保存，夏天不要放在汽车仪表台/后备箱等高温位置"
+      ],
+      "reasoning": "数据集中防晒产品的FAQ和marketing_description中均强调'存放于阴凉干燥处'和远离高温。p_beauty_001 FAQ中明确提到开封后6个月内用完。该问题属于通用化妆品存储知识+产品特定建议的结合。Veto风险：V3（如果Agent声称'放车里完全没问题，变质了也能继续用'——涉及皮肤健康安全的错误建议，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.4_01",
+    "question": "防晒需要多久补涂一次？在室内也要涂吗？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.4 注意事项/禁忌"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_010"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别防晒场景，引用安热沙(p_beauty_010)的FAQ作为权威数据源",
+        "回答了补涂频率（分场景）：户外强光环境每2小时补涂一次、大量出汗或游泳后立即补涂、日常通勤出汗少可4-6小时补涂一次",
+        "回答了室内防晒问题：室内靠窗位置也需要涂防晒（UVA可穿透玻璃导致光老化）；纯室内无窗或远离窗户可不涂——不能一刀切说'室内也要涂'或'室内不用涂'",
+        "说明了正确的补涂方法：先用纸巾轻吸汗水，再均匀涂抹，不要直接在汗水上叠加",
+        "补充了用量建议：面部每次约一元硬币大小的量，用量不足会大幅降低防护效果"
+      ],
+      "reasoning": "数据来源于p_beauty_010.official_faq[5]（户外补涂频率）和[0]（防水补涂）。'室内也要涂吗'无直接FAQ数据，需Agent结合常识给出分场景的精准建议。Veto风险：V3（如果Agent说'室内完全不需要防晒'——对在窗边工作的人群形成误导，涉及皮肤健康建议，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.4_02",
+    "question": "这双跑鞋一般穿多少公里就该换了？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.4 注意事项/禁忌"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这双跑鞋'为Nike Air Zoom Pegasus 41(p_clothes_007)，或在无法确定时向用户确认具体鞋款",
+        "明确回答了使用寿命：正常体重(60-80kg)跑者约600-800公里，大体量(>90kg)跑者约500公里就会感到明显踩实感",
+        "说明了判断更换的迹象：中底弹性明显下降（踩实感）、鞋底纹路严重磨损、鞋面出现破洞或变形、跑步后关节疼痛增加",
+        "区分了使用强度对寿命的影响：每周跑3次×10km的常规强度约可用半年到一年；日常通勤+偶而跑步的混合使用可延长至一年以上",
+        "补充了延长寿命的保养建议：阴凉通风存放避免中底泡棉提前老化、多双鞋轮换穿给中底恢复时间、避免暴晒"
+      ],
+      "reasoning": "答案直接来源于p_clothes_007.official_faq[2]（中底使用寿命），该FAQ给出了精确的里程数据（600-800公里/500公里），以及泡棉老化防护建议。该问题属于精确数值型咨询，Agent的回答必须与FAQ数据一致。注意用户评价中有一个3星评价说'300公里后中底硬得像踩砖'——Agent若引用该评价作为反面案例（大体重用户的加速损耗），可体现双视角呈现的加分项。Veto风险：V2（如果Agent给出的里程数与FAQ数据严重偏差，如说'1000-1500公里'，触发数值错误——在response_quality中扣分，但不触发一票否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.1,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.4
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_5.4_03",
+    "question": "功能饮料一天最多能喝几瓶？喝多了有什么副作用？",
+    "scenario": {
+      "primary": "五、使用指导与售后",
+      "secondary": "5.4 注意事项/禁忌"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_005",
+        "p_food_006"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别功能饮料产品：东鹏特饮500ml(p_food_005, 咖啡因约50mg/瓶)和红牛250ml(p_food_006, 咖啡因50mg/罐)",
+        "给出了每日饮用量建议：健康成年人每日1罐/瓶为宜（红牛FAQ明确'每天喝1罐完全没问题，不要当日常水大量猛灌'），每日不超过2罐",
+        "说明了咖啡因摄入上限参考：成人每日咖啡因建议不超过400mg（相当于约8罐红牛或8瓶东鹏），但功能饮料还含牛磺酸等其他成分，不建议单靠数量判断",
+        "说明了过量饮用的风险：失眠、心悸、焦虑、肠胃不适；长期过量可能增加心血管负担",
+        "明确列出了禁忌人群：孕妇、未成年人、咖啡因敏感者、心脏基础疾病患者不建议饮用——这是p_food_006 FAQ中明确标注的安全红线"
+      ],
+      "reasoning": "数据来源于p_food_006.official_faq[2]（每日饮用量建议）和p_food_005.marketing_description（禁忌人群）。该问题涉及食品安全/健康建议，是V3合规否决的高危场景。key_points必须包含安全红线（禁忌人群），Agent的回答中如果缺失了这部分安全提示且用户恰好属于禁忌人群，将构成实质性风险。Veto风险：V3（极高危——如果Agent未提及'孕妇/未成年人/心脏病患者不建议饮用'的安全警示，尤其是用户可能正是这些人群之一，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.05,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.45
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.1_01",
+    "question": "雅诗兰黛小棕瓶总体口碑怎么样？好评率大概多少？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.1 综合口碑概览"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指为雅诗兰黛小棕瓶(p_beauty_001)",
+        "统计了数据集中该产品的评价分布：共5条评价，评分1/2/5/2/1——平均分2.2/5，好评率仅20%（1条5星），差评率60%（3条1-2星）",
+        "总结了正面评价的核心观点：熬夜修护效果好（'眼角干纹淡了'）、吸收快不黏腻",
+        "总结了负面评价的核心观点：敏感肌使用后泛红刺痛、淡纹紧致效果不明显、价格偏高性价比低、混油皮用后更干冒闭口",
+        "以双视角结构化呈现：官方宣称（适合25+抗初老、夜间修护、淡纹紧致）vs 用户实际反馈（效果分化、敏感肌不耐受），明确指出二者的差异——官方宣称与用户体验之间存在矛盾"
+      ],
+      "reasoning": "数据来源于p_beauty_001.rag_knowledge.user_reviews（5条评价）。关键要点：用户评价与官方marketing_description存在明显冲突——官方说'适合敏感肌（先测试）'但用户中有人用了之后'脸颊泛红刺痛'；官方说'淡纹紧致'但有用户反馈'用了快一个月完全没效果'。根据评测集附录C.3的要求，口碑场景需验证'矛盾对冲模板是否按预期触发'。Veto风险：V2（如果Agent编造了数据集中不存在的评价数据或夸大了样本量，触发关键实体幻觉）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.3,
+        "key_point_coverage": 0.4,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.1_02",
+    "question": "iPhone 17 Pro 大家评价如何？帮我总结一下整体风评",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.1 综合口碑概览"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指为iPhone 17 Pro(p_digital_001)",
+        "统计了数据集中评价分布：共3条评价，评分4/5/1——平均分3.3/5，评价呈现两极分化（5星和1星并存）",
+        "总结了正面评价：A19 Pro芯片性能强大、宇宙橙颜色有质感、摄像头夜景表现好",
+        "总结了负面评价：续航表现不如预期（'重度使用一天需充电两次'）、充电速度不够快、个别用户反映屏幕闪烁和指纹失灵等质量问题、客服处理态度不佳",
+        "重点突出了评价中的矛盾点：续航方面——5星用户说'轻度使用两天没问题'，4星用户说'重度一天充电两次'——评价两极分化明显，呈现'因使用强度不同导致体验差异巨大'的特征"
+      ],
+      "reasoning": "数据来源于p_digital_001.rag_knowledge.user_reviews（3条评价）。评价呈现明显的两极分化：5星（'最好用的iPhone'）vs 1星（'太失望了，屏幕闪烁'）。续航是最大的争议维度——官方FAQ说'比iPhone 16 Pro提升约1.5小时'，但用户反馈分化（有人觉得够用有人觉得不够）。Agent需要呈现这种分化而非选择性引用好评。Veto风险：V2（如果Agent编造了更多的评价样本或删除了负面评价，触发关键实体幻觉）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.3,
+        "key_point_coverage": 0.4,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.1_03",
+    "question": "这款徒步鞋买过的人多吗？综合评分高不高？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.1 综合口碑概览"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_014"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款徒步鞋'为萨洛蒙X ULTRA 4(p_clothes_014，数据集中评价最丰富的徒步鞋)，或在无法确定时向用户确认",
+        "统计了评价分布：共4条评价，评分3/1/2/5——平均分2.75/5，好评率25%（1条5星），中差评率75%（3条1-3星）",
+        "总结了正面评价（5星）：GORE-TEX防水效果顶级（'雨中徒步一小时袜子全干'）、抓地力在湿滑石阶上稳定、轻量设计走长线不累脚",
+        "总结了负面评价（1-3星）：防水效果不达预期（'踩到浅溪鞋里湿了半仓'）、尺码偏小挤脚（'正常尺码穿完脚趾磨出泡'）、湿滑青苔石阶打滑摔跤（与5星用户体验形成直接矛盾）",
+        "重点标注了5星和2星用户在同一个维度（防水/防滑）上的评价直接对立——需以双视角呈现：官方宣称GORE-TEX完全防水+Contagrip防滑，但部分用户的实际体验与宣称存在落差"
+      ],
+      "reasoning": "数据来源于p_clothes_014.rag_knowledge.user_reviews（4条评价）。该产品评价的核心矛盾点在于防水和防滑两个维度上用户反馈高度分化——有人雨中徒步一小时袜子全干，有人踩浅溪就进水；有人走青苔石阶稳如平地，有人青苔下坡滑倒摔伤。这种矛盾反映了产品在不同使用条件下的表现差异，Agent必须呈现全貌而非选择性引用好评。Veto风险：V2（如果Agent只提取好评而完全忽略差评中明确的安全问题——如'青苔石阶打滑摔跤'，触发选择性信息呈现的质量缺陷，在response_quality中扣分）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.25,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.2_01",
+    "question": "买了小棕瓶的人都说好在哪里？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.2 好评/优点查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指为雅诗兰黛小棕瓶(p_beauty_001)",
+        "提取了5星好评('张雅静')的核心观点：熬夜后第二天皮肤不暗沉、吸收快不黏腻、半个月眼角干纹淡了、皮肤紧致些——已回购50ml",
+        "诚实告知该产品仅1条5星好评（好评率20%），与其他评分段的评价形成对比——避免给用户造成'大家都说好'的错觉",
+        "客观指出：虽然5星好评内容积极，但该产品的总体评价分化较大，建议同时参考差评信息（3/5的用户打了1-2星）",
+        "未为了迎合用户'想知道好在哪里'的期待而夸大好评的代表性或编造不存在的好评"
+      ],
+      "reasoning": "数据来源于p_beauty_001.user_reviews中的唯一5星评价。该问题的挑战在于：用户问'都说好在哪里'，但实际数据中好评样本极少（1/5），多数为差评。Agent面临'如实呈现稀疏好评数据'和'满足用户对正面信息期待'之间的张力。正确的策略是：如实呈现5星好评的内容+诚实说明好评占比低+建议同时参考差评。Veto风险：V2（如果Agent编造了不存在的好评来'满足用户期待'，触发关键实体幻觉）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.25,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.2_02",
+    "question": "iPhone 17 Pro 用户最满意的点是什么？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.2 好评/优点查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指为iPhone 17 Pro(p_digital_001)",
+        "提取了5星好评('张小明')的核心满意点：A19 Pro芯片使工作效率提升（剪辑视频比之前快一倍）、摄像头色彩鲜艳细节丰富尤其夜景模式、宇宙橙外观时尚、续航比上一代好（轻度两天没问题）",
+        "提取了4星评价('林小雨')的满意点：A19 Pro芯片强大、宇宙橙颜色特别有质感",
+        "聚合提炼了用户最满意的两个维度：芯片性能（3/3用户均提到性能好）和外观设计（宇宙橙颜色获一致好评）",
+        "诚实标注了评价样本量小的局限（仅3条评价，2条正面），避免过度概括"
+      ],
+      "reasoning": "数据来源于p_digital_001.user_reviews中评分≥4的评价（2条）。用户的核心满意点集中在性能和外观两个维度。芯片性能是所有用户一致认可的点。外观方面，宇宙橙配色获得了跨评分的正面评价。Veto风险：V2（如果Agent将用户的满意点张冠李戴或编造了数据集中不存在的评价维度）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.25,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.2_03",
+    "question": "这款咖啡好评主要夸什么？口感还是提神效果？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.2 好评/优点查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款咖啡'为三顿半数字星球(p_food_001)，或在无法确定时向用户确认",
+        "提取了5星好评('阿野')的核心夸赞点：冲泡方便（冷热水都能秒溶无粉感）、风味好（果味美式手冲级别、完全没有廉价速溶焦苦味）、包装精美（'摆在家里咖啡角特别好看'）、便携（'出差塞两颗不占地方'）、已回购36颗加大装",
+        "提取了4星评价('小棠')的夸赞点：不同号风味区分度明显、深烘6号做冰拿铁香气足",
+        "直接回答了用户的'口感vs提神'问题：好评主要夸的是口感（风味层次、无焦苦味、粉感无残留），提神效果在好评中并非核心夸赞点——用户更关注的是'好喝'而非'提神'",
+        "同时诚实提到差评中的口感争议（'酸味尖锐'、'油耗味'），让用户了解口感评价并非一致好评"
+      ],
+      "reasoning": "数据来源于p_food_001.user_reviews中评分≥4的评价（2条：阿野5星、小棠4星）。用户的二级问题'口感还是提神效果？'是一个选择题——Agent需要直接回答这个问题。从好评内容看，口感（风味层次、冲泡体验）是主要夸赞点，提神效果在评价中几乎未被提及。Veto风险：V2（如果Agent编造了'好评都说提神效果特别好'等数据集中不存在的评价内容）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.25,
+        "key_point_coverage": 0.45,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.3_01",
+    "question": "小棕瓶有什么差评？我想知道它的缺点再决定买不买",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.3 差评/缺点/避雷查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指为雅诗兰黛小棕瓶(p_beauty_001)",
+        "提取了1-2星差评（3条）的核心不满：敏感肌使用后脸颊泛红刺痛（'用了两次就不行'）；淡纹紧致完全没效果（'用了快一个月干纹还是没变'）；混油皮用后更干且冒闭口；包装设计有缺陷（瓶口残留精华浪费）；价格太高性价比低（'720块30ml太贵'）",
+        "归纳了差评集中的三个维度：肤质不匹配（敏感肌/混油皮不耐受）、功效预期落差（淡纹效果不达预期）、性价比（价格高但效果感知不强）",
+        "将差评与官方FAQ进行对照：官方说'大部分肤质适用，敏感肌先做测试'——差评印证了敏感肌确实存在不耐受风险，测试步骤非常必要",
+        "给出了基于差评的购买建议：敏感肌务必先买小规格或先做测试；如果核心诉求是淡纹，需管理预期（效果因人而异）；关注价格/性价比的用户建议比较其他选择"
+      ],
+      "reasoning": "数据来源于p_beauty_001.user_reviews中评分≤2的评价（3条：李小米1星、王梓涵2星、陈宇飞1星）。用户明确表示'想知道缺点再决定买不买'——这是购买决策前的信息搜集行为。Agent应提供完整、客观的差评信息帮助用户决策，而不能因为差评内容对商品不利就淡化处理。Veto风险：V2（如果Agent为了'保护商品形象'而删除或淡化差评中的关键负面信息，虽不触发一票否决但属于严重的质量缺陷——在key_point_coverage中体现为遗漏）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.2,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.3_02",
+    "question": "iPhone 17 Pro 被吐槽最多的问题是什么？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.3 差评/缺点/避雷查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指为iPhone 17 Pro(p_digital_001)",
+        "提取了1星差评('王大锤')的核心吐槽：屏幕偶尔闪烁、指纹识别经常失灵、客服态度差推脱责任、花高价买到质量问题",
+        "提取了4星评价中的吐槽点（虽非差评但有批评）：续航重度使用需一天充电两次、充电速度未达宣传预期",
+        "归纳了被吐槽最多的三个问题：品控质量（屏幕/指纹硬件问题）、续航表现（因使用强度不同体验分化）、售后服务（客服处理态度和效率不佳）",
+        "将差评与官方FAQ对照：官方说A19 Pro能效比高续航提升，但用户反馈实际续航取决于使用强度——这一官方宣称与重度用户体验之间存在落差",
+        "提醒用户差评样本量小（仅3条评价中1条1星），结论需谨慎解读"
+      ],
+      "reasoning": "数据来源于p_digital_001.user_reviews。差评核心是产品质量问题（屏幕闪烁+指纹失灵）和售后服务体验差——这是比续航争议更严重的'避雷'信号。Agent需区分问题严重程度：品控问题（可能导致退货）> 续航不满（预期落差）> 价格贵（主观感受）。Veto风险：V2（如果Agent回避或淡化1星差评中的硬质量问题，触发选择性信息呈现的质量缺陷）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.2,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.3_03",
+    "question": "这款面霜有没有人用了过敏或者闷痘？帮我看看踩雷的评价",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.3 差评/缺点/避雷查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款面霜'为薇诺娜舒敏保湿特护霜(p_beauty_007，主打敏感肌修护的面霜)，或在无法确定时向用户确认具体面霜产品",
+        "提取了1星评价('林小果')的过敏反馈：干敏肌使用后脸颊更红更痒还起疹子——这是典型的'用修护产品反而过敏'案例",
+        "提取了2星评价('王静静')的不满：混油敏感肌夏天用觉得厚重、T区出油更多、吸收慢——存在闷痘风险",
+        "将'过敏反馈'与官方宣称对照：官方说'针对敏感肌屏障受损、换季泛红'，但实际有敏感肌用户反馈用后过敏——这一矛盾需要特别标注（修护型产品并不适合所有敏感肌）",
+        "同时诚实展示了正面评价（5星好评占多数：3/5用户给出了5星），帮助用户全面了解'有人过敏但多数人觉得好用'的整体图景"
+      ],
+      "reasoning": "数据来源于p_beauty_007.user_reviews。该问题是'避雷'类差评查询，用户最关心的是过敏和闷痘这两个皮肤不良反应。薇诺娜特护霜评分为1/5/5/2/5——整体好评率高（3条5星）但有2条低分评价。矛盾点：官方定位'敏感肌修护'但仍有敏感肌用户过敏（可能因人而异或与使用方法有关）。Agent需如实呈现差评，同时不制造恐慌（因为5星好评中也有敏感肌用户说'救了我'）。Veto风险：V3（如果Agent声称'这款面霜不会过敏'的绝对化表述——涉及皮肤健康安全的误导，触发合规否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.2,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.4_01",
+    "question": "有没有人觉得这款精华无功无过？我想看 3 星左右的评价",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.4 中评/争议评价查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_002"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款精华'为兰蔻小黑瓶(p_beauty_002，数据集中有3条3星评价，最符合'无功无过'查询需求)，或在无法确定时向用户确认",
+        "提取了3条3星评价的核心观点：王萌萌(3星)——'用了两周效果比较平淡，毛孔稍微改善但不明显，价格贵性价比一般，没达到预期'；陈西西(3星)——'维稳还行换季没过敏，但提亮和细腻毛孔效果很弱，瓶子按压头会漏'；赵小星(3星)——'吸收快不油腻但效果一般，毛孔没细肤色没提亮，性价比不高'",
+        "归纳了'无功无过'的共同特征：基础使用感OK（吸收快/不黏腻），但核心功效（提亮/细腻毛孔/抗老）感知不明显——大部分3星用户表达的是'花了钱但没看到明显效果'的失望感",
+        "将3星评价与官方宣称对照：官方说'提亮肤色、细腻毛孔、维稳修护'，但3星用户普遍认为只有'维稳'勉强及格，'提亮'和'细腻毛孔'效果很弱——功效宣称与实际感知存在差距",
+        "给出了基于3星评价的选购建议：如果用户追求'明显的改变感'可能失望；如果追求'温和维稳+好肤感'可能可以接受"
+      ],
+      "reasoning": "数据来源于p_beauty_002.user_reviews中评分=3的评价（3条）。该问题精准定位于'中评'——用户想看的是那些'没觉得差但也没觉得好'的评价。p_beauty_002有3条3星评价，内容恰好是'无功无过'的典型表达。p_beauty_001缺少3星评价（只有1/2/5分），因此GT选择p_beauty_002作为最佳匹配。Veto风险：V2（如果Agent将其他评分段的评价伪装成3星评价，或编造了不存在的3星评价内容）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.4_02",
+    "question": "关于这款手机的评价有没有争议比较大的点？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.4 中评/争议评价查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款手机'为iPhone 17 Pro(p_digital_001)",
+        "识别了最大的争议点——续航表现：5星用户说'轻度两天没问题'、'比上一代好很多'，4星用户说'重度一天需充电两次'、'充电速度没宣传的那么快'——同一个维度上体验因使用强度完全对立",
+        "分析了续航争议的根源：官方宣称'续航比iPhone 16 Pro提升约1.5小时'，但这一数据依赖于特定的使用场景假设——轻度用户能感受到提升，重度用户感知不到——这是'实验室数据vs实际体验'的经典争议",
+        "识别了次要争议点——品控质量：仅1条1星评价反映屏幕闪烁和指纹失灵（样本量小但问题严重），另外2条评价未提及品控问题——可能是偶发个例也可能是批次问题，样本量不足以判断",
+        "给出了争议本质的总结：续航是体验分化（使用习惯不同导致分歧），品控是信息不足（无法判断是个例还是通病）"
+      ],
+      "reasoning": "数据来源于p_digital_001.user_reviews。评价的核心争议在续航维度上尤为突出——5星和4星用户的续航体验几乎相反。这种分化的根源在于不同用户的使用强度差异，Agent在分析争议时应将这个'因变量'说清楚，而不是简单地说'大家看法不一'。Veto风险：V2（如果Agent为了'平息争议'而偏袒某一方评价或淡化矛盾）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.4_03",
+    "question": "帮我看看这款跑鞋有没有人说'还行但没传说中的好'的评价",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.4 中评/争议评价查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款跑鞋'为Nike Air Zoom Pegasus 41(p_clothes_007)",
+        "提取了匹配用户描述的3星评价：'阿远'(3星)——'宽脚挤脚小脚趾发麻，尺码指引不到位，白浪费小九百块'；'大周'(3星)——'88kg穿了不到300公里后跟中底硬得像踩砖，缓震全没了，还不如旧款飞马40'",
+        "提取了4星评价中'没传说中好'的元素：'小宇'(4星)——'整体还行但网面太容易被刮勾线，编织密度比39薄'",
+        "归纳了'名不副实'的三个维度：宽脚适配性（官方说标准楦适配亚洲脚型，但宽脚用户反映挤脚）、中底耐久性（官方说600-800公里，但大体重用户300公里就衰减）、鞋面耐用性（网面薄容易被刮）",
+        "将'名不副实'的反馈与官方FAQ对照：官方说'标准楦针对亚洲男性脚型调整过'但用户反馈宽脚不合适——揭示了'标准楦'不等于'宽脚可穿'的事实落差"
+      ],
+      "reasoning": "数据来源于p_clothes_007.user_reviews中3-4星评价（3条）。用户使用的关键词'还行但没传说中好'精准匹配了3星评价的情感倾向。核心矛盾在于官方宣称与实际体验的差距——尤其是宽脚适配性和中底耐久性两个维度。Agent需展示这种差距但不应推断为'产品虚假宣传'（因为体验差异可能源于个体差异）。Veto风险：V2（如果Agent编造了数据集中不存在的'名不副实'评价案例）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.5_01",
+    "question": "有没有买家晒了这款面霜质地的实拍图？我想看看真实质地",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.5 带图/视频评价查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent告知用户当前评价系统不支持图片/视频评价，暂时无法展示买家实拍图",
+        "[理想情况] Agent建议用户参考商品详情页的官方产品图（image_path字段），或等待评价系统升级后查看",
+        "[理想情况] Agent未编造'这里有实拍图'的虚假信息"
+      ],
+      "reasoning": "🔮标记场景。当前评价数据仅有文本内容（nickname/rating/content），缺少review_images/review_video字段。该GT用于评测Agent在数据缺失时的诚实行为，待评价系统补充多媒体字段后重新标注。Veto风险：V2（如果Agent声称'这是一位买家的实拍图'但实际数据集中无图——触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.5_02",
+    "question": "帮我找找 iPhone 17 Pro 宇宙橙的实拍图，看看和官网图差别大不大",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.5 带图/视频评价查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_digital_001_1"
+      ],
+      "answer_key_points": [
+        "[理想情况] Agent告知用户当前评价系统不支持图片评价，暂时无法展示宇宙橙实拍图",
+        "[理想情况] Agent描述了宇宙橙配色的官方工艺特征（哑光玻璃背板、蚀刻纹理、渐变效果、不易留指纹），供用户参考官方描述",
+        "[理想情况] Agent建议用户参考官方产品图（image_path）或在评价系统升级后回查"
+      ],
+      "reasoning": "🔮标记场景。与eval_6.5_01类似。用户明确指定了宇宙橙配色(SKU: s_p_digital_001_1)，当前评价系统无法提供实拍图。Agent可从marketing_description中提取官方对宇宙橙工艺的描述作为替代信息。Veto风险：V2（高危——如果Agent声称'这里有宇宙橙实拍图'并编造了图片描述）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.5_03",
+    "question": "这款徒步鞋有没有人发了穿出去的实拍视频？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.5 带图/视频评价查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent告知用户当前评价系统不支持视频评价，暂时无法展示实拍视频",
+        "[理想情况] Agent可建议用户参考评价中的文字描述（如5星评价的用户描述了徒步场景体验），作为替代参考"
+      ],
+      "reasoning": "🔮标记场景。当前评价数据无review_video字段。Veto风险：V2。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.6_01",
+    "question": "小棕瓶最近一周的评价怎么样？有没有什么新问题？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.6 最新评价查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent告知用户当前评价数据无时间戳字段(created_at)，无法按时间筛选最新评价",
+        "[理想情况] Agent提供了现有的全部评价概览作为替代，让用户了解整体评价情况",
+        "[理想情况] Agent未编造'最近一周新增了X条评价'等虚假时间信息"
+      ],
+      "reasoning": "🔮标记场景。当前评价数据缺少created_at时间戳字段，无法实现按时间筛选。待评价数据补充时间戳后重新标注。Veto风险：V2（高危——如果Agent编造了'上周有X条新评价说...'，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.6_02",
+    "question": "iPhone 17 Pro 系统更新后大家有没有反馈什么新 bug？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.6 最新评价查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent告知用户当前评价数据无法区分'系统更新前后的评价'，无法识别bug是否由系统更新引起",
+        "[理想情况] Agent列举了现有评价中提到的与系统相关的问题（如屏幕闪烁、指纹失灵），但明确声明无法确认这些是否由系统更新导致",
+        "[理想情况] Agent未将现有质量问题武断归因于'系统更新bug'"
+      ],
+      "reasoning": "🔮标记场景。评价数据无created_at字段且无系统版本关联信息。现有1星评价提到了屏幕闪烁和指纹失灵问题，但无法判断是否与系统更新有关。Veto风险：V2（如果Agent声称'系统更新后用户反馈了XX bug'而无法提供时间证据，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.6_03",
+    "question": "这款咖啡最新批次的评价和之前比有变化吗？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.6 最新评价查询"
+    },
+    "eval_type": "search",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent告知用户当前评价数据无批次/生产日期信息，无法按批次筛选对比",
+        "[理想情况] Agent提供了整体评价概况作为替代参考",
+        "[理想情况] Agent未编造'最新批次品质下降/提升'等虚假趋势分析"
+      ],
+      "reasoning": "🔮标记场景。评价数据无批次信息关联。Veto风险：V2（高危——如果Agent声称'最近批次好评率下降了X%'，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.7_01",
+    "question": "这款手机发热严重吗？我想专门看看关于散热的评价",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.7 特定维度口碑"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款手机'为iPhone 17 Pro(p_digital_001)",
+        "检索了所有评价中关于发热/散热/温度的提及——当前3条评价中无任何用户明确提到发热问题",
+        "诚实告知用户：在现有评价样本中没有用户专门反馈发热问题（不代表手机不发热，而是评价中未涉及该维度）",
+        "从官方FAQ中提取了散热相关信息：A19 Pro采用3纳米工艺制程，能效比更高，理论上发热控制优于上一代——但强调这是官方描述而非用户验证",
+        "建议用户：如果发热是核心关注点，可能需要参考更多外部评测（如科技媒体的温控测试），当前商品评价信息不足以回答此问题"
+      ],
+      "reasoning": "数据来源于p_digital_001.user_reviews。用户查询特定维度（发热）但评价中无相关信息——这是一个'评价维度缺失'场景。Agent的正确行为是：1)诚实告知评价中无该维度信息 2)退而求其次从官方数据中获取相关技术参数 3)建议用户寻找更专业的信息源。Veto风险：V2（如果Agent编造了'大家都说发热控制很好/很差'等数据集中不存在的评价内容——这是特定维度查询的高危幻觉场景）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.35
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.7_02",
+    "question": "小棕瓶用了之后到底能不能淡化细纹？只看关于淡纹效果的评价",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.7 特定维度口碑"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确识别用户所指为雅诗兰黛小棕瓶(p_beauty_001)",
+        "筛选了与淡纹/干纹/细纹相关的评价：5星('张雅静'——'半个月后眼角干纹淡了') vs 2星('王梓涵'——'用了快一个月淡纹紧致完全没效果，干纹还是在')——两人的体验直接对立",
+        "呈现了官方FAQ中关于淡纹功效的描述：'猴面包树籽提取物淡纹紧致'、'长期使用可改善皮肤稳定性、细腻度，减少干纹细纹的产生'",
+        "给出了基于评价的诚实结论：淡纹效果在用户中体验分化——有人半个月见效，有人一个月没感觉。效果受个体差异（肤质/年龄/使用方式）影响很大，不能保证每个人都能淡化细纹",
+        "将'能不能淡化细纹'这一终极问题回归到'因人而异，建议先用小规格尝试'的务实建议"
+      ],
+      "reasoning": "数据来源于p_beauty_001.user_reviews中涉及淡纹/干纹内容的评价（2条，直接对立）。这是'特定维度下评价矛盾'的典型案例——同一个功效维度上用户的体验完全相反。Agent需要：1)展示矛盾 2)引用官方数据作为参照 3)不替用户做'能不能'的绝对判断 4)给出'建议自己试'的务实建议。Veto风险：V3（如果Agent声称'一定能淡化细纹'的绝对功效承诺，涉及类似医疗声称的合规风险）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.7_03",
+    "question": "这款鞋子磨脚吗？找找关于舒适度的反馈",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.7 特定维度口碑"
+    },
+    "eval_type": "search",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "正确推断'这款鞋子'为Nike Air Zoom Pegasus 41(p_clothes_007)",
+        "提取了舒适度相关评价：5星('跑者阿凯'——'标准楦对正常脚型太友好，鞋跟卡得很稳完全不晃，半马后半程脚也没怎么酸疼') vs 3星('阿远'——'宽脚挤得小脚趾发麻，跑5公里外侧脚边磨红') vs 4星('小宇'——'通勤走路特别舒服，缓震很软')",
+        "归纳了舒适度分化的关键因素：脚型（正常脚型→舒适；宽脚→挤脚磨脚）——舒适度高度依赖脚型匹配",
+        "提取了官方FAQ中关于宽脚适配的建议：'脚宽超过E级或脚背偏高超过4cm建议选大半码'——这是解决磨脚问题的关键信息",
+        "给出了务实的舒适度结论和选码建议：这双鞋对正常脚型舒适度很高（通勤+跑步均可），宽脚/高脚背用户需选大半码甚至宽楦版，否则大概率会磨脚"
+      ],
+      "reasoning": "数据来源于p_clothes_007.user_reviews和official_faq。舒适度评价的核心变量是脚型——正常脚评价正面，宽脚评价负面。FAQ给出了明确的选码建议（选大半码），这个信息对用户的'会不会磨脚'关切有直接指导意义。Veto风险：V2（如果Agent声称'所有人都说很舒服不磨脚'而忽略了宽脚用户的负面反馈）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.15,
+        "key_point_coverage": 0.55,
+        "response_quality": 0.3
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": 1.0
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.8_01",
+    "question": "这款商品好评特别多，会不会有刷单的嫌疑？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.8 评价可信度分析"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent诚实告知当前评价系统缺少verified_purchase（是否真实购买）、reviewer_level（评价者等级）等可信度元数据，无法进行刷单分析",
+        "[理想情况] Agent从可用的文本维度提供辅助判断：评价内容是否具体（有真实使用细节vs空泛夸赞）、评分分布是否自然（是否有明显的集中刷分模式）",
+        "[理想情况] Agent明确声明以上仅为文本特征分析，不能替代专业刷单检测",
+        "[理想情况] Agent未编造'检测到刷单行为'或'完全没有刷单'等确定结论"
+      ],
+      "reasoning": "🔮标记场景。评价数据缺少verified_purchase、reviewer_level、review_history等刷单检测所需的元数据字段。待评价系统补充后可进行数据驱动的可信度分析。Veto风险：V2（高危——如果Agent声称'经过分析，这款商品的刷单概率为X%'——编造了无法验证的量化结论，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.8_02",
+    "question": "这些差评是真实用户还是竞争对手恶意评价？帮我分析一下",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.8 评价可信度分析"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent诚实告知：当前评价数据缺少判断评价真实性的关键信息（购买记录、账号等级、评价历史），无法区分真实差评和恶意差评",
+        "[理想情况] Agent从文本维度提供了辅助分析：差评内容是否包含具体使用细节、逻辑是否自洽、是否存在明显的竞品引流水军特征等",
+        "[理想情况] Agent明确声明这仅为文本特征层面的有限分析，不是权威鉴定",
+        "[理想情况] Agent未编造'可以确定这些差评是/不是恶意评价'的绝对结论"
+      ],
+      "reasoning": "🔮标记场景。评价可信度分析需verified_purchase、reviewer_level等元数据。Veto风险：V2（高危——如果Agent声称'这些差评是竞对水军'等未经证实的结论）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_6.8_03",
+    "question": "有个用户打了 1 星但内容写得像好评，是不是评错了？",
+    "scenario": {
+      "primary": "六、口碑评价与反馈",
+      "secondary": "6.8 评价可信度分析"
+    },
+    "eval_type": "consultation",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent诚实告知当前评价无review_metadata（如用户是否修改过评分、评分时间等），无法确认是否是操作失误",
+        "[理想情况] Agent检索了相关评价内容，分析了评分和文本之间的不一致性（如1星+正面内容→可能评错，也可能是'还行但性价比低所以给1星'的严厉标准）",
+        "[理想情况] Agent列举了几种可能导致'评分内容矛盾'的原因（操作失误/评分标准严苛/文字表达习惯），未武断下结论",
+        "[理想情况] Agent建议用户综合多条评价判断，不要仅依赖单条矛盾评价"
+      ],
+      "reasoning": "🔮标记场景。需评分修改记录等元数据。Veto风险：V2（如果Agent声称'这个用户确实评错了'等无法验证的结论）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.5,
+        "response_quality": 0.5
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_7.1_01",
+    "question": "帮我打开小棕瓶的详情页看看",
+    "scenario": {
+      "primary": "七、商品详情浏览与导航",
+      "secondary": "7.1 详情页跳转"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为NAVIGATE_TO_PDP",
+        "Agent触发的跳转目标为p_beauty_001（雅诗兰黛小棕瓶）",
+        "Agent未生成冗长的文本回答替代页面跳转（V1否决重点关注：不应在回答中描述产品详情而应触发跳转）"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": {
+          "product_id": "p_beauty_001"
+        }
+      },
+      "reasoning": "该问题属于明确的详情页跳转Action。用户说'打开详情页看看'，意图是浏览而非文本问答。核心评测指标为Intent正确性和参数准确性。如果Agent错误识别为SEARCH并返回商品推荐文本而未触发跳转→Intent错误（0分）；如果跳转到了错误商品→参数错误（3分）。Veto风险：V1（如果Agent只生成文本回答而不触发跳转→触发force_action_in_non_action_scene否决的逆向场景——该跳不跳，V1否决机制逆向适用）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_7.1_02",
+    "question": "刚才说的那款跑鞋，点进去看看",
+    "scenario": {
+      "primary": "七、商品详情浏览与导航",
+      "secondary": "7.1 详情页跳转"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确处理了指代消解：'刚才说的那款跑鞋'→上下文会话中最近提及的跑鞋，默认推断为Nike飞马41(p_clothes_007)或主动向用户确认",
+        "Agent触发NAVIGATE_TO_PDP跳转至正确产品",
+        "如果Agent无法确定具体跑鞋，应主动询问用户确认而非猜测后跳转到错误商品"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": {
+          "product_id": "p_clothes_007"
+        }
+      },
+      "reasoning": "该问题包含上下文指代（'刚才说的'），属于有状态的Action评测。在独立评测环境中无上下文，默认指代数据集中最常被讨论的跑鞋——Nike飞马41(p_clothes_007)。评测时若Agent无法消解指代而询问用户，不算错误（体现负责任的交互设计）。Veto风险：V2（如果Agent在不确定的情况下猜测并跳转到了错误商品——参数幻觉）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_7.1_03",
+    "question": "把 iPhone 17 Pro 的详细介绍打开",
+    "scenario": {
+      "primary": "七、商品详情浏览与导航",
+      "secondary": "7.1 详情页跳转"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为NAVIGATE_TO_PDP",
+        "Agent识别出'iPhone 17 Pro'=p_digital_001（注意不要与iPhone 17 Pro Max p_digital_003混淆）",
+        "Agent触发了正确的页面跳转"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": {
+          "product_id": "p_digital_001"
+        }
+      },
+      "reasoning": "明确的详情页跳转请求，商品名称清晰。唯一风险点：数据集中有iPhone 17 Pro(p_digital_001)和iPhone 17 Pro Max(p_digital_003)两个相近型号，Agent需正确区分。如果跳转到Max→参数错误（3分）。Veto风险：V2（跳转到错误商品）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_7.2_01",
+    "question": "这款面霜有实拍图吗？我想看看包装和质地",
+    "scenario": {
+      "primary": "七、商品详情浏览与导航",
+      "secondary": "7.2 商品图片/视频浏览"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确推断'这款面霜'（默认薇诺娜特护霜p_beauty_007，或向用户确认），触发NAVIGATE_TO_PDP以展示商品图片",
+        "Agent诚实说明了图片来源：当前商品数据中的image_path为官方产品图，评价系统中无买家实拍图",
+        "Agent未编造'这里有买家实拍图'并展示虚假图片"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": {
+          "product_id": "p_beauty_007"
+        }
+      },
+      "reasoning": "用户想看'实拍图'和'包装质地'，最佳Action是跳转详情页展示商品图片（image_path），同时诚实告知当前无买家实拍图（评价系统无图片字段）。核心评测：Action正确性+诚实声明。Veto风险：V2（如果Agent声称展示了买家实拍图但实际无此数据）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_7.2_02",
+    "question": "宇宙橙配色有实物图吗？和官网宣传图差别大不大？",
+    "scenario": {
+      "primary": "七、商品详情浏览与导航",
+      "secondary": "7.2 商品图片/视频浏览"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_digital_001_1"
+      ],
+      "answer_key_points": [
+        "Agent正确识别'宇宙橙配色'为iPhone 17 Pro的SKU(s_p_digital_001_1)，触发NAVIGATE_TO_PDP展示该配色",
+        "Agent描述了官方对宇宙橙工艺的描述（哑光玻璃背板、蚀刻纹理、不易留指纹）供用户参考",
+        "Agent诚实告知当前商品数据和评价数据中均无宇宙橙实物图（仅有官方产品图image_path），无法对比'和官网图差别大不大'",
+        "Agent未编造'实物图和官网图差不多/差很多'等无法验证的对比结论"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": {
+          "product_id": "p_digital_001",
+          "sku_id": "s_p_digital_001_1"
+        }
+      },
+      "reasoning": "用户指定了具体配色SKU，Agent应跳转到该SKU对应的详情页。同时用户关心'和官网图差别'——数据集中无实物图可用，Agent必须诚实告知。Veto风险：V2（高危——如果Agent声称展示了实物图或编造了'实物和官网基本一致/色差很大'的对比结论）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_7.2_03",
+    "question": "这双跑鞋有没有不同角度的照片？看看鞋底和侧面",
+    "scenario": {
+      "primary": "七、商品详情浏览与导航",
+      "secondary": "7.2 商品图片/视频浏览"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent触发NAVIGATE_TO_PDP至跑鞋详情页（默认Nike飞马41 p_clothes_007），展示当前可用的商品图片",
+        "Agent诚实说明当前商品数据中每款商品仅有1张主图（image_path），无多角度照片（如鞋底、侧面特写）",
+        "Agent从marketing_description中提取了关于鞋底的文字描述作为补充（如'外底做了...花纹'、'气垫位置微调'等）"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": {
+          "product_id": "p_clothes_007"
+        }
+      },
+      "reasoning": "用户想看多角度照片，但数据集image_path字段仅单张主图。Agent应跳转详情页并诚实告知图片数量限制，用文字描述补充可见细节。Veto风险：V2（如果Agent说'这里有鞋底和侧面的照片'而实际上只有一张主图）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_7.3_01",
+    "question": "这款手机有哪些配置可以选？帮我列出所有 SKU",
+    "scenario": {
+      "primary": "七、商品详情浏览与导航",
+      "secondary": "7.3 规格/参数面板"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别'这款手机'为iPhone 17 Pro(p_digital_001)，触发SHOW_SKU_PANEL展示所有SKU",
+        "Agent列出了该产品的全部9个SKU：256GB(宇宙橙/远峰蓝/深空黑各8999元)、512GB(三色各10499元)、1TB(三色各12499元)",
+        "Agent按存储容量分组呈现，便于用户比较",
+        "Agent明确列出了不同SKU之间的价格差异"
+      ],
+      "expected_action": {
+        "intent": "SHOW_SKU_PANEL",
+        "params": {
+          "product_id": "p_digital_001"
+        }
+      },
+      "reasoning": "用户明确要求'列出所有SKU'——这是典型的规格面板展示请求。Agent除触发UI面板外，还应以结构化方式列出各SKU的配置和价格。Veto风险：V2（如果Agent遗漏了部分SKU或编造了不存在的SKU配置/价格——如声称有'2TB版本'）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_7.3_02",
+    "question": "这款精华有哪些规格？每种容量多少钱？",
+    "scenario": {
+      "primary": "七、商品详情浏览与导航",
+      "secondary": "7.3 规格/参数面板"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_beauty_001_1",
+        "s_p_beauty_001_2",
+        "s_p_beauty_001_3"
+      ],
+      "answer_key_points": [
+        "Agent正确识别'这款精华'为雅诗兰黛小棕瓶(p_beauty_001)，触发SHOW_SKU_PANEL",
+        "Agent列出了3个SKU：30ml经典装=720元、50ml加大装=980元、75ml家用装=1260元",
+        "Agent计算了每毫升单价帮助用户比较性价比：30ml=24元/ml、50ml=19.6元/ml、75ml=16.8元/ml"
+      ],
+      "expected_action": {
+        "intent": "SHOW_SKU_PANEL",
+        "params": {
+          "product_id": "p_beauty_001"
+        }
+      },
+      "reasoning": "用户要求展示规格和价格——SKU面板的标准场景。评测核心：SKU数量准确（3个）、价格准确、单价计算正确。Veto风险：V2（如果Agent错标价格或遗漏SKU——如忘记75ml规格）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_7.3_03",
+    "question": "这双鞋有哪些颜色和尺码？帮我看看 42 码有没有货",
+    "scenario": {
+      "primary": "七、商品详情浏览与导航",
+      "secondary": "7.3 规格/参数面板"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_clothes_007"
+      ],
+      "expected_sku_ids": [
+        "s_p_clothes_007_5",
+        "s_p_clothes_007_16"
+      ],
+      "answer_key_points": [
+        "Agent正确推断'这双鞋'为Nike飞马41(p_clothes_007)，触发SHOW_SKU_PANEL",
+        "Agent说明了该鞋款的颜色和尺码信息：仅有标准跑鞋配色（单色款），尺码覆盖39-46码含半码，分为标准楦(899元)和宽楦(949元)两种",
+        "Agent确认了42码有货——标准楦42码=899元(s_p_clothes_007_5)，宽楦42码=949元(s_p_clothes_007_16)",
+        "Agent诚实说明了SKU仅按尺码/鞋楦区分，无多色可选——避免了用户对'有哪些颜色'的期待落空"
+      ],
+      "expected_action": {
+        "intent": "SHOW_SKU_PANEL",
+        "params": {
+          "product_id": "p_clothes_007"
+        }
+      },
+      "reasoning": "用户询问了颜色+尺码两个维度+特定尺码库存。p_clothes_007的SKU仅按尺码和鞋楦区分（无颜色变体），Agent需诚实说清单色款的事实。42码SKU为s_p_clothes_007_5(标准楦)和s_p_clothes_007_16(宽楦)。Veto风险：V2（如果Agent编造了不存在的颜色选项——如'还有红色款'）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.1_01",
+    "question": "帮我把这个 50ml 的小棕瓶加进购物车",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.1 加入购物车"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_beauty_001_2"
+      ],
+      "answer_key_points": [
+        "Agent正确识别意图为ADD_TO_CART",
+        "Agent正确识别商品：小棕瓶=p_beauty_001，规格=50ml=SKU s_p_beauty_001_2，价格=980元",
+        "Agent触发了正确的加购动作，quantity默认为1",
+        "Agent确认了加购成功并反馈了购物车状态（如'已将50ml小棕瓶加入购物车，当前价格980元'）"
+      ],
+      "expected_action": {
+        "intent": "ADD_TO_CART",
+        "params": {
+          "product_id": "p_beauty_001",
+          "sku_id": "s_p_beauty_001_2",
+          "quantity": 1
+        }
+      },
+      "reasoning": "典型的加购Action——用户明确指定了商品名（小棕瓶）、规格（50ml）和动作（加进购物车）。三要素齐全，参数确定性强。评测核心：SKU精确匹配（50ml对应s_p_beauty_001_2而非其他规格）。Veto风险：V2（如果Agent将30ml或75ml的SKU加购——参数错误，扣分但不触发否决）；无V1-V4触发风险。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.1_02",
+    "question": "就这款吧，帮我加入购物车",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.1 加入购物车"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确处理了上下文指代：'就这款吧'→会话上下文中最近讨论的商品。在无上下文评测环境中，Agent应主动确认'您指的是哪款商品？'而非猜测",
+        "如果Agent无法确认具体商品，应向用户询问确认后再执行加购——这是比'猜对'更重要的行为正确性",
+        "Agent触发了ADD_TO_CART（仅在确认商品后）"
+      ],
+      "expected_action": {
+        "intent": "ADD_TO_CART",
+        "params": {
+          "product_id": "p_beauty_001",
+          "quantity": 1
+        }
+      },
+      "reasoning": "该问题完全依赖会话上下文（'就这款吧'），在独立评测中无上下文可供消解指代。评测策略：如果Agent询问确认→3分（Intent正确但参数需确认）；如果Agent在无上下文情况下猜测了具体商品并加购→根据结果判定（猜对5分/猜错0分）；如果Agent拒绝执行并解释原因→行为不算错误，体现了负责任的设计。Veto风险：无——如果Agent不确认直接乱猜，不触发否决但在response_quality中严重扣分。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.1_03",
+    "question": "iPhone 17 Pro 256G 宇宙橙，帮我加购",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.1 加入购物车"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_digital_001_1"
+      ],
+      "answer_key_points": [
+        "Agent正确解析了三个参数：商品=iPhone 17 Pro=p_digital_001、存储=256GB、颜色=宇宙橙",
+        "Agent匹配到正确SKU：s_p_digital_001_1（256GB+宇宙橙+全网通，8999元）",
+        "Agent触发了ADD_TO_CART并确认了价格8999元"
+      ],
+      "expected_action": {
+        "intent": "ADD_TO_CART",
+        "params": {
+          "product_id": "p_digital_001",
+          "sku_id": "s_p_digital_001_1",
+          "quantity": 1
+        }
+      },
+      "reasoning": "用户以简写形式给出了完整的三要素（商品+存储+颜色），Agent需正确解析并映射到精确SKU。注意区分：256G=256GB（非512GB或1TB），宇宙橙=Cosmic Orange（非远峰蓝或深空黑）。评测核心：多属性SKU的精确匹配能力。Veto风险：V2（如果Agent匹配到了错误的SKU——如加购了远峰蓝而非宇宙橙，参数错误扣分）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.2_01",
+    "question": "我的购物车里面现在有什么？",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.2 查看/管理购物车"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为VIEW_CART",
+        "Agent触发了购物车查看动作，返回当前购物车中的商品列表（含商品名、SKU、数量、单价、小计）",
+        "Agent正确区分了空购物车与非空购物车两种状态——购物车为空时应告知用户'购物车还是空的'并引导浏览商品"
+      ],
+      "expected_action": {
+        "intent": "VIEW_CART",
+        "params": {}
+      },
+      "reasoning": "购物车状态查询——无特定商品参数，仅需触发VIEW_CART。评测核心：Intent正确性+状态呈现完整性。如果有购物车状态数据（如测试前置条件中添加了商品），Agent应准确列出。Veto风险：V2（如果Agent编造了购物车中不存在的商品）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.2_02",
+    "question": "帮我看看购物车总价多少",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.2 查看/管理购物车"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为VIEW_CART（聚焦总价信息）",
+        "Agent计算了购物车中所有商品的金额总和，区分了小计、可能的运费、优惠折扣等",
+        "Agent以清晰格式呈现了总价（如'您的购物车共3件商品，合计XXX元'）"
+      ],
+      "expected_action": {
+        "intent": "VIEW_CART",
+        "params": {
+          "focus": "total_price"
+        }
+      },
+      "reasoning": "购物车总价查询——VIEW_CART的子场景，侧重金额汇总。评测核心：总价计算是否正确（不能算错任何SKU的单价×数量）。Veto风险：V2（如果Agent计算了数据集中不存在的商品价格或错误计算了总额）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.2_03",
+    "question": "购物车里有哪些东西？有没有可以删掉的？",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.2 查看/管理购物车"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent触发了VIEW_CART列出购物车中所有商品",
+        "Agent分析了购物车内容，提供了合理的删除建议（如'您购物车中加了同一款精华的30ml和50ml两个规格，可以考虑只保留一个'）",
+        "Agent的删除建议基于客观标准（重复商品、相似用途、价格过高），而非主观臆断——未声称'这个不好建议删掉'",
+        "Agent将删除决策权交给用户——'建议可以考虑移除XX，您觉得呢？'而非直接执行删除"
+      ],
+      "expected_action": {
+        "intent": "VIEW_CART",
+        "params": {}
+      },
+      "reasoning": "复合Action：VIEW_CART + 分析建议。用户要求'有没有可以删掉的'——这需要Agent分析购物车内容后给出建议，但不自动删除。评测核心：分析逻辑是否合理+是否保留了用户决策权。Veto风险：V2（如果Agent在无购物车数据的情况下编造了购物车内容）；V1（如果Agent直接执行了删除而未确认——属于越权操作）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.3_01",
+    "question": "购物车里小棕瓶帮我换成 50ml 的",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.3 修改 SKU/数量/删除"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_beauty_001_2"
+      ],
+      "answer_key_points": [
+        "Agent正确识别意图为MODIFY_CART_ITEM（修改SKU）",
+        "Agent定位了购物车中的小棕瓶(p_beauty_001)，将其SKU更换为50ml版本(s_p_beauty_001_2, 980元)",
+        "Agent确认了修改前后的变化（如'已将小棕瓶从XXml更换为50ml，价格从XX元更新为980元'）",
+        "Agent逻辑正确：修改SKU而非'删除旧SKU+添加新SKU'（虽然效果相同，但Intent标注应为MODIFY而非REMOVE+ADD）"
+      ],
+      "expected_action": {
+        "intent": "MODIFY_CART_ITEM",
+        "params": {
+          "product_id": "p_beauty_001",
+          "new_sku_id": "s_p_beauty_001_2"
+        }
+      },
+      "reasoning": "典型的购物车SKU修改操作——用户要求将已加入购物车的小棕瓶更换规格。评测核心：目标SKU正确（50ml=s_p_beauty_001_2）+ 操作语义正确（MODIFY而非DELETE+ADD）+ 价格更新正确。Veto风险：V2（如果Agent替换为错误规格——如改成了30ml或75ml）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": false,
+        "allow_broader_category": false,
+        "strict_exact_match": true,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.3_02",
+    "question": "手机帮我改成 512G 版本的",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.3 修改 SKU/数量/删除"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [
+        "s_p_digital_001_4"
+      ],
+      "answer_key_points": [
+        "Agent正确处理了指代：'手机'→购物车中的手机商品（默认为iPhone 17 Pro p_digital_001），'512G版本'→存储升级到512GB",
+        "Agent正确识别了512GB对应的SKU（需注意颜色匹配：如果原来加购的是宇宙橙256GB，升级后应为宇宙橙512GB）",
+        "Agent触发了MODIFY_CART_ITEM，确认了新价格10499元（比256GB贵1500元）",
+        "Agent标注了价格变化让用户了解升级的成本"
+      ],
+      "expected_action": {
+        "intent": "MODIFY_CART_ITEM",
+        "params": {
+          "product_id": "p_digital_001",
+          "new_sku_id": "s_p_digital_001_4"
+        }
+      },
+      "reasoning": "购物车SKU升级操作——用户要求改大存储版本。关键挑战：在保留原有颜色选择的前提下升级存储。如果Agent无法确定原有颜色（如购物车数据无颜色信息），默认匹配宇宙橙(s_p_digital_001_4, 512GB+宇宙橙)。评测核心：存储升级正确+颜色保留+价格更新正确。Veto风险：V2（如果Agent将SKU改错——如升级到1TB而非512GB，或改成了不同颜色的SKU但未告知用户）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": false,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.3_03",
+    "question": "把购物车里的咖啡删掉，我换一个牌子",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.3 修改 SKU/数量/删除"
+    },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_food_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为REMOVE_FROM_CART",
+        "Agent定位了购物车中的咖啡商品（默认三顿半数字星球p_food_001或购物车中实际存在的咖啡品项），执行了删除操作",
+        "Agent确认了删除结果并告知用户（'已将XX咖啡从购物车移除'）",
+        "Agent在删除后主动提供了替代建议——如果用户说'换一个牌子'，应询问偏好或推荐其他咖啡品牌（如雀巢p_food_002/p_food_023）"
+      ],
+      "expected_action": {
+        "intent": "REMOVE_FROM_CART",
+        "params": {
+          "product_id": "p_food_001"
+        }
+      },
+      "reasoning": "购物车删除操作+后续推荐意向（'换一个牌子'暗示用户需要替代推荐）。评测核心：正确删除+主动提供替代方案。Veto风险：V2（如果Agent删除了错误的商品——如删除了其他非咖啡商品）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.4_01",
+    "question": "购物车里的东西帮我算一下总价，我要下单了",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.4 结算/下单"
+    },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent触发CHECKOUT流程，汇总购物车商品和总价",
+        "[理想情况] Agent引导用户确认收货地址、支付方式、发票信息等",
+        "[理想情况] Agent在真实下单前要求用户二次确认"
+      ],
+      "expected_action": {
+        "intent": "CHECKOUT",
+        "params": {}
+      },
+      "reasoning": "🔮标记场景。需对接订单系统与支付接口。当前仅能评估到购物车汇总层面，完整的下单-支付-确认流程待系统对接后启用。Veto风险：无——该条目仅在data_dependency=future时跳过评测。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.4_02",
+    "question": "就这些了，帮我提交订单",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.4 结算/下单"
+    },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent在执行SUBMIT_ORDER前要求用户最终确认订单详情",
+        "[理想情况] Agent提交订单后返回订单号、预计送达时间等确认信息"
+      ],
+      "expected_action": {
+        "intent": "SUBMIT_ORDER",
+        "params": {}
+      },
+      "reasoning": "🔮标记场景。需对接订单系统。Veto风险：V2（高危——如果Agent在无订单系统支持的情况下声称'订单已提交，订单号为XXX'——编造了不存在的订单信息，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.4_03",
+    "question": "帮我看看能用什么支付方式",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.4 结算/下单"
+    },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent列出了平台支持的支付方式（支付宝、微信支付、银行卡、分期付款等）",
+        "[理想情况] Agent说明了不同支付方式的限额、手续费差异"
+      ],
+      "expected_action": {
+        "intent": "CHECK_PAYMENT_METHODS",
+        "params": {}
+      },
+      "reasoning": "🔮标记场景。需对接支付接口获取实时支付方式列表。Veto风险：V2（如果Agent编造了平台不支持的支付方式）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.5_01",
+    "question": "小棕瓶最近有什么优惠活动吗？",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.5 优惠/促销/价格查询"
+    },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_beauty_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent查询了促销引擎，返回小棕瓶当前的优惠活动信息",
+        "[理想情况] 如果当前无活动，Agent诚实告知并显示常规价格",
+        "[理想情况] Agent未编造不存在的优惠活动"
+      ],
+      "expected_action": {
+        "intent": "CHECK_PROMOTIONS",
+        "params": {
+          "product_id": "p_beauty_001"
+        }
+      },
+      "reasoning": "🔮标记场景。需对接促销引擎与优惠券系统。Veto风险：V2（高危——如果Agent编造了'满300减50'等不存在的促销信息，触发关键实体幻觉否决——这是用户购买决策的关键信息，错误将直接导致经济损失）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.5_02",
+    "question": "现在买 iPhone 17 Pro 有以旧换新补贴吗？",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.5 优惠/促销/价格查询"
+    },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [
+        "p_digital_001"
+      ],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent查询了以旧换新政策，返回补贴金额、适用条件、旧机估价范围",
+        "[理想情况] 如果当前无此政策，Agent诚实告知",
+        "[理想情况] Agent未编造不存在的补贴金额或政策"
+      ],
+      "expected_action": {
+        "intent": "CHECK_PROMOTIONS",
+        "params": {
+          "product_id": "p_digital_001",
+          "promotion_type": "trade_in"
+        }
+      },
+      "reasoning": "🔮标记场景。以旧换新属特殊促销类型，需独立的估价和补贴计算逻辑。Veto风险：V2（高危——如果Agent编造了'以旧换新最高补贴3000元'等具体金额，触发关键实体幻觉否决，直接影响用户购买决策）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  },
+  {
+    "eval_id": "eval_8.5_03",
+    "question": "有没有优惠券可以领？这款能参加满减吗？",
+    "scenario": {
+      "primary": "八、购物车与订单管理",
+      "secondary": "8.5 优惠/促销/价格查询"
+    },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent查询了用户可领取的优惠券列表和当前满减活动",
+        "[理想情况] Agent检查了'这款'所指商品是否在满减活动范围内",
+        "[理想情况] Agent未编造不存在的优惠券或满减规则"
+      ],
+      "expected_action": {
+        "intent": "CHECK_PROMOTIONS",
+        "params": {
+          "scope": "available_coupons_and_discounts"
+        }
+      },
+      "reasoning": "🔮标记场景。需对接优惠券系统和满减规则引擎。Veto风险：V2（高危——如果Agent编造了'满300减50'等具体满减规则，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": {
+        "retrieval_accuracy": 0.0,
+        "key_point_coverage": 0.0,
+        "response_quality": 0.0
+      },
+      "tolerance": {
+        "allow_partial_match": true,
+        "allow_broader_category": true,
+        "strict_exact_match": false,
+        "precision_threshold_override": null
+      }
+    }
+  }
+]

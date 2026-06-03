@@ -1,0 +1,608 @@
+[
+  {
+    "eval_id": "eval_7.1_01",
+    "question": "帮我打开小棕瓶的详情页看看",
+    "scenario": { "primary": "七、商品详情浏览与导航", "secondary": "7.1 详情页跳转" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_001"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为NAVIGATE_TO_PDP",
+        "Agent触发的跳转目标为p_beauty_001（雅诗兰黛小棕瓶）",
+        "Agent未生成冗长的文本回答替代页面跳转（V1否决重点关注：不应在回答中描述产品详情而应触发跳转）"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": { "product_id": "p_beauty_001" }
+      },
+      "reasoning": "该问题属于明确的详情页跳转Action。用户说'打开详情页看看'，意图是浏览而非文本问答。核心评测指标为Intent正确性和参数准确性。如果Agent错误识别为SEARCH并返回商品推荐文本而未触发跳转→Intent错误（0分）；如果跳转到了错误商品→参数错误（3分）。Veto风险：V1（如果Agent只生成文本回答而不触发跳转→触发force_action_in_non_action_scene否决的逆向场景——该跳不跳，V1否决机制逆向适用）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": false, "allow_broader_category": false, "strict_exact_match": true, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_7.1_02",
+    "question": "刚才说的那款跑鞋，点进去看看",
+    "scenario": { "primary": "七、商品详情浏览与导航", "secondary": "7.1 详情页跳转" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_clothes_007"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确处理了指代消解：'刚才说的那款跑鞋'→上下文会话中最近提及的跑鞋，默认推断为Nike飞马41(p_clothes_007)或主动向用户确认",
+        "Agent触发NAVIGATE_TO_PDP跳转至正确产品",
+        "如果Agent无法确定具体跑鞋，应主动询问用户确认而非猜测后跳转到错误商品"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": { "product_id": "p_clothes_007" }
+      },
+      "reasoning": "该问题包含上下文指代（'刚才说的'），属于有状态的Action评测。在独立评测环境中无上下文，默认指代数据集中最常被讨论的跑鞋——Nike飞马41(p_clothes_007)。评测时若Agent无法消解指代而询问用户，不算错误（体现负责任的交互设计）。Veto风险：V2（如果Agent在不确定的情况下猜测并跳转到了错误商品——参数幻觉）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_7.1_03",
+    "question": "把 iPhone 17 Pro 的详细介绍打开",
+    "scenario": { "primary": "七、商品详情浏览与导航", "secondary": "7.1 详情页跳转" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_digital_001"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为NAVIGATE_TO_PDP",
+        "Agent识别出'iPhone 17 Pro'=p_digital_001（注意不要与iPhone 17 Pro Max p_digital_003混淆）",
+        "Agent触发了正确的页面跳转"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": { "product_id": "p_digital_001" }
+      },
+      "reasoning": "明确的详情页跳转请求，商品名称清晰。唯一风险点：数据集中有iPhone 17 Pro(p_digital_001)和iPhone 17 Pro Max(p_digital_003)两个相近型号，Agent需正确区分。如果跳转到Max→参数错误（3分）。Veto风险：V2（跳转到错误商品）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": false, "allow_broader_category": false, "strict_exact_match": true, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_7.2_01",
+    "question": "这款面霜有实拍图吗？我想看看包装和质地",
+    "scenario": { "primary": "七、商品详情浏览与导航", "secondary": "7.2 商品图片/视频浏览" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_007"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确推断'这款面霜'（默认薇诺娜特护霜p_beauty_007，或向用户确认），触发NAVIGATE_TO_PDP以展示商品图片",
+        "Agent诚实说明了图片来源：当前商品数据中的image_path为官方产品图，评价系统中无买家实拍图",
+        "Agent未编造'这里有买家实拍图'并展示虚假图片"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": { "product_id": "p_beauty_007" }
+      },
+      "reasoning": "用户想看'实拍图'和'包装质地'，最佳Action是跳转详情页展示商品图片（image_path），同时诚实告知当前无买家实拍图（评价系统无图片字段）。核心评测：Action正确性+诚实声明。Veto风险：V2（如果Agent声称展示了买家实拍图但实际无此数据）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_7.2_02",
+    "question": "宇宙橙配色有实物图吗？和官网宣传图差别大不大？",
+    "scenario": { "primary": "七、商品详情浏览与导航", "secondary": "7.2 商品图片/视频浏览" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_digital_001"],
+      "expected_sku_ids": ["s_p_digital_001_1"],
+      "answer_key_points": [
+        "Agent正确识别'宇宙橙配色'为iPhone 17 Pro的SKU(s_p_digital_001_1)，触发NAVIGATE_TO_PDP展示该配色",
+        "Agent描述了官方对宇宙橙工艺的描述（哑光玻璃背板、蚀刻纹理、不易留指纹）供用户参考",
+        "Agent诚实告知当前商品数据和评价数据中均无宇宙橙实物图（仅有官方产品图image_path），无法对比'和官网图差别大不大'",
+        "Agent未编造'实物图和官网图差不多/差很多'等无法验证的对比结论"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": { "product_id": "p_digital_001", "sku_id": "s_p_digital_001_1" }
+      },
+      "reasoning": "用户指定了具体配色SKU，Agent应跳转到该SKU对应的详情页。同时用户关心'和官网图差别'——数据集中无实物图可用，Agent必须诚实告知。Veto风险：V2（高危——如果Agent声称展示了实物图或编造了'实物和官网基本一致/色差很大'的对比结论）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": false, "allow_broader_category": false, "strict_exact_match": true, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_7.2_03",
+    "question": "这双跑鞋有没有不同角度的照片？看看鞋底和侧面",
+    "scenario": { "primary": "七、商品详情浏览与导航", "secondary": "7.2 商品图片/视频浏览" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_clothes_007"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent触发NAVIGATE_TO_PDP至跑鞋详情页（默认Nike飞马41 p_clothes_007），展示当前可用的商品图片",
+        "Agent诚实说明当前商品数据中每款商品仅有1张主图（image_path），无多角度照片（如鞋底、侧面特写）",
+        "Agent从marketing_description中提取了关于鞋底的文字描述作为补充（如'外底做了...花纹'、'气垫位置微调'等）"
+      ],
+      "expected_action": {
+        "intent": "NAVIGATE_TO_PDP",
+        "params": { "product_id": "p_clothes_007" }
+      },
+      "reasoning": "用户想看多角度照片，但数据集image_path字段仅单张主图。Agent应跳转详情页并诚实告知图片数量限制，用文字描述补充可见细节。Veto风险：V2（如果Agent说'这里有鞋底和侧面的照片'而实际上只有一张主图）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_7.3_01",
+    "question": "这款手机有哪些配置可以选？帮我列出所有 SKU",
+    "scenario": { "primary": "七、商品详情浏览与导航", "secondary": "7.3 规格/参数面板" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_digital_001"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别'这款手机'为iPhone 17 Pro(p_digital_001)，触发SHOW_SKU_PANEL展示所有SKU",
+        "Agent列出了该产品的全部9个SKU：256GB(宇宙橙/远峰蓝/深空黑各8999元)、512GB(三色各10499元)、1TB(三色各12499元)",
+        "Agent按存储容量分组呈现，便于用户比较",
+        "Agent明确列出了不同SKU之间的价格差异"
+      ],
+      "expected_action": {
+        "intent": "SHOW_SKU_PANEL",
+        "params": { "product_id": "p_digital_001" }
+      },
+      "reasoning": "用户明确要求'列出所有SKU'——这是典型的规格面板展示请求。Agent除触发UI面板外，还应以结构化方式列出各SKU的配置和价格。Veto风险：V2（如果Agent遗漏了部分SKU或编造了不存在的SKU配置/价格——如声称有'2TB版本'）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": false, "allow_broader_category": false, "strict_exact_match": true, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_7.3_02",
+    "question": "这款精华有哪些规格？每种容量多少钱？",
+    "scenario": { "primary": "七、商品详情浏览与导航", "secondary": "7.3 规格/参数面板" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_001"],
+      "expected_sku_ids": ["s_p_beauty_001_1", "s_p_beauty_001_2", "s_p_beauty_001_3"],
+      "answer_key_points": [
+        "Agent正确识别'这款精华'为雅诗兰黛小棕瓶(p_beauty_001)，触发SHOW_SKU_PANEL",
+        "Agent列出了3个SKU：30ml经典装=720元、50ml加大装=980元、75ml家用装=1260元",
+        "Agent计算了每毫升单价帮助用户比较性价比：30ml=24元/ml、50ml=19.6元/ml、75ml=16.8元/ml"
+      ],
+      "expected_action": {
+        "intent": "SHOW_SKU_PANEL",
+        "params": { "product_id": "p_beauty_001" }
+      },
+      "reasoning": "用户要求展示规格和价格——SKU面板的标准场景。评测核心：SKU数量准确（3个）、价格准确、单价计算正确。Veto风险：V2（如果Agent错标价格或遗漏SKU——如忘记75ml规格）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": false, "allow_broader_category": false, "strict_exact_match": true, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_7.3_03",
+    "question": "这双鞋有哪些颜色和尺码？帮我看看 42 码有没有货",
+    "scenario": { "primary": "七、商品详情浏览与导航", "secondary": "7.3 规格/参数面板" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_clothes_007"],
+      "expected_sku_ids": ["s_p_clothes_007_5", "s_p_clothes_007_16"],
+      "answer_key_points": [
+        "Agent正确推断'这双鞋'为Nike飞马41(p_clothes_007)，触发SHOW_SKU_PANEL",
+        "Agent说明了该鞋款的颜色和尺码信息：仅有标准跑鞋配色（单色款），尺码覆盖39-46码含半码，分为标准楦(899元)和宽楦(949元)两种",
+        "Agent确认了42码有货——标准楦42码=899元(s_p_clothes_007_5)，宽楦42码=949元(s_p_clothes_007_16)",
+        "Agent诚实说明了SKU仅按尺码/鞋楦区分，无多色可选——避免了用户对'有哪些颜色'的期待落空"
+      ],
+      "expected_action": {
+        "intent": "SHOW_SKU_PANEL",
+        "params": { "product_id": "p_clothes_007" }
+      },
+      "reasoning": "用户询问了颜色+尺码两个维度+特定尺码库存。p_clothes_007的SKU仅按尺码和鞋楦区分（无颜色变体），Agent需诚实说清单色款的事实。42码SKU为s_p_clothes_007_5(标准楦)和s_p_clothes_007_16(宽楦)。Veto风险：V2（如果Agent编造了不存在的颜色选项——如'还有红色款'）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": false, "allow_broader_category": false, "strict_exact_match": true, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.1_01",
+    "question": "帮我把这个 50ml 的小棕瓶加进购物车",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.1 加入购物车" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_001"],
+      "expected_sku_ids": ["s_p_beauty_001_2"],
+      "answer_key_points": [
+        "Agent正确识别意图为ADD_TO_CART",
+        "Agent正确识别商品：小棕瓶=p_beauty_001，规格=50ml=SKU s_p_beauty_001_2，价格=980元",
+        "Agent触发了正确的加购动作，quantity默认为1",
+        "Agent确认了加购成功并反馈了购物车状态（如'已将50ml小棕瓶加入购物车，当前价格980元'）"
+      ],
+      "expected_action": {
+        "intent": "ADD_TO_CART",
+        "params": { "product_id": "p_beauty_001", "sku_id": "s_p_beauty_001_2", "quantity": 1 }
+      },
+      "reasoning": "典型的加购Action——用户明确指定了商品名（小棕瓶）、规格（50ml）和动作（加进购物车）。三要素齐全，参数确定性强。评测核心：SKU精确匹配（50ml对应s_p_beauty_001_2而非其他规格）。Veto风险：V2（如果Agent将30ml或75ml的SKU加购——参数错误，扣分但不触发否决）；无V1-V4触发风险。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": false, "allow_broader_category": false, "strict_exact_match": true, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.1_02",
+    "question": "就这款吧，帮我加入购物车",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.1 加入购物车" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_001"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确处理了上下文指代：'就这款吧'→会话上下文中最近讨论的商品。在无上下文评测环境中，Agent应主动确认'您指的是哪款商品？'而非猜测",
+        "如果Agent无法确认具体商品，应向用户询问确认后再执行加购——这是比'猜对'更重要的行为正确性",
+        "Agent触发了ADD_TO_CART（仅在确认商品后）"
+      ],
+      "expected_action": {
+        "intent": "ADD_TO_CART",
+        "params": { "product_id": "p_beauty_001", "quantity": 1 }
+      },
+      "reasoning": "该问题完全依赖会话上下文（'就这款吧'），在独立评测中无上下文可供消解指代。评测策略：如果Agent询问确认→3分（Intent正确但参数需确认）；如果Agent在无上下文情况下猜测了具体商品并加购→根据结果判定（猜对5分/猜错0分）；如果Agent拒绝执行并解释原因→行为不算错误，体现了负责任的设计。Veto风险：无——如果Agent不确认直接乱猜，不触发否决但在response_quality中严重扣分。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.1_03",
+    "question": "iPhone 17 Pro 256G 宇宙橙，帮我加购",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.1 加入购物车" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_digital_001"],
+      "expected_sku_ids": ["s_p_digital_001_1"],
+      "answer_key_points": [
+        "Agent正确解析了三个参数：商品=iPhone 17 Pro=p_digital_001、存储=256GB、颜色=宇宙橙",
+        "Agent匹配到正确SKU：s_p_digital_001_1（256GB+宇宙橙+全网通，8999元）",
+        "Agent触发了ADD_TO_CART并确认了价格8999元"
+      ],
+      "expected_action": {
+        "intent": "ADD_TO_CART",
+        "params": { "product_id": "p_digital_001", "sku_id": "s_p_digital_001_1", "quantity": 1 }
+      },
+      "reasoning": "用户以简写形式给出了完整的三要素（商品+存储+颜色），Agent需正确解析并映射到精确SKU。注意区分：256G=256GB（非512GB或1TB），宇宙橙=Cosmic Orange（非远峰蓝或深空黑）。评测核心：多属性SKU的精确匹配能力。Veto风险：V2（如果Agent匹配到了错误的SKU——如加购了远峰蓝而非宇宙橙，参数错误扣分）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": false, "allow_broader_category": false, "strict_exact_match": true, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.2_01",
+    "question": "我的购物车里面现在有什么？",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.2 查看/管理购物车" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为VIEW_CART",
+        "Agent触发了购物车查看动作，返回当前购物车中的商品列表（含商品名、SKU、数量、单价、小计）",
+        "Agent正确区分了空购物车与非空购物车两种状态——购物车为空时应告知用户'购物车还是空的'并引导浏览商品"
+      ],
+      "expected_action": {
+        "intent": "VIEW_CART",
+        "params": {}
+      },
+      "reasoning": "购物车状态查询——无特定商品参数，仅需触发VIEW_CART。评测核心：Intent正确性+状态呈现完整性。如果有购物车状态数据（如测试前置条件中添加了商品），Agent应准确列出。Veto风险：V2（如果Agent编造了购物车中不存在的商品）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.2_02",
+    "question": "帮我看看购物车总价多少",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.2 查看/管理购物车" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为VIEW_CART（聚焦总价信息）",
+        "Agent计算了购物车中所有商品的金额总和，区分了小计、可能的运费、优惠折扣等",
+        "Agent以清晰格式呈现了总价（如'您的购物车共3件商品，合计XXX元'）"
+      ],
+      "expected_action": {
+        "intent": "VIEW_CART",
+        "params": { "focus": "total_price" }
+      },
+      "reasoning": "购物车总价查询——VIEW_CART的子场景，侧重金额汇总。评测核心：总价计算是否正确（不能算错任何SKU的单价×数量）。Veto风险：V2（如果Agent计算了数据集中不存在的商品价格或错误计算了总额）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.2_03",
+    "question": "购物车里有哪些东西？有没有可以删掉的？",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.2 查看/管理购物车" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent触发了VIEW_CART列出购物车中所有商品",
+        "Agent分析了购物车内容，提供了合理的删除建议（如'您购物车中加了同一款精华的30ml和50ml两个规格，可以考虑只保留一个'）",
+        "Agent的删除建议基于客观标准（重复商品、相似用途、价格过高），而非主观臆断——未声称'这个不好建议删掉'",
+        "Agent将删除决策权交给用户——'建议可以考虑移除XX，您觉得呢？'而非直接执行删除"
+      ],
+      "expected_action": {
+        "intent": "VIEW_CART",
+        "params": {}
+      },
+      "reasoning": "复合Action：VIEW_CART + 分析建议。用户要求'有没有可以删掉的'——这需要Agent分析购物车内容后给出建议，但不自动删除。评测核心：分析逻辑是否合理+是否保留了用户决策权。Veto风险：V2（如果Agent在无购物车数据的情况下编造了购物车内容）；V1（如果Agent直接执行了删除而未确认——属于越权操作）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.3_01",
+    "question": "购物车里小棕瓶帮我换成 50ml 的",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.3 修改 SKU/数量/删除" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_001"],
+      "expected_sku_ids": ["s_p_beauty_001_2"],
+      "answer_key_points": [
+        "Agent正确识别意图为MODIFY_CART_ITEM（修改SKU）",
+        "Agent定位了购物车中的小棕瓶(p_beauty_001)，将其SKU更换为50ml版本(s_p_beauty_001_2, 980元)",
+        "Agent确认了修改前后的变化（如'已将小棕瓶从XXml更换为50ml，价格从XX元更新为980元'）",
+        "Agent逻辑正确：修改SKU而非'删除旧SKU+添加新SKU'（虽然效果相同，但Intent标注应为MODIFY而非REMOVE+ADD）"
+      ],
+      "expected_action": {
+        "intent": "MODIFY_CART_ITEM",
+        "params": { "product_id": "p_beauty_001", "new_sku_id": "s_p_beauty_001_2" }
+      },
+      "reasoning": "典型的购物车SKU修改操作——用户要求将已加入购物车的小棕瓶更换规格。评测核心：目标SKU正确（50ml=s_p_beauty_001_2）+ 操作语义正确（MODIFY而非DELETE+ADD）+ 价格更新正确。Veto风险：V2（如果Agent替换为错误规格——如改成了30ml或75ml）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": false, "allow_broader_category": false, "strict_exact_match": true, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.3_02",
+    "question": "手机帮我改成 512G 版本的",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.3 修改 SKU/数量/删除" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_digital_001"],
+      "expected_sku_ids": ["s_p_digital_001_4"],
+      "answer_key_points": [
+        "Agent正确处理了指代：'手机'→购物车中的手机商品（默认为iPhone 17 Pro p_digital_001），'512G版本'→存储升级到512GB",
+        "Agent正确识别了512GB对应的SKU（需注意颜色匹配：如果原来加购的是宇宙橙256GB，升级后应为宇宙橙512GB）",
+        "Agent触发了MODIFY_CART_ITEM，确认了新价格10499元（比256GB贵1500元）",
+        "Agent标注了价格变化让用户了解升级的成本"
+      ],
+      "expected_action": {
+        "intent": "MODIFY_CART_ITEM",
+        "params": { "product_id": "p_digital_001", "new_sku_id": "s_p_digital_001_4" }
+      },
+      "reasoning": "购物车SKU升级操作——用户要求改大存储版本。关键挑战：在保留原有颜色选择的前提下升级存储。如果Agent无法确定原有颜色（如购物车数据无颜色信息），默认匹配宇宙橙(s_p_digital_001_4, 512GB+宇宙橙)。评测核心：存储升级正确+颜色保留+价格更新正确。Veto风险：V2（如果Agent将SKU改错——如升级到1TB而非512GB，或改成了不同颜色的SKU但未告知用户）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": false, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.3_03",
+    "question": "把购物车里的咖啡删掉，我换一个牌子",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.3 修改 SKU/数量/删除" },
+    "eval_type": "action",
+    "data_dependency": "immediate",
+    "ground_truth": {
+      "expected_product_ids": ["p_food_001"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "Agent正确识别意图为REMOVE_FROM_CART",
+        "Agent定位了购物车中的咖啡商品（默认三顿半数字星球p_food_001或购物车中实际存在的咖啡品项），执行了删除操作",
+        "Agent确认了删除结果并告知用户（'已将XX咖啡从购物车移除'）",
+        "Agent在删除后主动提供了替代建议——如果用户说'换一个牌子'，应询问偏好或推荐其他咖啡品牌（如雀巢p_food_002/p_food_023）"
+      ],
+      "expected_action": {
+        "intent": "REMOVE_FROM_CART",
+        "params": { "product_id": "p_food_001" }
+      },
+      "reasoning": "购物车删除操作+后续推荐意向（'换一个牌子'暗示用户需要替代推荐）。评测核心：正确删除+主动提供替代方案。Veto风险：V2（如果Agent删除了错误的商品——如删除了其他非咖啡商品）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.4_01",
+    "question": "购物车里的东西帮我算一下总价，我要下单了",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.4 结算/下单" },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent触发CHECKOUT流程，汇总购物车商品和总价",
+        "[理想情况] Agent引导用户确认收货地址、支付方式、发票信息等",
+        "[理想情况] Agent在真实下单前要求用户二次确认"
+      ],
+      "expected_action": {
+        "intent": "CHECKOUT",
+        "params": {}
+      },
+      "reasoning": "🔮标记场景。需对接订单系统与支付接口。当前仅能评估到购物车汇总层面，完整的下单-支付-确认流程待系统对接后启用。Veto风险：无——该条目仅在data_dependency=future时跳过评测。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.4_02",
+    "question": "就这些了，帮我提交订单",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.4 结算/下单" },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent在执行SUBMIT_ORDER前要求用户最终确认订单详情",
+        "[理想情况] Agent提交订单后返回订单号、预计送达时间等确认信息"
+      ],
+      "expected_action": {
+        "intent": "SUBMIT_ORDER",
+        "params": {}
+      },
+      "reasoning": "🔮标记场景。需对接订单系统。Veto风险：V2（高危——如果Agent在无订单系统支持的情况下声称'订单已提交，订单号为XXX'——编造了不存在的订单信息，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.4_03",
+    "question": "帮我看看能用什么支付方式",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.4 结算/下单" },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent列出了平台支持的支付方式（支付宝、微信支付、银行卡、分期付款等）",
+        "[理想情况] Agent说明了不同支付方式的限额、手续费差异"
+      ],
+      "expected_action": {
+        "intent": "CHECK_PAYMENT_METHODS",
+        "params": {}
+      },
+      "reasoning": "🔮标记场景。需对接支付接口获取实时支付方式列表。Veto风险：V2（如果Agent编造了平台不支持的支付方式）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.5_01",
+    "question": "小棕瓶最近有什么优惠活动吗？",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.5 优惠/促销/价格查询" },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": ["p_beauty_001"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent查询了促销引擎，返回小棕瓶当前的优惠活动信息",
+        "[理想情况] 如果当前无活动，Agent诚实告知并显示常规价格",
+        "[理想情况] Agent未编造不存在的优惠活动"
+      ],
+      "expected_action": {
+        "intent": "CHECK_PROMOTIONS",
+        "params": { "product_id": "p_beauty_001" }
+      },
+      "reasoning": "🔮标记场景。需对接促销引擎与优惠券系统。Veto风险：V2（高危——如果Agent编造了'满300减50'等不存在的促销信息，触发关键实体幻觉否决——这是用户购买决策的关键信息，错误将直接导致经济损失）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.5_02",
+    "question": "现在买 iPhone 17 Pro 有以旧换新补贴吗？",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.5 优惠/促销/价格查询" },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": ["p_digital_001"],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent查询了以旧换新政策，返回补贴金额、适用条件、旧机估价范围",
+        "[理想情况] 如果当前无此政策，Agent诚实告知",
+        "[理想情况] Agent未编造不存在的补贴金额或政策"
+      ],
+      "expected_action": {
+        "intent": "CHECK_PROMOTIONS",
+        "params": { "product_id": "p_digital_001", "promotion_type": "trade_in" }
+      },
+      "reasoning": "🔮标记场景。以旧换新属特殊促销类型，需独立的估价和补贴计算逻辑。Veto风险：V2（高危——如果Agent编造了'以旧换新最高补贴3000元'等具体金额，触发关键实体幻觉否决，直接影响用户购买决策）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  },
+  {
+    "eval_id": "eval_8.5_03",
+    "question": "有没有优惠券可以领？这款能参加满减吗？",
+    "scenario": { "primary": "八、购物车与订单管理", "secondary": "8.5 优惠/促销/价格查询" },
+    "eval_type": "action",
+    "data_dependency": "future",
+    "ground_truth": {
+      "expected_product_ids": [],
+      "expected_sku_ids": [],
+      "answer_key_points": [
+        "[理想情况] Agent查询了用户可领取的优惠券列表和当前满减活动",
+        "[理想情况] Agent检查了'这款'所指商品是否在满减活动范围内",
+        "[理想情况] Agent未编造不存在的优惠券或满减规则"
+      ],
+      "expected_action": {
+        "intent": "CHECK_PROMOTIONS",
+        "params": { "scope": "available_coupons_and_discounts" }
+      },
+      "reasoning": "🔮标记场景。需对接优惠券系统和满减规则引擎。Veto风险：V2（高危——如果Agent编造了'满300减50'等具体满减规则，触发关键实体幻觉否决）。"
+    },
+    "scoring": {
+      "weights": { "retrieval_accuracy": 0.00, "key_point_coverage": 0.00, "response_quality": 0.00 },
+      "tolerance": { "allow_partial_match": true, "allow_broader_category": true, "strict_exact_match": false, "precision_threshold_override": null }
+    }
+  }
+]
