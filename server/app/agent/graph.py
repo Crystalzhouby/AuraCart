@@ -11,7 +11,7 @@ from app.agent.state import AgentState
 from app.agent.nodes.router import router_node
 from app.agent.nodes.extraction import extraction_node
 from app.agent.nodes.scenario_gen import scenario_gen_node
-from app.agent.nodes.retrieval import retrieval_node
+from app.agent.nodes.retriever import retrieval_node
 from app.agent.nodes.option_gen import option_gen_node
 from app.agent.nodes.chitchat import chitchat_node
 
@@ -45,28 +45,27 @@ def _preview(state_or_result: dict, max_field_len: int = 500) -> str:
 
 
 def route_intent(state: AgentState) -> str:
-    """条件边函数：根据 intent 和 is_scenario 路由。
+    """条件边函数：根据 intent 路由。
 
     路由规则:
-        intent == "chat"                    → "chitchat"
-        intent == "recommend" && !scenario  → "extraction"
-        intent == "recommend" && scenario   → "scenario_gen"
+        intent == "chat"      → "chitchat"
+        intent == "explicit"  → "extraction"
+        intent == "scenario"  → "scenario_gen"
     """
-    intent = state.get("intent", "recommend")
-    is_scenario = state.get("is_scenario", False)
+    intent = state.get("intent", "explicit")
 
     if intent == "chat":
         target = "chitchat"
-    elif is_scenario:
+    elif intent == "scenario":
         target = "scenario_gen"
     else:
         target = "extraction"
 
-    logger.debug("route_intent 路由决策", intent=intent, is_scenario=is_scenario, target=target)
+    logger.debug("route_intent 路由决策", intent=intent, target=target)
     return target
 
 
-def build_graph(llm, emb_service, async_session_factory, category_list_provider=None):
+def build_graph(llm, emb_service, async_session_factory, category_list_provider=None, reranker_service=None):
     """构建编译后的 StateGraph。
 
     参数:
@@ -74,6 +73,7 @@ def build_graph(llm, emb_service, async_session_factory, category_list_provider=
         emb_service: EmbeddingService 实例。
         async_session_factory: async_session 工厂函数。
         category_list_provider: 可选，提供品类列表的异步函数（用于 Scenario Gen）。
+        reranker_service: 可选，RerankerService 实例（用于精排）。
 
     返回值:
         编译后的 CompiledStateGraph。
@@ -96,7 +96,7 @@ def build_graph(llm, emb_service, async_session_factory, category_list_provider=
 
     async def _extraction(state: AgentState) -> dict:
         logger.debug("extraction 输入", state=_preview(state))
-        # 加载品类上下文（提示词注入 + 后校验用）
+        # 加载品类上下文（Step 1 内部使用 fetch_category_context）
         category_list = ""
         valid_categories = None
         try:
@@ -107,6 +107,7 @@ def build_graph(llm, emb_service, async_session_factory, category_list_provider=
             logger.warning("extraction 品类加载失败，降级为无约束", error=str(e))
         result = await extraction_node(
             state, llm=llm,
+            db_session_factory=async_session_factory,
             category_list=category_list,
             valid_categories=valid_categories,
         )
@@ -118,7 +119,10 @@ def build_graph(llm, emb_service, async_session_factory, category_list_provider=
         category_list = ""
         if category_list_provider:
             category_list = await category_list_provider()
-        result = await scenario_gen_node(state, llm=llm, category_list=category_list)
+        result = await scenario_gen_node(
+            state, llm=llm, category_list=category_list,
+            db_session_factory=async_session_factory,
+        )
         logger.debug("scenario_gen 输出", result=_preview(result))
         return result
 
@@ -129,6 +133,7 @@ def build_graph(llm, emb_service, async_session_factory, category_list_provider=
             llm=llm,
             emb_service=emb_service,
             async_session_factory=async_session_factory,
+            reranker=reranker_service,
         )
         logger.debug("retrieval 输出", result=_preview(result))
         return result

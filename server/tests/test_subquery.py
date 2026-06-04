@@ -6,7 +6,7 @@
 3. 字典序列化/反序列化兼容性
 """
 import pytest
-from app.services.retriever import SubQuery
+from app.services.retriever_service import SubQuery
 
 
 def test_subquery_default_category_fields_none():

@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.models.product import Product
 from app.models.sku import Sku
 from app.models.product_review import ProductReview
-from app.services.retriever import SKUHit
+from app.services.retriever_service import SKUHit
 from app.config import settings
 
 logger = structlog.get_logger("agent.retrieval")

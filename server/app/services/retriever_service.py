@@ -18,13 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 import structlog
-from app.services.embedding import EmbeddingService
+from app.services.embedding_service import EmbeddingService
 from app.config import settings
 
 logger = structlog.get_logger("agent.retrieval")
 
 
-__all__ = ["Retriever", "SubQuery", "SKUHit", "Filters", "FilterClause"]
+__all__ = ["Retriever", "SubQuery", "SKUHit", "Filters", "FilterClause", "Merger"]
 
 
 @dataclass
@@ -163,6 +163,9 @@ class Retriever:
         遍历所有 strategy="structured_filter" 的 SubQuery，
         为每条生成一个 FilterClause。非 filter 子查询被忽略。
 
+        每条 FilterClause 的参数名使用全局递增计数器去重，
+        避免多个 filter 共用 :val / :pat 导致的参数覆盖。
+
         参数:
             subs: 所有子查询列表。
 
@@ -176,6 +179,7 @@ class Retriever:
         }
 
         clauses: list[FilterClause] = []
+        counter = 0  # 全局计数器，确保每条 FilterClause 的参数名唯一
         for sub in subs:
             if sub.strategy != "structured_filter":
                 continue
@@ -190,34 +194,37 @@ class Retriever:
             col = "p" if table == "product" else "s"
 
             if sub.operator in ("in", "not_in") and values:
-                placeholders = ", ".join([f":v{i}" for i in range(len(values))])
+                placeholders = ", ".join(
+                    [f":fv{counter}_{i}" for i in range(len(values))]
+                )
                 col_ref = f"{col}.{sub.field}"
                 if sub.operator == "in":
                     sql = f"{col_ref} IN ({placeholders})"
                 else:
                     sql = f"{col_ref} NOT IN ({placeholders})"
-                params = {f"v{i}": v for i, v in enumerate(values)}
+                params = {f"fv{counter}_{i}": v for i, v in enumerate(values)}
             elif sub.operator == "lt" and sub.value is not None:
-                sql = f"{col}.{sub.field} < :val"
-                params = {"val": sub.value}
+                sql = f"{col}.{sub.field} < :fv{counter}"
+                params = {f"fv{counter}": sub.value}
             elif sub.operator == "gt" and sub.value is not None:
-                sql = f"{col}.{sub.field} > :val"
-                params = {"val": sub.value}
+                sql = f"{col}.{sub.field} > :fv{counter}"
+                params = {f"fv{counter}": sub.value}
             elif sub.operator == "eq" and sub.value is not None:
-                sql = f"{col}.{sub.field} = :val"
-                params = {"val": sub.value}
+                sql = f"{col}.{sub.field} = :fv{counter}"
+                params = {f"fv{counter}": sub.value}
             elif sub.operator in ("contains", "not_contains") and sub.value:
                 pattern = f"%{sub.value}%"
                 col_ref = f"{col}.{sub.field}"
                 if sub.operator == "contains":
-                    sql = f"{col_ref} ILIKE :pat"
+                    sql = f"{col_ref} ILIKE :fv{counter}"
                 else:
-                    sql = f"{col_ref} NOT ILIKE :pat"
-                params = {"pat": pattern}
+                    sql = f"{col_ref} NOT ILIKE :fv{counter}"
+                params = {f"fv{counter}": pattern}
             else:
                 continue
 
             clauses.append(FilterClause(table=table, sql=sql, params=params))
+            counter += 1
 
         return Filters(conditions=clauses)
 
@@ -264,7 +271,7 @@ class Retriever:
             sql_fragment:  "CASE pr.source WHEN 'marketing' THEN :wv_mkt ... ELSE 1.0 END"
             params:        参数绑定字典。
         """
-        known_sources = ["marketing", "faq", "user_review"]
+        known_sources = ["marketing", "faq", "user_review", "property"]
         when_parts: list[str] = []
         params: dict = {}
 
@@ -388,9 +395,15 @@ class Retriever:
         params.update(w_params)  # 合并 source 权重参数
 
         sql = text(sql_str)
-        logger.info("semantic_search SQL", sql=sql_str, params={k: str(v)[:80] for k, v in params.items()})
+        logger.debug("semantic_search SQL", sql=sql_str, params={k: str(v)[:80] for k, v in params.items()})
         result = await self.db.execute(sql, params)
         rows = result.fetchall()
+
+        logger.debug("semantic_search 结果",
+                     row_count=len(rows),
+                     top_rows=[{"sku_id": r.sku_id,
+                                "content": (r.matched_texts_json or [{}])[0].get("content", "")[:100]}
+                               for r in rows[:3]])
 
         # 构建 SKUHit 列表 + hit_metadata（asyncpg 自动将 JSONB 反序列化为 Python list）
         hits: list[SKUHit] = []
@@ -459,7 +472,7 @@ class Retriever:
                     )
                     sql = text(base_sql + " ORDER BY score DESC LIMIT :limit")
                     kw_params = {"tsv_config": tsv_config, "kw": sub.text.strip(), "limit": top_k, **filters._all_params(), **w_params}
-                    logger.info("keyword_search SQL (tsvector)", config=tsv_config, sql=base_sql, params={k: str(v)[:80] for k, v in kw_params.items()})
+                    logger.debug("keyword_search SQL (tsvector)", config=tsv_config, sql=base_sql, params={k: str(v)[:80] for k, v in kw_params.items()})
                     result = await self.db.execute(sql, kw_params)
                     rows = result.fetchall()
                     if rows:
@@ -484,9 +497,16 @@ class Retriever:
 
                 sql = text(sql_str)
                 ilike_params = {"pat": f"%{sub.text}%", "limit": top_k, **filters._all_params(), **w_params}
-                logger.info("keyword_search SQL (ILIKE fallback)", sql=sql_str, params={k: str(v)[:80] for k, v in ilike_params.items()})
+                logger.debug("keyword_search SQL (ILIKE fallback)", sql=sql_str, params={k: str(v)[:80] for k, v in ilike_params.items()})
                 result = await self.db.execute(sql, ilike_params)
                 rows = result.fetchall()
+
+            if rows:
+                logger.debug("keyword_search 结果",
+                             sub_text=sub.text[:80],
+                             row_count=len(rows),
+                             top_rows=[{"sku_id": r.sku_id, "content": r.content[:100]}
+                                        for r in rows[:3]])
 
             for r in rows:
                 all_rows.append({
@@ -625,4 +645,78 @@ class Retriever:
         return [
             {"product_id": r.product_id, "source": r.source, "score": float(r.score)}
             for r in result.fetchall()
+        ]
+
+
+# ---------------------------------------------------------------------------
+# 加权 RRF (Reciprocal Rank Fusion) 合并器
+# ---------------------------------------------------------------------------
+# 将 keyword 和 semantic 两路已排名的 SKUHit 列表通过加权 RRF 公式
+# 融合为单一排序结果。
+#
+# 加权 RRF 公式: RRF(sku) = sw * Σ 1/(k + sem_rank_i) + kw * Σ 1/(k + kw_rank_i)
+# 其中 k=60, rank 从 1 开始, sw/kw 为语义/关键词权重。
+# ---------------------------------------------------------------------------
+
+
+class Merger:
+    """将 keyword/semantic 两路排名结果通过加权 RRF 融合。
+
+    属性:
+        rrf_k: RRF 平滑参数（默认 60）。
+        semantic_weight: 语义检索权重（默认 0.7）。
+        keyword_weight: 关键词检索权重（默认 0.3）。
+        final_limit: 融合后返回的最大 SKU 数量（默认 25）。
+    """
+
+    def __init__(
+        self,
+        rrf_k: int = 60,
+        semantic_weight: float = 0.7,
+        keyword_weight: float = 0.3,
+        final_limit: int = 25,
+    ):
+        self.rrf_k = rrf_k
+        self.semantic_weight = semantic_weight
+        self.keyword_weight = keyword_weight
+        self.final_limit = final_limit
+
+    def merge(
+        self,
+        keyword_ranked: list[SKUHit],
+        semantic_ranked: list[SKUHit],
+    ) -> list[SKUHit]:
+        """通过加权 RRF 融合两路排名结果。
+
+        参数:
+            keyword_ranked: 关键词检索的排名结果（按分数降序）。
+            semantic_ranked: 语义检索的排名结果（按分数降序）。
+
+        返回值:
+            按加权 RRF 得分降序排列的 SKUHit 列表，最多 final_limit 条。
+        """
+        rrf_scores: dict[str, float] = {}
+        sku_map: dict[str, SKUHit] = {}
+
+        for rank, hit in enumerate(keyword_ranked, start=1):
+            rrf = self.keyword_weight / (self.rrf_k + rank)
+            rrf_scores[hit.sku_id] = rrf_scores.get(hit.sku_id, 0.0) + rrf
+            if hit.sku_id not in sku_map:
+                sku_map[hit.sku_id] = hit
+
+        for rank, hit in enumerate(semantic_ranked, start=1):
+            rrf = self.semantic_weight / (self.rrf_k + rank)
+            rrf_scores[hit.sku_id] = rrf_scores.get(hit.sku_id, 0.0) + rrf
+            if hit.sku_id not in sku_map:
+                sku_map[hit.sku_id] = hit
+
+        ranked_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
+
+        return [
+            SKUHit(
+                sku_id=sku_map[sid].sku_id,
+                product_id=sku_map[sid].product_id,
+                score=rrf_scores[sid],
+            )
+            for sid in ranked_ids[:self.final_limit]
         ]

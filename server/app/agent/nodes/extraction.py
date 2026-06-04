@@ -1,119 +1,279 @@
 """
 Intent Extraction 节点 — 明确商品需求路径。
 
-从 user_query 中提取结构化 SubQuery 列表，复用扩展后的 QUERY_PARSE_SYSTEM。
-具备品类标记能力（category/sub_category），与 Scenario Gen 保持数据契约一致。
+三步流程：
+1. LLM 提取品类/品牌意图 + Tool 校验合法性
+2. 从 session_memory 按品类检索历史查询并拼接
+3. LLM 分组提取结构化+语义意图
+
+输出新格式: [{category, sub_category, text, min_price, max_price, order_num, brand}]
 """
 import json
+import re
 import structlog
-from app.config import settings
-from app.rag.prompt import build_parse_prompt
-from app.services.llm import LLMService
+from app.agent.prompts.extraction_prompt import EXTRACTION_STEP1_SYSTEM, EXTRACTION_STEP3_SYSTEM
+from app.agent.memory import get_queries_by_category
+from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.extraction")
 
 
-def _format_history_context(conversation_history: list[dict]) -> str:
-    """从 conversation_history 中提取子查询，格式化为 LLM 可消费的历史需求文本。
+def _parse_json_array(raw: str) -> list:
+    """从 LLM 原始响应中提取 JSON 数组，失败返回空列表。
 
-    每轮对话只取 sub_queries 中的 text/strategy/category/sub_category 关键字段，
-    省略内部细节（field/operator/value 等），控制注入量。
+    增强容错：去除 markdown 代码围栏、尾随逗号、JSON 前后文字。
+    """
+    if not raw:
+        return []
+
+    raw = raw.strip()
+    # 去除 markdown 代码围栏
+    if raw.startswith("```"):
+        lines = raw.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        raw = "\n".join(lines).strip()
+
+    # 提取 JSON 数组
+    start = raw.find("[")
+    end = raw.rfind("]") + 1
+    if start >= 0 and end > start:
+        json_str = raw[start:end]
+    else:
+        return []
+
+    # 1. 直接解析
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. 移除尾随逗号后重试
+    cleaned = re.sub(r",\s*([}\]])", r"\1", json_str)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    return []
+
+
+def _build_context_with_memory(
+    rewritten_query: str,
+    categories: list[dict],
+    session_memory: list[dict],
+) -> str:
+    """Step 2: 按品类从 session_memory 检索历史查询，与当前查询拼接。
+
+    每个品类的历史查询按时间升序编号，末尾追加当前改写查询。
+    所有品类拼接为一个文本块供 Step 3 一次性处理。
 
     参数:
-        conversation_history: 对话历史列表。
+        rewritten_query: Router 改写后的查询。
+        categories: Step 1 输出的品类列表 [{category, sub_category, ...}]。
+        session_memory: session_memory 列表。
 
     返回值:
-        str: 格式化的历史需求文本（在提示词中注入）。空历史返回 ""。
+        str: 拼接后的文本，多品类分段展示。
     """
-    if not conversation_history:
-        return ""
+    parts = []
 
-    lines = []
-    for i, entry in enumerate(conversation_history, 1):
-        subs = entry.get("sub_queries", [])
-        for sq in subs:
-            parts = [f"text={sq.get('text', '')}"]
-            if sq.get("category"):
-                parts.append(f"category={sq['category']}")
-            if sq.get("sub_category"):
-                parts.append(f"sub_category={sq['sub_category']}")
-            lines.append(", ".join(parts))
-    if not lines:
-        return ""
+    for i, cat in enumerate(categories, 1):
+        cat_name = cat.get("category")
+        sub_name = cat.get("sub_category")
+        label = f"{cat_name or '未知'}/{sub_name or '未知'}"
 
-    header = "## 用户历史需求"
-    body = "\n".join(f"- {line}" for line in lines)
-    return f"{header}\n{body}"
+        # 检索该品类的历史查询
+        history = get_queries_by_category(session_memory, cat_name, sub_name)
+        sorted_history = sorted(history, key=lambda q: q.get("timestamp", ""))
+
+        lines = [f"## 品类 {i}: {label}"]
+        if sorted_history:
+            lines.append("历史查询（按时间顺序）：")
+            for j, hq in enumerate(sorted_history, 1):
+                lines.append(f"  #{j} [{hq.get('timestamp', '')}] {hq.get('query', '')}")
+        else:
+            lines.append("历史查询：(无)")
+        lines.append(f"当前查询: {rewritten_query}")
+        parts.append("\n".join(lines))
+
+    return "\n\n".join(parts) if parts else rewritten_query
+
+
+async def _extract_categories_and_brands(
+    rewritten_query: str,
+    llm: LLMService,
+    db_session_factory,
+) -> list[dict]:
+    """Step 1: LLM 提取品类/品牌 + Tool 校验合法性。
+
+    参数:
+        rewritten_query: Router 改写后的查询。
+        llm: LLMService 实例。
+        db_session_factory: async_session 工厂函数。
+
+    返回值:
+        [{"category": "面部护肤", "sub_category": "防晒霜", "brand": ["安热沙"]}, ...]
+    """
+    # 加载品类上下文用于提示词注入
+    category_list = ""
+    valid_categories = None
+    try:
+        from app.services.category_lookup_service import fetch_category_context
+        async with db_session_factory() as session:
+            category_list, valid_categories = await fetch_category_context(session)
+    except Exception as e:
+        logger.warning("extraction Step1 品类加载失败", error=str(e))
+
+    prompt = EXTRACTION_STEP1_SYSTEM.replace("{category_list}", category_list)
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": rewritten_query},
+    ]
+
+    try:
+        raw = await llm.chat(messages, temperature=0.1)
+        parsed = _parse_json_array(raw)
+    except Exception as e:
+        logger.warning("extraction Step1 LLM 调用失败", error=str(e))
+        return []
+
+    if not parsed:
+        return []
+
+    # Tool 校验：brand 取值需在 product 表中存在
+    result = []
+    for item in parsed:
+        cat = item.get("category")
+        sub = item.get("sub_category")
+        brands = item.get("brand", [])
+
+        # 品类校验
+        if valid_categories and cat and sub:
+            if (cat, sub) not in valid_categories:
+                logger.debug("Step1 品类不合法，置 null", category=cat, sub_category=sub)
+                cat = None
+                sub = None
+
+        # 品牌校验
+        valid_brands = []
+        if brands and cat and sub:
+            try:
+                from app.agent.tools import query_field_values
+                async with db_session_factory() as session:
+                    valid_brands = await query_field_values(
+                        session, "product", "brand",
+                        {"category": cat, "sub_category": sub},
+                    )
+            except Exception as e:
+                logger.warning("Step1 brand 校验失败", error=str(e))
+
+        verified_brands = [b for b in brands if b in valid_brands] if valid_brands else brands
+
+        result.append({
+            "category": cat,
+            "sub_category": sub,
+            "brand": verified_brands if verified_brands else None,
+        })
+
+    return result
+
+
+async def _extract_intents_per_category(
+    context: str,
+    llm: LLMService,
+) -> list[dict]:
+    """Step 3: 从拼接文本中按品类分组提取结构化+语义意图。
+
+    参数:
+        context: Step 2 输出的拼接文本。
+        llm: LLMService 实例。
+
+    返回值:
+        [{category, sub_category, text, min_price, max_price, order_num, brand}, ...]
+    """
+    prompt = EXTRACTION_STEP3_SYSTEM.replace("{context}", context)
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": "请提取意图"},
+    ]
+
+    try:
+        raw = await llm.chat(messages, temperature=0.1)
+        parsed = _parse_json_array(raw)
+    except Exception as e:
+        logger.warning("extraction Step3 LLM 调用失败", error=str(e))
+        return []
+
+    # 字段标准化
+    result = []
+    for item in parsed:
+        result.append({
+            "category": item.get("category"),
+            "sub_category": item.get("sub_category"),
+            "text": (item.get("text") or "").strip(),
+            "min_price": int(item.get("min_price", 0) or 0),
+            "max_price": int(item.get("max_price", 4294967295) or 4294967295),
+            "order_num": int(item.get("order_num", 1) or 1),
+            "brand": item.get("brand") if item.get("brand") else None,
+        })
+
+    return result
 
 
 async def extraction_node(
     state: dict,
     llm: LLMService,
+    db_session_factory,
     category_list: str = "",
     valid_categories: set | None = None,
 ) -> dict:
-    """Intent Extraction 节点函数。
+    """Intent Extraction 节点函数 — 三步流程。
 
     参数:
         state: AgentState 字典。
         llm: LLMService 实例。
-        category_list: 按 category 分组的品类清单字符串，
-            由 fetch_category_context() 生成。默认 "" 表示不注入。
-        valid_categories: 合法 (category, sub_category) 对集合，
-            用于后校验。默认 None 表示跳过后校验。
+        db_session_factory: async_session 工厂函数（用于 Tools 调用）。
+        category_list: [已废弃] 旧品类清单字符串，保留兼容但不使用。
+        valid_categories: [已废弃] 旧品类校验集合，保留兼容但不使用。
 
     返回值:
-        dict: {"requirements": {"sub_queries": [...]}, "conversation_history": [...]}
+        dict: {"requirements": [新格式]}，写入 AgentState。
     """
-    user_query = state.get("user_query", "")
-    conversation_history = state.get("conversation_history", [])
+    rewritten_query = state.get("rewritten_query", state.get("user_query", ""))
+    session_memory = state.get("session_memory", [])
 
-    # 组装提示词：品类约束提示词 + 历史需求上下文 + 用户查询
-    history_context = _format_history_context(conversation_history)
-    system_prompt = build_parse_prompt(category_list)
-    if history_context:
-        system_prompt = system_prompt + "\n\n" + history_context
+    # ---- Step 1: 提取品类/品牌 ----
+    categories = await _extract_categories_and_brands(
+        rewritten_query, llm, db_session_factory
+    )
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_query},
-    ]
+    if not categories:
+        # 无法提取品类时，用空品类做一次尝试
+        logger.warning("extraction Step1 未提取到品类，使用空品类回退")
+        categories = [{"category": None, "sub_category": None, "brand": None}]
 
-    try:
-        # 使用流式调用收集完整响应
-        parts = []
-        async for token in llm.chat_stream(messages, temperature=0.1):
-            parts.append(token)
-        raw_response = "".join(parts)
+    # ---- Step 2: 检索历史并拼接 ----
+    context = _build_context_with_memory(rewritten_query, categories, session_memory)
 
-        # 复用 QueryParser 的解析逻辑
-        from app.services.query_parser import QueryParser
-        parser = QueryParser(llm=llm)
-        sub_queries = parser._parse_response(raw_response)
-    except Exception as e:
-        logger.warning("Extraction LLM 调用失败，使用 fallback", error=str(e))
-        from app.services.retriever import SubQuery
-        sub_queries = [SubQuery(text=user_query, strategy="semantic")]
+    # ---- Step 3: 分组提取意图 ----
+    requirements = await _extract_intents_per_category(context, llm)
 
-    # 后校验：确保 LLM 输出的品类值严格合法
-    if valid_categories:
-        from app.services.category_lookup_service import validate_categories
-        sub_queries = validate_categories(sub_queries, valid_categories)
+    if not requirements:
+        logger.warning("extraction Step3 未提取到意图，使用 fallback")
+        requirements = [{
+            "category": None,
+            "sub_category": None,
+            "text": rewritten_query,
+            "min_price": 0,
+            "max_price": 4294967295,
+            "order_num": 1,
+            "brand": None,
+        }]
 
-    # 转为可序列化字典列表
-    subs_dicts = [
-        {
-            "text": sq.text, "strategy": sq.strategy,
-            "field": sq.field, "operator": sq.operator,
-            "value": sq.value, "expanded_values": sq.expanded_values,
-            "category": sq.category, "sub_category": sq.sub_category,
-        }
-        for sq in sub_queries
-    ]
+    logger.info("extraction 完成", category_count=len(categories),
+                requirement_count=len(requirements))
 
-    # 注意：conversation_history 的更新移至 retrieval_node，
-    # 在检索完成后才将当前 requirements 写入 memory，避免
-    # requirements 与 conversation_history 重复注入到检索节点。
-    return {
-        "requirements": {"sub_queries": subs_dicts},
-    }
+    return {"requirements": requirements}

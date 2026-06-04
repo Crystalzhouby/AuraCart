@@ -3,11 +3,8 @@
 
 模块: app.api.search
 
-提供 RAG 检索接口 /api/search：
-- stream=True（默认） — SSE 流式：查询解析 → 多策略检索 → RRF 融合 → LLM 推荐生成
-- stream=False         — JSON 非流式：一次返回完整的管线结果
-
-需要嵌入服务、异步数据库会话和 LLM 服务实例。
+提供 RAG 检索接口 /api/search — SSE 流式 Agent 工作流：
+查询解析 → 多策略检索 → RRF 融合 → 商品推荐
 """
 import json
 import asyncio
@@ -18,14 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 from app.database import get_db, engine
 from app.config import settings
-from app.schemas.product import SearchResponse
-from app.services.embedding import EmbeddingService
-from app.services.llm import LLMService
-from app.services.query_parser import QueryParser
-from app.services.retriever import Retriever, SubQuery
-from app.services.sku_utils import _get_skus
-from app.rag.merger import Merger
-from app.rag.generator import Generator
+from app.services.embedding_service import EmbeddingService
+from app.services.llm_service import LLMService
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 router = APIRouter(prefix="/api", tags=["search"])
@@ -87,145 +78,28 @@ async def search(
     llm: LLMService = Depends(get_llm_service),
 ):
     """
-    基于 RAG 的 AI 推理搜索，支持流式 (SSE) 与非流式 (JSON) 两种模式。
+    基于 Agent 工作流的 AI 推理搜索，通过 SSE 流式返回结果。
 
-    管线各阶段：
-      1. LLM 将用户查询解析为结构化的子查询（语义、关键词、过滤）。
-      2. Retriever 对向量库并行执行语义检索和关键词检索。
-      3. Merger 通过 RRF 融合排序，补充 SKU 与产品详情。
-      4. Generator 通过 LLM 生成推荐文案。
+    Agent 工作流各阶段：
+      1. Router — 意图识别（chat/explicit/scenario）
+      2. Extraction / ScenarioGen — 需求提取
+      3. Retrieval — 多策略检索 + RRF 融合
+      4. OptionGen — 生成后续选项
 
-    接口: GET /api/search?q=...&stream=true|false
+    接口: GET /api/search?q=...&stream=true
 
     参数:
         request (Request):       FastAPI Request 对象，用于连接管理。
         q (str):                 用户提供的搜索查询字符串。
-        stream (bool):           是否以 SSE 流式返回；默认 True。
+        stream (bool):           是否以 SSE 流式返回；保留参数向后兼容，始终走 Agent 工作流。
+        conversation_id (str|None): 会话ID，用于多轮对话记忆。
         db (AsyncSession):       通过依赖注入获取的异步 SQLAlchemy 会话。
         emb (EmbeddingService):  通过依赖注入获取的嵌入服务。
         llm (LLMService):        通过依赖注入获取的 LLM 服务。
 
     返回值:
-        stream=True  → EventSourceResponse（SSE 事件流）。
-        stream=False → SearchResponse（JSON）。
+        EventSourceResponse（SSE 事件流）。
     """
-    # 初始化 RAG 管线组件。
-    retriever = Retriever(db=db, emb=emb)
-    parser = QueryParser(llm=llm)
-    merger = Merger(
-        rrf_k=60,
-        final_limit=settings.search.final_sku_limit,
-    )
-    generator = Generator(llm=llm)
-
-    async def _run_pipeline(q: str, db: AsyncSession) -> dict:
-        """执行 RAG 管线阶段 1-3，流式/非流式共用。"""
-        pipeline_log = structlog.get_logger("search")
-        result: dict = {}
-
-        # ---- 加载品类列表 ----
-        category_list = ""
-        valid_categories = None
-        try:
-            from app.services.category_lookup_service import fetch_category_context
-            category_list, valid_categories = await fetch_category_context(db)
-        except Exception:
-            pass
-
-        # ---- 阶段 1: 查询解析 (LLM) ----
-        pipeline_log.info("阶段1: 查询解析开始", raw_query=q)
-        try:
-            sub_queries = await asyncio.wait_for(
-                parser.parse(q, category_list=category_list, valid_categories=valid_categories),
-                timeout=settings.timeout.query_parse,
-            )
-        except asyncio.TimeoutError:
-            pipeline_log.info("阶段1: 查询解析超时，回退为语义检索")
-            sub_queries = [SubQuery(text=q, strategy="semantic")]
-
-        subs_detail = [
-            {
-                "text": s.text, "strategy": s.strategy,
-                "field": s.field, "operator": s.operator, "value": s.value,
-            }
-            for s in sub_queries
-        ]
-        pipeline_log.info("阶段1: 查询解析完成", sub_queries=subs_detail)
-        result["sub_queries"] = subs_detail
-
-        # ---- 阶段 2: 多策略检索 ----
-        retrieve_result = await retriever.retrieve(
-            sub_queries, top_k=settings.search.top_k_per_query
-        )
-        pipeline_log.info("阶段2: 检索完成",
-                          keyword_count=len(retrieve_result["keyword"]),
-                          semantic_count=len(retrieve_result["semantic"]))
-
-        # ---- 阶段 3: RRF 融合与排序 ----
-        ranked_skuhits = merger.merge(
-            keyword_ranked=retrieve_result["keyword"],
-            semantic_ranked=retrieve_result["semantic"],
-        )
-        skus = await _get_skus(db, ranked_skuhits)
-        match_stats = [
-            {"sku_id": s["sku_id"],
-             "texts": len(s.get("matched_texts", [])),
-             "chars": sum(len(t["content"]) for t in s.get("matched_texts", []))}
-            for s in skus
-        ]
-        pipeline_log.info("阶段3: 合并排序结果",
-                          sku_count=len(skus), match_stats=match_stats)
-        result["products"] = skus
-
-        return result
-
-    # ---- 非流式模式 ----
-    if not stream:
-        pipeline_log = structlog.get_logger("search")
-        try:
-            result = await _run_pipeline(q, db)
-            products = result["products"]
-            subs = result["sub_queries"]
-
-            reasoning = None
-            if products:
-                pipeline_log.info("阶段4: LLM生成开始", sku_count=len(products))
-                tokens: list[str] = []
-                try:
-                    agen = generator.generate(products, q, sub_queries=subs)
-                    deadline = asyncio.get_event_loop().time() + settings.timeout.generation
-                    while True:
-                        remaining = deadline - asyncio.get_event_loop().time()
-                        if remaining <= 0:
-                            break
-                        try:
-                            token = await asyncio.wait_for(
-                                agen.__anext__(), timeout=remaining
-                            )
-                            tokens.append(token)
-                        except StopAsyncIteration:
-                            break
-                except asyncio.TimeoutError:
-                    pipeline_log.info("阶段4: LLM生成超时", token_count=len(tokens))
-                reasoning = "".join(tokens)
-                pipeline_log.info("阶段4: LLM生成完成", token_count=len(tokens))
-            else:
-                pipeline_log.info("阶段4: 无候选商品，跳过生成")
-
-            return SearchResponse(
-                query=q, sub_queries=subs, products=products, reasoning=reasoning,
-                conversation_id=conversation_id,
-            )
-        except Exception as e:
-            pipeline_log.info("搜索异常", error=str(e))
-            try:
-                await db.rollback()
-            except Exception:
-                pass
-            return SearchResponse(
-                query=q, sub_queries=[], products=[], reasoning=None,
-                conversation_id=conversation_id,
-            )
 
     # ---- 流式模式 (SSE) — Agent 工作流 ----
     async def event_stream():
@@ -298,7 +172,7 @@ async def _agent_event_stream(
     stream_log = structlog.get_logger("agent_stream")
 
     # ---- 加载会话记忆 ----
-    initial_history: list[dict] = []
+    initial_session_memory: list[dict] = []
     if conversation_id:
         try:
             from app.database import async_session
@@ -314,11 +188,11 @@ async def _agent_event_stream(
                 row = result.scalar_one_or_none()
                 if row is not None:
                     # asyncpg JSONB → Python list[dict] 自动反序列化
-                    initial_history = row
+                    initial_session_memory = row
                     stream_log.debug(
                         "会话记忆已加载",
                         conversation_id=conversation_id,
-                        rounds=len(initial_history),
+                        groups=len(initial_session_memory),
                     )
                 else:
                     stream_log.warning(
@@ -335,10 +209,11 @@ async def _agent_event_stream(
     # 构建初始状态
     initial_state: AgentState = {
         "user_query": user_query,
-        "conversation_history": initial_history,
-        "intent": "recommend",
-        "is_scenario": False,
-        "requirements": {},
+        "conversation_history": [],       # 旧格式，保留兼容（LangGraph add reducer）
+        "rewritten_query": "",
+        "session_memory": initial_session_memory,
+        "intent": "explicit",
+        "requirements": [],               # 新格式: list[dict]
         "scenario_description": None,
         "retrieval_results": [],
         "chat_reply": "",
@@ -431,7 +306,7 @@ async def _agent_event_stream(
                 from sqlalchemy.dialects.postgresql import insert as pg_insert
                 from app.models.conversation import Conversation
 
-                memory = final_state.get("conversation_history", [])
+                memory = final_state.get("session_memory", [])
                 async with async_session() as session:
                     stmt = pg_insert(Conversation).values(
                         conversation_id=conversation_id,
@@ -448,7 +323,7 @@ async def _agent_event_stream(
                     stream_log.debug(
                         "会话记忆已保存",
                         conversation_id=conversation_id,
-                        rounds=len(memory),
+                        groups=len(memory),
                     )
             except Exception as e:
                 stream_log.warning(

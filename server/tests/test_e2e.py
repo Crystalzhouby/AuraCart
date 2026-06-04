@@ -10,7 +10,7 @@ import json
 import os
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from app.services.import_data import chunk_product, DataImporter
+from app.services.import_data_service import chunk_product, DataImporter
 
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "ecommerce_agent_dataset_sample")

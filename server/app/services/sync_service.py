@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select
 from app.models import Product, ProductMarketing, ProductFaq, UserReview
 from app.models.product_review import ProductReview
-from app.services.embedding import EmbeddingService
+from app.services.embedding_service import EmbeddingService
 
 
 class SyncService:

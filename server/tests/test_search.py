@@ -9,8 +9,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient, ASGITransport
 from app.main import app
-from app.services.sku_utils import _truncate_texts, _get_skus
-from app.services.retriever import SKUHit
+from app.services.sku_utils_service import _truncate_texts, _get_skus
+from app.services.retriever_service import SKUHit
 
 
 @pytest.mark.asyncio
@@ -211,88 +211,3 @@ class TestGetSkus:
         skuhits = [SKUHit(sku_id="NONEXIST", product_id="PX", score=0.5)]
         result = await _get_skus(db, skuhits)
         assert result == []
-
-
-# ======================================================================
-# Generator._build_context 单元测试
-# ======================================================================
-
-
-# 基础 SKU dict（不含 matched_texts）
-_BASE_SKU = {
-    "product_id": "P1", "title": "测试防晒霜", "brand": "测试品牌",
-    "category": "美妆", "base_price": 100.0,
-    "sku_id": "SKU1", "properties": {"容量": "60ml"},
-    "price": 99.0,
-}
-
-
-class TestBuildContext:
-    """测试 _build_context 的匹配文本格式化行为。"""
-
-    def test_no_matched_texts_section(self):
-        """无 matched_texts 时不输出【用户评价与描述】段落。"""
-        from app.rag.generator import Generator
-        gen = Generator(llm=None)  # _build_context 不需要 LLM
-        skus = [{**_BASE_SKU, "matched_texts": []}]
-        output = gen._build_context(skus)
-        assert "【用户评价与描述】" not in output
-        assert "测试防晒霜" in output
-
-    def test_with_matched_texts(self):
-        """有 matched_texts 时输出段落并带来源标签。"""
-        from app.rag.generator import Generator
-        gen = Generator(llm=None)
-        skus = [{
-            **_BASE_SKU,
-            "matched_texts": [
-                {"content": "保湿效果好", "source": "user_review", "metadata": None},
-            ],
-        }]
-        output = gen._build_context(skus)
-        assert "【用户评价与描述】" in output
-        assert "[用户评价] 保湿效果好" in output
-
-    def test_source_labels(self):
-        """不同 source 使用对应中文标签。"""
-        from app.rag.generator import Generator
-        gen = Generator(llm=None)
-        skus = [{
-            **_BASE_SKU,
-            "matched_texts": [
-                {"content": "官方推荐", "source": "marketing", "metadata": None},
-                {"content": "常见问题", "source": "faq", "metadata": None},
-                {"content": "用户好评", "source": "user_review", "metadata": None},
-            ],
-        }]
-        output = gen._build_context(skus)
-        assert "[官方描述] 官方推荐" in output
-        assert "[FAQ] 常见问题" in output
-        assert "[用户评价] 用户好评" in output
-
-    def test_mixed_skus(self):
-        """部分 SKU 有 matched_texts，部分没有，只输出有的。"""
-        from app.rag.generator import Generator
-        gen = Generator(llm=None)
-        skus = [
-            {**_BASE_SKU, "sku_id": "SKU1", "matched_texts": []},
-            {**_BASE_SKU, "sku_id": "SKU2", "matched_texts": [
-                {"content": "好评", "source": "user_review", "metadata": None},
-            ]},
-        ]
-        output = gen._build_context(skus)
-        assert "【用户评价与描述】" in output
-        assert "[用户评价] 好评" in output
-
-    def test_unknown_source_label(self):
-        """未知 source 使用 [其他] 标签。"""
-        from app.rag.generator import Generator
-        gen = Generator(llm=None)
-        skus = [{
-            **_BASE_SKU,
-            "matched_texts": [
-                {"content": "未知来源内容", "source": "unknown", "metadata": None},
-            ],
-        }]
-        output = gen._build_context(skus)
-        assert "[其他] 未知来源内容" in output

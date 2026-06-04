@@ -19,7 +19,7 @@ import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.models import Product, Sku, ProductMarketing, ProductFaq, UserReview, ProductReview
-from app.services.embedding import EmbeddingService
+from app.services.embedding_service import EmbeddingService
 
 
 def chunk_product(product_data: dict) -> list[tuple[str, str, dict]]:

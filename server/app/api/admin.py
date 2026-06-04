@@ -9,8 +9,8 @@ Admin API 路由
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.services.sync import SyncService
-from app.services.embedding import EmbeddingService
+from app.services.sync_service import SyncService
+from app.services.embedding_service import EmbeddingService
 from app.config import settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])

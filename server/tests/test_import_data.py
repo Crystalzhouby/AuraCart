@@ -7,7 +7,7 @@ chunk_product 函数将商品的 RAG 知识拆分为语义块（营销文案、
 """
 
 import pytest
-from app.services.import_data import chunk_product
+from app.services.import_data_service import chunk_product
 
 
 def test_chunk_product():

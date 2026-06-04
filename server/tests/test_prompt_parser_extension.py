@@ -6,8 +6,9 @@
 3. _parse_response 兼容新旧两种 LLM 响应格式
 """
 import json
-from app.rag.prompt import QUERY_PARSE_SYSTEM, GENERATOR_SYSTEM
-from app.services.query_parser import QueryParser
+from app.services.query_parser_service import QUERY_PARSE_SYSTEM
+from app.agent.prompts.generator_prompt import GENERATOR_SYSTEM
+from app.services.query_parser_service import QueryParser
 
 
 class TestQueryParseSystemPrompt:

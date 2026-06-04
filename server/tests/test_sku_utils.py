@@ -6,26 +6,26 @@ import pytest
 
 
 def test_sku_utils_module_importable():
-    """验证 app.services.sku_utils 模块可导入。"""
-    from app.services import sku_utils
-    assert sku_utils is not None
+    """验证 app.services.sku_utils_service 模块可导入。"""
+    from app.services import sku_utils_service
+    assert sku_utils_service is not None
 
 
 def test_get_skus_function_exists():
     """验证 _get_skus 函数可从 sku_utils 导入。"""
-    from app.services.sku_utils import _get_skus
+    from app.services.sku_utils_service import _get_skus
     assert callable(_get_skus)
 
 
 def test_truncate_texts_function_exists():
     """验证 _truncate_texts 函数可从 sku_utils 导入。"""
-    from app.services.sku_utils import _truncate_texts
+    from app.services.sku_utils_service import _truncate_texts
     assert callable(_truncate_texts)
 
 
 def test_source_priority_constant_exists():
     """验证 _SOURCE_PRIORITY 常量存在于 sku_utils。"""
-    from app.services.sku_utils import _SOURCE_PRIORITY
+    from app.services.sku_utils_service import _SOURCE_PRIORITY
     assert isinstance(_SOURCE_PRIORITY, dict)
     assert "faq" in _SOURCE_PRIORITY
     assert "marketing" in _SOURCE_PRIORITY
@@ -35,7 +35,7 @@ def test_source_priority_constant_exists():
 def test_search_imports_from_sku_utils():
     """验证 search.py 可从 sku_utils 导入 _get_skus。"""
     # 此测试确保迁移后 search.py 的导入路径正确
-    from app.services.sku_utils import _get_skus
+    from app.services.sku_utils_service import _get_skus
     # 验证函数签名接受 db 和 skuhits 参数
     import inspect
     sig = inspect.signature(_get_skus)
@@ -46,7 +46,7 @@ def test_search_imports_from_sku_utils():
 
 def test_truncate_texts_basic_behavior():
     """验证 _truncate_texts 的基本行为（不依赖 DB）。"""
-    from app.services.sku_utils import _truncate_texts
+    from app.services.sku_utils_service import _truncate_texts
 
     texts = [
         {"content": "很好的产品", "source": "faq", "metadata": {}},
@@ -62,7 +62,7 @@ def test_truncate_texts_basic_behavior():
 
 def test_truncate_texts_respects_max_chars():
     """验证 _truncate_texts 遵守 max_chars 限制。"""
-    from app.services.sku_utils import _truncate_texts
+    from app.services.sku_utils_service import _truncate_texts
 
     texts = [
         {"content": "A" * 100, "source": "faq", "metadata": {}},

@@ -7,7 +7,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from app.services.llm import LLMService
+from app.services.llm_service import LLMService
 
 
 @pytest.mark.asyncio

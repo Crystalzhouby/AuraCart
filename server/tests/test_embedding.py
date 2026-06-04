@@ -7,7 +7,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from app.services.embedding import EmbeddingService
+from app.services.embedding_service import EmbeddingService
 
 
 @pytest.mark.asyncio

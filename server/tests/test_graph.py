@@ -15,33 +15,26 @@ sys.modules["langgraph.graph"] = MagicMock()
 def test_route_intent_chat():
     """route_intent 应将 intent=chat 路由到 chitchat。"""
     from app.agent.graph import route_intent
-    state = {"intent": "chat", "is_scenario": False}
+    state = {"intent": "chat"}
     assert route_intent(state) == "chitchat"
 
 
 def test_route_intent_scenario():
-    """route_intent 应将 scenario 路由到 scenario_gen。"""
+    """route_intent 应将 intent=scenario 路由到 scenario_gen。"""
     from app.agent.graph import route_intent
-    state = {"intent": "recommend", "is_scenario": True}
+    state = {"intent": "scenario"}
     assert route_intent(state) == "scenario_gen"
 
 
 def test_route_intent_extraction():
-    """route_intent 应将 explicit 路由到 extraction。"""
+    """route_intent 应将 intent=explicit 路由到 extraction。"""
     from app.agent.graph import route_intent
-    state = {"intent": "recommend", "is_scenario": False}
+    state = {"intent": "explicit"}
     assert route_intent(state) == "extraction"
 
 
-def test_route_intent_chat_overrides_scenario():
-    """intent=chat 时即使 is_scenario=True 也应优先路由到 chitchat。"""
-    from app.agent.graph import route_intent
-    state = {"intent": "chat", "is_scenario": True}
-    assert route_intent(state) == "chitchat"
-
-
 def test_route_intent_missing_keys_defaults():
-    """缺少 intent/is_scenario 时默认路由到 extraction。"""
+    """缺少 intent 时默认路由到 extraction。"""
     from app.agent.graph import route_intent
     state: dict = {}
     assert route_intent(state) == "extraction"
@@ -61,4 +54,3 @@ async def test_build_graph_registers_six_nodes():
 
     # 编译后的 graph 应该有节点字典
     assert hasattr(graph, "nodes") or hasattr(graph, "_all_nodes")
-

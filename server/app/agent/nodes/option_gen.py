@@ -8,7 +8,7 @@ Option Gen 节点 — 推荐选项生成。
 import json
 import structlog
 from app.agent.prompts.option_gen_prompt import OPTION_GEN_SYSTEM
-from app.services.llm import LLMService
+from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.option_gen")
 

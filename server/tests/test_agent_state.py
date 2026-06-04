@@ -15,9 +15,10 @@ def test_agent_state_default_values():
     state = AgentState(
         user_query="测试查询",
         conversation_history=[],
+        rewritten_query="",
+        session_memory=[],
         intent="",
-        is_scenario=False,
-        requirements={"sub_queries": []},
+        requirements=[],
         retrieval_results=[],
         chat_reply="",
         next_options=[],
@@ -26,9 +27,10 @@ def test_agent_state_default_values():
     )
     assert state["user_query"] == "测试查询"
     assert state["conversation_history"] == []
+    assert state["rewritten_query"] == ""
+    assert state["session_memory"] == []
     assert state["intent"] == ""
-    assert state["is_scenario"] is False
-    assert state["requirements"] == {"sub_queries": []}
+    assert state["requirements"] == []
     assert state["retrieval_results"] == []
     assert state["chat_reply"] == ""
     assert state["next_options"] == []
@@ -41,9 +43,10 @@ def test_agent_state_sse_queue_injection():
     state = AgentState(
         user_query="test",
         conversation_history=[],
+        rewritten_query="",
+        session_memory=[],
         intent="",
-        is_scenario=False,
-        requirements={"sub_queries": []},
+        requirements=[],
         retrieval_results=[],
         chat_reply="",
         next_options=[],
@@ -60,9 +63,10 @@ def test_agent_state_sse_queue_in_annotations():
     state = AgentState(
         user_query="test",
         conversation_history=[],
+        rewritten_query="",
+        session_memory=[],
         intent="",
-        is_scenario=False,
-        requirements={"sub_queries": []},
+        requirements=[],
         retrieval_results=[],
         chat_reply="",
         next_options=[],
@@ -80,9 +84,10 @@ async def test_sse_queue_put_get():
     state = AgentState(
         user_query="test",
         conversation_history=[],
+        rewritten_query="",
+        session_memory=[],
         intent="",
-        is_scenario=False,
-        requirements={"sub_queries": []},
+        requirements=[],
         retrieval_results=[],
         chat_reply="",
         next_options=[],

@@ -116,12 +116,39 @@ class SearchSettings(BaseSettings):
     rrf_k: int = 60
     """RRF 融合平滑参数，调节排名差异的权重。"""
 
+    # --- 新分段检索参数（替换旧的 top_k_per_query / final_sku_limit） ---
+    semantic_top_k: int = 25
+    """语义检索单路返回的最大候选数量。"""
+
+    keyword_top_k: int = 25
+    """关键词检索单路返回的最大候选数量。"""
+
+    rrf_semantic_weight: float = 0.7
+    """RRF 融合时语义检索的权重。"""
+
+    rrf_keyword_weight: float = 0.3
+    """RRF 融合时关键词检索的权重。"""
+
+    rrf_top_k: int = 25
+    """RRF 融合后返回的最大 SKU 数量。"""
+
+    rerank_top_k: int = 5
+    """bge-reranker 精排后最终返回的 SKU 数量。"""
+
+    max_reviews_per_product: int = 5
+    """单个 product_id 最多保留的 product_review 条数。"""
+
+    memory_recent_rounds: int = 10
+    """Router 改写时检索的最近历史查询轮数。"""
+
+    # --- 保留的旧参数（向后兼容，逐步迁移） ---
     top_k_per_query: int = 20
-    """单次查询从每条路径检索的最大候选数量。"""
+    """[已废弃] 单次查询从每条路径检索的最大候选数量。请使用 semantic_top_k / keyword_top_k。"""
 
     final_sku_limit: int = 10
-    """RRF 融合后返回给用户的最大 SKU 数量。"""
+    """[已废弃] RRF 融合后返回给用户的最大 SKU 数量。请使用 rrf_top_k。"""
 
+    # --- 不变的参数 ---
     max_match_texts_per_sku: int = 3
     """每个 SKU 最多附带几条 product_review 评论文本。"""
 
@@ -184,8 +211,27 @@ class TimeoutSettings(BaseSettings):
     generation: float = 15.0
     """LLM 答案生成的超时时间（秒）。"""
 
+    rerank: float = 5.0
+    """bge-reranker API 调用的超时时间（秒）。"""
+
     total_request: float = 30.0
     """整个搜索请求生命周期的总超时时间（秒）。"""
+
+
+class RerankerSettings(BaseSettings):
+    """bge-reranker-v2-m3 精排模型配置（SiliconFlow API）。"""
+
+    base_url: str = "https://api.siliconflow.cn/v1"
+    """Reranker API 端点的基础 URL。"""
+
+    api_key: str = ""
+    """Reranker API 密钥。建议通过环境变量设置。"""
+
+    model: str = "BAAI/bge-reranker-v2-m3"
+    """Reranker 模型标识。"""
+
+    timeout: float = 5.0
+    """Reranker API 调用超时时间（秒）。"""
 
 
 class Settings(BaseSettings):
@@ -203,6 +249,7 @@ class Settings(BaseSettings):
     search: SearchSettings = SearchSettings()
     sync: SyncSettings = SyncSettings()
     timeout: TimeoutSettings = TimeoutSettings()
+    reranker: RerankerSettings = RerankerSettings()
 
     @classmethod
     def from_yaml(cls, path: str = "config.yaml") -> "Settings":
@@ -284,6 +331,12 @@ class Settings(BaseSettings):
         timeout_data = data.get("timeout", {})
         timeout = TimeoutSettings(**timeout_data)
 
+        reranker_data = data.get("reranker", {})
+        reranker_data["api_key"] = os.environ.get(
+            "RERANKER_API_KEY", reranker_data.get("api_key", "")
+        )
+        reranker = RerankerSettings(**reranker_data)
+
         dataset_data = data.get("dataset", {})
         dataset = DatasetSettings(**dataset_data)
 
@@ -291,7 +344,7 @@ class Settings(BaseSettings):
         log_data["level"] = os.environ.get("AURACART_LOG_LEVEL", log_data.get("level", "INFO"))
         log = LogSettings(**log_data)
 
-        return cls(database=db, dataset=dataset, embedding=emb, llm=llm, search=search, sync=sync, timeout=timeout, log=log)
+        return cls(database=db, dataset=dataset, embedding=emb, llm=llm, search=search, sync=sync, timeout=timeout, log=log, reranker=reranker)
 
 
 # 模块级配置单例 —— 在导入时一次性初始化

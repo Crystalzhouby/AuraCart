@@ -31,8 +31,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
-from app.services.embedding import EmbeddingService
-from app.services.import_data import DataImporter
+from app.services.embedding_service import EmbeddingService
+from app.services.import_data_service import DataImporter
 
 
 def _parse_args() -> argparse.Namespace:

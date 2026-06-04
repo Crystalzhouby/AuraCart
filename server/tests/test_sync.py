@@ -49,7 +49,7 @@ async def test_sync_polls_tables():
     mock_emb = AsyncMock()
     mock_emb.embed.return_value = [0.1, 0.2]
 
-    from app.services.sync import SyncService
+    from app.services.sync_service import SyncService
     svc = SyncService(db_session_factory=lambda: mock_db, emb=mock_emb)
     await svc.run_once(last_sync=datetime(2026, 1, 1))
 

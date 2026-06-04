@@ -1,16 +1,19 @@
 """
 Intent Router 节点 — 工作流第一个节点。
 
-根据 user_query + conversation_history 做两级分类：
-1. 意图分流: recommend / chat
-2. 查询类型: is_scenario (场景化需求) / explicit (明确商品需求)
-
-一次 LLM 调用同时输出 intent + is_scenario，驱动条件边。
+单次三分类 + 查询改写：
+1. 意图分类: chat（闲聊）/ explicit（明确商品需求）/ scenario（场景化推荐）
+2. 若为 explicit 或 scenario，利用 session_memory 中最近 N 轮历史改写当前查询，
+   补充商品主体。完整查询不做改写（透传）。
 """
 import json
+import re
 import structlog
+from app.config import settings
 from app.agent.prompts.router_prompt import ROUTER_SYSTEM
-from app.services.llm import LLMService
+from app.agent.prompts.rewrite_prompt import REWRITE_SYSTEM
+from app.agent.memory import get_recent_queries
+from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.router")
 
@@ -24,13 +27,13 @@ def _parse_router_response(raw: str) -> dict:
     - JSON 前后的说明文字
     """
     if not raw:
-        return {"intent": "recommend", "is_scenario": False}
+        return {"intent": "explicit"}
 
     # 尝试提取第一个 { ... } JSON 对象
     start = raw.find("{")
     end = raw.rfind("}") + 1
     if start < 0 or end <= start:
-        return {"intent": "recommend", "is_scenario": False}
+        return {"intent": "explicit"}
 
     json_str = raw[start:end]
 
@@ -41,35 +44,108 @@ def _parse_router_response(raw: str) -> dict:
         pass
 
     # 2. 移除尾随逗号后重试（常见 LLM 输出错误）
-    import re
     cleaned = re.sub(r",\s*([}\]])", r"\1", json_str)
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
         pass
 
-    return {"intent": "recommend", "is_scenario": False}
+    return {"intent": "explicit"}
+
+
+def _format_recent_queries(recent_queries: list[dict]) -> str:
+    """将最近 N 轮原始查询格式化为提示词可用的平铺文本。
+
+    格式: #1 [2026-06-04T10:00:00] 帮我推荐跑鞋
+          #2 [2026-06-04T10:01:00] 要轻量的
+
+    参数:
+        recent_queries: get_recent_queries() 的返回结果（已按时间降序）。
+
+    返回值:
+        str: 格式化后的多行文本。空列表返回 "(无历史记录)"。
+    """
+    if not recent_queries:
+        return "(无历史记录)"
+
+    # 按时间升序展示（最早→最新），便于理解对话发展
+    sorted_queries = sorted(recent_queries, key=lambda q: q["timestamp"])
+    lines = []
+    for i, q in enumerate(sorted_queries, 1):
+        lines.append(f"#{i} [{q['timestamp']}] {q['query']}")
+    return "\n".join(lines)
+
+
+async def _rewrite_query(
+    user_query: str,
+    recent_queries: list[dict],
+    llm: LLMService,
+) -> str:
+    """利用历史对话改写当前查询，补充商品主体。
+
+    若当前查询已完整，LLM 根据提示词指示直接返回原查询（透传）。
+
+    参数:
+        user_query: 当前用户原始查询。
+        recent_queries: 最近 N 轮历史原始查询。
+        llm: LLMService 实例。
+
+    返回值:
+        str: 改写后的查询（或原查询）。
+    """
+    history_text = _format_recent_queries(recent_queries)
+    prompt = (REWRITE_SYSTEM
+              .replace("{recent_queries}", history_text)
+              .replace("{user_query}", user_query))
+
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": user_query},
+    ]
+
+    try:
+        raw_response = await llm.chat(messages, temperature=0.1)
+        rewritten = raw_response.strip()
+        # 去除可能的 markdown 代码围栏或引号
+        if rewritten.startswith("```"):
+            lines = rewritten.split("\n")
+            rewritten = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        rewritten = rewritten.strip().strip('"').strip("'")
+        logger.info("Router 查询改写完成",
+                    original=user_query[:80],
+                    rewritten=rewritten[:80])
+        return rewritten if rewritten else user_query
+    except Exception as e:
+        logger.warning("Router 查询改写失败，透传原查询", error=str(e))
+        return user_query
 
 
 async def router_node(state: dict, llm: LLMService) -> dict:
-    """Intent Router 节点函数。
+    """Intent Router + 查询改写节点函数。
+
+    流程:
+    1. LLM 三分类: chat / explicit / scenario
+    2. 若为 explicit 或 scenario: 从 session_memory 取最近 N 轮 → LLM 改写查询
 
     参数:
-        state: AgentState 字典，读取 user_query 和 conversation_history。
-        llm: LLMService 实例，通过闭包/参数注入。
+        state: AgentState 字典。
+        llm: LLMService 实例。
 
     返回值:
-        dict: {"intent": str, "is_scenario": bool}，写入 AgentState。
+        dict: {"intent", "rewritten_query"}，写入 AgentState。
     """
     user_query = state.get("user_query", "")
     conversation_history = state.get("conversation_history", [])
+    session_memory = state.get("session_memory", [])
 
-    # 序列化对话历史
+    # ---- Step 1: 三分类 ----
     history_str = ""
     if conversation_history:
         history_str = json.dumps(conversation_history, ensure_ascii=False)
 
-    prompt = ROUTER_SYSTEM.replace("{conversation_history}", history_str).replace("{user_query}", user_query)
+    prompt = (ROUTER_SYSTEM
+              .replace("{conversation_history}", history_str)
+              .replace("{user_query}", user_query))
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": user_query},
@@ -80,6 +156,19 @@ async def router_node(state: dict, llm: LLMService) -> dict:
         parsed = _parse_router_response(raw_response)
     except Exception as e:
         logger.warning("Router LLM 调用失败，使用 fallback", error=str(e))
-        parsed = {"intent": "recommend", "is_scenario": False}
+        parsed = {"intent": "explicit"}
 
-    return {"intent": parsed.get("intent", "recommend"), "is_scenario": parsed.get("is_scenario", False)}
+    intent = parsed.get("intent", "explicit")
+
+    # ---- Step 2: 查询改写（explicit / scenario 路径） ----
+    if intent in ("explicit", "scenario"):
+        n_rounds = settings.search.memory_recent_rounds
+        recent_queries = get_recent_queries(session_memory, n_rounds)
+        rewritten_query = await _rewrite_query(user_query, recent_queries, llm)
+    else:
+        rewritten_query = user_query
+
+    return {
+        "intent": intent,
+        "rewritten_query": rewritten_query,
+    }

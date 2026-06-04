@@ -19,8 +19,8 @@ from fastapi.staticfiles import StaticFiles
 from app.api import search, products, admin, conversation
 from app.config import settings
 from app.database import async_session
-from app.services.embedding import EmbeddingService
-from app.services.sync import SyncService
+from app.services.embedding_service import EmbeddingService
+from app.services.sync_service import SyncService
 from app.core.logging import setup_logging
 
 # 尽早初始化结构化日志，以便所有后续 logger 均被正确配置

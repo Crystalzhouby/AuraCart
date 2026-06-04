@@ -14,10 +14,14 @@ class AgentState(TypedDict):
 
     字段:
         user_query: 当前轮用户原始输入。
-        conversation_history: 对话历史，LangGraph add reducer 自动累加。
-        intent: "recommend" | "chat"。
-        is_scenario: True=场景化需求, False=明确商品需求。
-        requirements: {"sub_queries": [...]}，SubQuery 列表的容器。
+        conversation_history: 旧对话历史格式（LangGraph add reducer 自动累加）。
+            保留字段，新代码使用 session_memory。
+        rewritten_query: Router 改写后的用户查询。
+        session_memory: 新会话记忆 — 按 (category,sub_category) 分组的原始查询列表。
+            格式: [{category, sub_category, queries: [{query, timestamp}]}]
+        intent: "chat" | "explicit" | "scenario"。
+        requirements: 提取后的意图列表。
+            新格式: [{category, sub_category, text, min_price, max_price, order_num, brand}]。
         scenario_description: 场景原文，仅 Scenario 路径填写。
         retrieval_results: 各品类检索结果（完整 SKU 含 matched_texts）。
         chat_reply: Chit-Chat 输出文本。
@@ -28,9 +32,10 @@ class AgentState(TypedDict):
 
     user_query: str
     conversation_history: Annotated[list[dict], add]
+    rewritten_query: str
+    session_memory: list[dict]
     intent: str
-    is_scenario: bool
-    requirements: dict
+    requirements: list[dict]
     scenario_description: str | None
     retrieval_results: list[dict]
     chat_reply: str

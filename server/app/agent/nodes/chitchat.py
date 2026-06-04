@@ -6,7 +6,7 @@ Chit-Chat 节点 — 处理非导购相关的闲聊提问。
 """
 import structlog
 from app.agent.prompts.chitchat_prompt import CHITCHAT_SYSTEM
-from app.services.llm import LLMService
+from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.chitchat")
 

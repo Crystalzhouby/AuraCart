@@ -1,14 +1,15 @@
 # tests/test_merger.py
-"""测试 Merger 服务：RRF (Reciprocal Rank Fusion) 排名融合。
+"""测试 Merger 服务：加权 RRF (Reciprocal Rank Fusion) 排名融合。
 
 Merger 将 keyword 和 semantic 两路已排名的 SKUHit 列表
-通过 RRF 公式融合为单一排序结果。RRF 仅关心排名而非原始分数，
-天然适合异构检索源的融合。
+通过加权 RRF 公式融合为单一排序结果。
+
+加权 RRF: score = sw/(k + sem_rank) + kw/(k + kw_rank)
+默认权重: semantic=0.7, keyword=0.3, k=60
 """
 
 import pytest
-from app.services.retriever import SKUHit
-from app.rag.merger import Merger
+from app.services.retriever_service import SKUHit, Merger
 
 
 # ---------------------------------------------------------------------------
@@ -17,38 +18,41 @@ from app.rag.merger import Merger
 
 
 def test_merger_default_params():
-    """验证 Merger 默认使用 k=60 和 final_limit=10。"""
+    """验证 Merger 默认参数。"""
     merger = Merger()
     assert merger.rrf_k == 60
-    assert merger.final_limit == 10
+    assert merger.semantic_weight == 0.7
+    assert merger.keyword_weight == 0.3
+    assert merger.final_limit == 25
 
 
 def test_merger_custom_params():
-    """验证 Merger 接受自定义 rrf_k 和 final_limit。"""
-    merger = Merger(rrf_k=40, final_limit=5)
+    """验证 Merger 接受自定义参数。"""
+    merger = Merger(rrf_k=40, semantic_weight=0.8, keyword_weight=0.2, final_limit=5)
     assert merger.rrf_k == 40
+    assert merger.semantic_weight == 0.8
+    assert merger.keyword_weight == 0.2
     assert merger.final_limit == 5
 
 
 # ---------------------------------------------------------------------------
-# RRF 融合测试
+# 加权 RRF 融合测试
 # ---------------------------------------------------------------------------
 
 
 def test_rrf_basic():
-    """验证两组非重叠 SKU 的 RRF 融合。
+    """验证两组非重叠 SKU 的加权 RRF 融合。
 
     关键词路:   [SKU-A (rank=1), SKU-B (rank=2)]
     语义路:     [SKU-C (rank=1), SKU-D (rank=2)]
 
-    RRF 得分:
-      SKU-A: 1/(60+1) = 0.01639
-      SKU-B: 1/(60+2) = 0.01613
-      SKU-C: 1/(60+1) = 0.01639
-      SKU-D: 1/(60+2) = 0.01613
+    加权 RRF 得分（sw=0.7, kw=0.3）:
+      SKU-A: 0.3/(60+1) = 0.00492
+      SKU-B: 0.3/(60+2) = 0.00484
+      SKU-C: 0.7/(60+1) = 0.01148
+      SKU-D: 0.7/(60+2) = 0.01129
 
-    排序: SKU-A, SKU-C 并列第一，然后 SKU-B, SKU-D
-    (分数相同时按 sku_id 字典序)
+    排序: 语义路权重更高，SKU-C, SKU-D 排前面
     """
     merger = Merger(rrf_k=60)
 
@@ -64,21 +68,22 @@ def test_rrf_basic():
     result = merger.merge(keyword_ranked=kw, semantic_ranked=sem)
 
     assert len(result) == 4
-    assert result[0].sku_id in ("SKU-A", "SKU-C")
-    assert result[1].sku_id in ("SKU-A", "SKU-C")
-    assert result[2].sku_id in ("SKU-B", "SKU-D")
-    assert result[3].sku_id in ("SKU-B", "SKU-D")
+    # 语义路权重 0.7 > 关键词路权重 0.3，语义结果排前面
+    assert result[0].sku_id == "SKU-C"
+    assert result[1].sku_id == "SKU-D"
+    assert result[2].sku_id == "SKU-A"
+    assert result[3].sku_id == "SKU-B"
 
 
 def test_rrf_overlapping():
-    """验证同一 SKU 出现在两路时的 RRF 得分会累加。
+    """验证同一 SKU 出现在两路时的加权 RRF 得分会累加。
 
     关键词路: [SKU-X (rank=1), SKU-Y (rank=2)]
     语义路:   [SKU-X (rank=1)]
 
-    RRF 得分:
-      SKU-X: 1/(60+1) + 1/(60+1) = 0.03279
-      SKU-Y: 1/(60+2) = 0.01613
+    加权 RRF 得分:
+      SKU-X: 0.3/(60+1) + 0.7/(60+1) = 1.0/61 ≈ 0.01639
+      SKU-Y: 0.3/(60+2) ≈ 0.00484
 
     SKU-X 应在 SKU-Y 之前。
     """
@@ -100,7 +105,7 @@ def test_rrf_overlapping():
 
 
 def test_rrf_empty_keyword():
-    """验证关键词路为空时，仅返回语义路的结果（按 RRF 得分排序）。"""
+    """验证关键词路为空时，仅返回语义路的结果（按加权 RRF 得分排序）。"""
     merger = Merger(rrf_k=60)
 
     sem = [
@@ -160,9 +165,9 @@ def test_rrf_final_limit():
 
 
 def test_rrf_score_values():
-    """验证返回的 SKUHit.score 为正确的 RRF 得分。
+    """验证返回的 SKUHit.score 为正确的加权 RRF 得分。
 
-    单路单 SKU: RRF = 1/(60+1) ≈ 0.01639
+    关键词路单 SKU: RRF = 0.3/(60+1) ≈ 0.00492
     """
     merger = Merger(rrf_k=60)
 
@@ -173,4 +178,4 @@ def test_rrf_score_values():
     assert len(result) == 1
     assert result[0].sku_id == "SKU-1"
     assert result[0].product_id == "P1"
-    assert abs(result[0].score - (1.0 / 61.0)) < 0.0001
+    assert abs(result[0].score - (0.3 / 61.0)) < 0.0001

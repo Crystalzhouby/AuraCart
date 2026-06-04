@@ -26,14 +26,26 @@ llm:
 # ---- 检索 ----
 search:
   rrf_k: 60
+  # 新分段检索参数
+  semantic_top_k: 25
+  keyword_top_k: 25
+  rrf_semantic_weight: 0.7
+  rrf_keyword_weight: 0.3
+  rrf_top_k: 25
+  rerank_top_k: 5
+  max_reviews_per_product: 5
+  memory_recent_rounds: 10
+  # 旧参数（向后兼容，逐步废弃）
   top_k_per_query: 20
   final_sku_limit: 10
+  # 不变参数
   max_match_texts_per_sku: 3
   max_match_chars_per_sku: 500
   source_weights:
     marketing: 1.0
     faq: 1.0
     user_review: 0.7
+    property: 1.0
   reasoning_max_chars: 500
   max_category_concurrency: 5
   max_batch_ids: 20
@@ -58,4 +70,12 @@ timeout:
   query_parse: 30.0
   retrieval: 1.0
   generation: 60.0
+  rerank: 5.0
   total_request: 60.0
+
+# ---- 精排模型 ----
+reranker:
+  base_url: "https://api.siliconflow.cn/v1"
+  api_key: ""  # 请在 .secrets.yaml 中设置，或通过 RERANKER_API_KEY 环境变量
+  model: "BAAI/bge-reranker-v2-m3"
+  timeout: 5.0

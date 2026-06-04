@@ -9,7 +9,7 @@ negation 字段已移除，否定语义由 operator 值表达。
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from app.services.query_parser import QueryParser, SubQuery
+from app.services.query_parser_service import QueryParser, SubQuery
 
 
 def test_parse_llm_response():

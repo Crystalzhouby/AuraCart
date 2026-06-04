@@ -7,7 +7,7 @@ Retriever 针对每个 SubQuery，通过相应的数据库查询（pgvector
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from app.services.retriever import Retriever, SubQuery
+from app.services.retriever_service import Retriever, SubQuery
 
 
 def test_subquery_no_negation_field():
@@ -109,7 +109,7 @@ async def test_retrieve_semantic(mock_db, mock_emb):
     - 查询数据库中相似的 product_review 行。
     - 返回 SKUHit 列表。
     """
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -136,7 +136,7 @@ async def test_retrieve_keyword(mock_db, mock_emb):
     - 不应调用 embed()（关键词无需向量化）。
     - 返回以归一化 rank 作为 score 的 SKUHit 结果。
     """
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -186,7 +186,7 @@ async def test_retrieve_keyword_fallback(mock_db, mock_emb):
     使用 ILIKE 模式对 brand、category 和 title 列进行模糊匹配。
     本测试断言 execute() 在 tsvector 尝试（chinese + simple）后再进行降级查询。
     """
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -243,7 +243,7 @@ def test_retrieve_structured_lt_price():
 
     assert len(filters.conditions) == 1
     assert filters.conditions[0].table == "sku"
-    assert "s.price < :val" == filters.conditions[0].sql
+    assert "s.price < :fv0" == filters.conditions[0].sql
 
 
 def test_retrieve_structured_not_contains():
@@ -270,7 +270,7 @@ def test_retrieve_structured_not_contains():
 
 def test_skuhit_creation():
     """验证 SKUHit 数据类正确存储 sku_id、product_id 和 score。"""
-    from app.services.retriever import SKUHit
+    from app.services.retriever_service import SKUHit
 
     hit = SKUHit(sku_id="SKU001", product_id="PROD001", score=0.95)
     assert hit.sku_id == "SKU001"
@@ -280,7 +280,7 @@ def test_skuhit_creation():
 
 def test_skuhit_defaults():
     """验证 SKUHit 所有字段均为必填（无默认值），确保调用方显式传参。"""
-    from app.services.retriever import SKUHit
+    from app.services.retriever_service import SKUHit
 
     hit = SKUHit(sku_id="SKU002", product_id="PROD002", score=0.0)
     assert hit.score == 0.0
@@ -288,7 +288,7 @@ def test_skuhit_defaults():
 
 def test_filter_clause_creation():
     """验证 FilterClause 数据类正确存储 table、sql 和 params。"""
-    from app.services.retriever import FilterClause
+    from app.services.retriever_service import FilterClause
 
     fc = FilterClause(
         table="product",
@@ -302,7 +302,7 @@ def test_filter_clause_creation():
 
 def test_filters_empty():
     """验证 Filters 数据类初始化为空的 conditions 列表。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     f = Filters(conditions=[])
     assert f.conditions == []
@@ -310,7 +310,7 @@ def test_filters_empty():
 
 def test_filters_with_clauses():
     """验证 Filters 数据类正确聚合多个 FilterClause。"""
-    from app.services.retriever import Filters, FilterClause
+    from app.services.retriever_service import Filters, FilterClause
 
     fc1 = FilterClause(table="product", sql="p.brand = :v0", params={"v0": "Nike"})
     fc2 = FilterClause(table="sku", sql="s.price < :val", params={"val": 200})
@@ -334,7 +334,7 @@ def retriever_without_db():
 
 def test_extract_filters_empty_subs(retriever_without_db):
     """验证空列表返回空 Filters。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     result = retriever_without_db._extract_filters([])
     assert isinstance(result, Filters)
@@ -367,8 +367,8 @@ def test_extract_filters_brand_not_in(retriever_without_db):
     fc = result.conditions[0]
     assert fc.table == "product"
     assert "p.brand NOT IN" in fc.sql
-    assert fc.params["v0"] == "SK-II"
-    assert fc.params["v1"] == "资生堂"
+    assert fc.params["fv0_0"] == "SK-II"
+    assert fc.params["fv0_1"] == "资生堂"
 
 
 def test_extract_filters_price_lt(retriever_without_db):
@@ -386,8 +386,8 @@ def test_extract_filters_price_lt(retriever_without_db):
     assert len(result.conditions) == 1
     fc = result.conditions[0]
     assert fc.table == "sku"
-    assert "s.price < :val" == fc.sql
-    assert fc.params["val"] == 200
+    assert "s.price < :fv0" == fc.sql
+    assert fc.params["fv0"] == 200
 
 
 def test_extract_filters_brand_in(retriever_without_db):
@@ -406,8 +406,8 @@ def test_extract_filters_brand_in(retriever_without_db):
     fc = result.conditions[0]
     assert fc.table == "product"
     assert "p.category IN" in fc.sql
-    assert fc.params["v0"] == "美妆护肤"
-    assert fc.params["v1"] == "个人护理"
+    assert fc.params["fv0_0"] == "美妆护肤"
+    assert fc.params["fv0_1"] == "个人护理"
 
 
 def test_extract_filters_contains(retriever_without_db):
@@ -426,7 +426,7 @@ def test_extract_filters_contains(retriever_without_db):
     fc = result.conditions[0]
     assert fc.table == "product"
     assert "ILIKE" in fc.sql
-    assert "资生" in fc.params["pat"]
+    assert "资生" in fc.params["fv0"]
 
 
 def test_extract_filters_mixed(retriever_without_db):
@@ -469,7 +469,7 @@ def test_extract_filters_unknown_field(retriever_without_db):
 
 def test_build_base_query_no_filters():
     """验证无 filter 时构建仅包含活跃条件的三表 JOIN SQL 骨架。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=MagicMock(), emb=MagicMock())
     filters = Filters(conditions=[])
@@ -484,7 +484,7 @@ def test_build_base_query_no_filters():
 
 def test_build_base_query_with_product_filter():
     """验证含 product 表 FilterClause 时 WHERE 子句包含 product 条件。"""
-    from app.services.retriever import Filters, FilterClause
+    from app.services.retriever_service import Filters, FilterClause
 
     retriever = Retriever(db=MagicMock(), emb=MagicMock())
     fc = FilterClause(
@@ -501,7 +501,7 @@ def test_build_base_query_with_product_filter():
 
 def test_build_base_query_with_sku_filter():
     """验证含 sku 表 FilterClause 时 WHERE 子句包含 sku 条件。"""
-    from app.services.retriever import Filters, FilterClause
+    from app.services.retriever_service import Filters, FilterClause
 
     retriever = Retriever(db=MagicMock(), emb=MagicMock())
     fc = FilterClause(
@@ -518,7 +518,7 @@ def test_build_base_query_with_sku_filter():
 
 def test_build_base_query_multiple_filters():
     """验证同时含 product 和 sku FilterClause 时 WHERE 用 AND 连接。"""
-    from app.services.retriever import Filters, FilterClause
+    from app.services.retriever_service import Filters, FilterClause
 
     retriever = Retriever(db=MagicMock(), emb=MagicMock())
     fc1 = FilterClause(table="product", sql="p.brand = :v0", params={"v0": "Nike"})
@@ -533,7 +533,7 @@ def test_build_base_query_multiple_filters():
 
 def test_build_base_query_score_expr_injection():
     """验证不同 score_expr 被正确注入 SELECT 子句。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=MagicMock(), emb=MagicMock())
     sql = retriever._build_base_query(Filters(conditions=[]), "SUM(1-(pr.embedding <=> :vec)) AS score")
@@ -549,7 +549,7 @@ def test_build_base_query_score_expr_injection():
 @pytest.mark.asyncio
 async def test_keyword_search_returns_skuhits(mock_db, mock_emb):
     """验证 _keyword_search 返回 list[SKUHit] 格式，score 为 ts_rank 值。"""
-    from app.services.retriever import Filters, SKUHit
+    from app.services.retriever_service import Filters, SKUHit
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -573,7 +573,7 @@ async def test_keyword_search_returns_skuhits(mock_db, mock_emb):
 @pytest.mark.asyncio
 async def test_keyword_search_applies_filters(mock_db, mock_emb):
     """验证 _keyword_search 在 SQL 中包含 FilterClause 的硬约束条件。"""
-    from app.services.retriever import Filters, FilterClause
+    from app.services.retriever_service import Filters, FilterClause
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -596,7 +596,7 @@ async def test_keyword_search_applies_filters(mock_db, mock_emb):
 @pytest.mark.asyncio
 async def test_keyword_search_tsv_fallback(mock_db, mock_emb):
     """验证 tsvector 无结果时降级为 ILIKE，并返回 list[SKUHit]。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -626,7 +626,7 @@ async def test_keyword_search_tsv_fallback(mock_db, mock_emb):
 @pytest.mark.asyncio
 async def test_semantic_search_single_sub(mock_db, mock_emb):
     """验证单条 semantic 子查询返回 list[SKUHit]，embed 被调用一次。"""
-    from app.services.retriever import Filters, SKUHit
+    from app.services.retriever_service import Filters, SKUHit
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -649,7 +649,7 @@ async def test_semantic_search_single_sub(mock_db, mock_emb):
 @pytest.mark.asyncio
 async def test_semantic_search_multi_sub(mock_db, mock_emb):
     """验证多条 semantic 子查询时每条都被 embed，sum 得分汇总到单个 SQL。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -674,7 +674,7 @@ async def test_semantic_search_multi_sub(mock_db, mock_emb):
 @pytest.mark.asyncio
 async def test_semantic_search_applies_filters(mock_db, mock_emb):
     """验证 _semantic_search 将 FilterClause 硬约束注入 SQL。"""
-    from app.services.retriever import Filters, FilterClause
+    from app.services.retriever_service import Filters, FilterClause
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -760,7 +760,7 @@ class TestBuildWeightExpr:
 @pytest.mark.asyncio
 async def test_semantic_search_includes_weight_expr(mock_db, mock_emb):
     """验证 _semantic_search SQL 中包含 CASE WHEN 权重表达式。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -786,7 +786,7 @@ async def test_semantic_search_includes_weight_expr(mock_db, mock_emb):
 @pytest.mark.asyncio
 async def test_semantic_search_weight_params_bound(mock_db, mock_emb):
     """验证权重参数被绑定到 SQL 参数中。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -814,7 +814,7 @@ async def test_semantic_search_weight_params_bound(mock_db, mock_emb):
 @pytest.mark.asyncio
 async def test_keyword_search_includes_weight_expr(mock_db, mock_emb):
     """验证 ts_rank 路径的 SQL 中包含 CASE WHEN 权重表达式。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -837,7 +837,7 @@ async def test_keyword_search_includes_weight_expr(mock_db, mock_emb):
 @pytest.mark.asyncio
 async def test_keyword_search_weight_params_bound(mock_db, mock_emb):
     """验证 keyword 检索的参数中包含权重值。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
@@ -859,7 +859,7 @@ async def test_keyword_search_weight_params_bound(mock_db, mock_emb):
 @pytest.mark.asyncio
 async def test_keyword_fallback_includes_weight_expr(mock_db, mock_emb):
     """验证 ILIKE 降级路径的 SQL 中也包含权重表达式。"""
-    from app.services.retriever import Filters
+    from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
