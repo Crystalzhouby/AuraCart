@@ -9,6 +9,7 @@ import com.ecomguide.model.ApiProduct
 import com.ecomguide.model.ChatStreamEvent
 import com.ecomguide.model.HistoryItem
 import com.ecomguide.model.MessageItem
+import com.ecomguide.model.ScenarioCard
 import com.ecomguide.network.ChatStreamClient
 import com.ecomguide.repository.DemoProducts
 import com.google.gson.Gson
@@ -75,7 +76,8 @@ class ChatViewModel : ViewModel() {
     private data class LocalReply(
         val aiText: String,
         val products: List<ApiProduct> = emptyList(),
-        val followTags: List<String> = emptyList()
+        val followTags: List<String> = emptyList(),
+        val scenarioCards: List<ScenarioCard> = emptyList()   // 场景推荐卡片
     )
 
     /**
@@ -109,12 +111,22 @@ class ChatViewModel : ViewModel() {
                     listOf("哪个性价比更高？", "安卓用户选哪款？")
                 )
 
+            // ── 场景推荐：连衣裙 / 穿搭 / 春装 — 返回场景卡片 ───────────────
+            listOf("连衣裙", "春装", "春游", "穿搭", "裙子", "法式").any { t.contains(it) } ->
+                LocalReply(
+                    aiText = "春游穿搭讲究的就是轻便好看还得上镜！结合你之前挑的那几款基础款风格，帮你整理了几个超实用的春游look～",
+                    products = DemoProducts.sportsProducts,
+                    followTags = listOf("亮点点结", "PK 对比", "选款建议", "参数解读"),
+                    scenarioCards = listOf(DemoProducts.scenarioSpringDress, DemoProducts.scenarioSpringOutfit)
+                )
+
             // 精华 / 护肤
             beautyKw.any { t.contains(it) } ->
                 LocalReply(
                     "为你精选以下热门精华，均来自品牌授权商品库 ✨",
                     DemoProducts.beautyProducts,
-                    listOf("帮我对比这几款", "哪款适合敏感肌？", "有平价替代吗？")
+                    listOf("帮我对比这几款", "哪款适合敏感肌？", "有平价替代吗？"),
+                    scenarioCards = listOf(DemoProducts.scenarioAntiAging)
                 )
 
             // 耳机 / 蓝牙 / 降噪
@@ -122,7 +134,8 @@ class ChatViewModel : ViewModel() {
                 LocalReply(
                     "推荐两款旗舰级降噪耳机，音质和降噪都是天花板级别 🎧",
                     DemoProducts.digitalProducts,
-                    listOf("哪个降噪更强？", "适合苹果用户吗？", "运动时能用吗？")
+                    listOf("哪个降噪更强？", "适合苹果用户吗？", "运动时能用吗？"),
+                    scenarioCards = listOf(DemoProducts.scenarioHeadphone)
                 )
 
             // 跑鞋 / 运动
@@ -138,7 +151,8 @@ class ChatViewModel : ViewModel() {
                 LocalReply(
                     "这是今日热门好物推荐，覆盖美妆、数码、运动三大类 🛍️",
                     listOf(DemoProducts.beauty001, DemoProducts.digital007, DemoProducts.clothes007),
-                    listOf("看更多美妆", "推荐耳机", "推荐跑鞋")
+                    listOf("看更多美妆", "推荐耳机", "推荐跑鞋"),
+                    scenarioCards = DemoProducts.allScenarioCards.take(2)
                 )
 
             else -> null  // 未命中，交给后端 SSE 处理
@@ -147,26 +161,88 @@ class ChatViewModel : ViewModel() {
 
     /**
      * 以流式效果投递本地回复（模拟打字机效果）。
-     * 将回复文本按每 6 字符分块，每块延迟 60ms 推送，营造真实流式感。
+     *
+     * 统一使用 ScenarioReply：
+     * - 有场景卡片：文字 + 场景卡片 + 商品卡片都在同一 AI 气泡内
+     * - 无场景卡片：文字 + 商品卡片也在同一 AI 气泡内
+     *
+     * 追问标签仍作为独立 FollowTags 消息，显示在气泡外。
      */
     private fun deliverLocalReply(reply: LocalReply, userText: String) {
         // 移除 Typing
         removeLast<MessageItem.Typing>()
-        // 逐字流式效果（分段添加 AI 文本）
-        val chunks = reply.aiText.chunked(6)
-        var built = ""
-        addItem(MessageItem.AiMsg(chunks.firstOrNull() ?: "", isStreaming = true))
-        val aiIdx = currentList().lastIndex
 
-        chunks.drop(1).forEachIndexed { i, chunk ->
+        // ── 有场景卡片：合并为一条 ScenarioReply ────────────────────────────
+        if (reply.scenarioCards.isNotEmpty()) {
+            // 流式文字效果
+            val chunks = reply.aiText.chunked(6)
+            addItem(MessageItem.ScenarioReply(
+                text = chunks.firstOrNull() ?: "",
+                scenarioCards = emptyList<ScenarioCard>(),   // 先不显示卡片，等流式结束
+                products = reply.products,
+                followTags = reply.followTags
+            ))
+            val replyIdx = currentList().lastIndex
+
+            chunks.drop(1).forEachIndexed { i, chunk ->
+                mainHandler.postDelayed({
+                    val list = currentList()
+                    if (replyIdx < list.size) {
+                        val prev = list[replyIdx] as? MessageItem.ScenarioReply ?: return@postDelayed
+                        list[replyIdx] = prev.copy(
+                            text = reply.aiText.take(chunks.take(i + 2).sumOf { it.length })
+                        )
+                        _messages.value = list
+                    }
+                }, (i + 1) * 60L)
+            }
+
+            // 流式结束后一次性展示完整内容（含场景卡片）
+            val totalDelay = chunks.size * 60L + 100L
             mainHandler.postDelayed({
                 val list = currentList()
-                if (aiIdx < list.size) {
-                    built += chunk
-                    val prev = list[aiIdx] as? MessageItem.AiMsg ?: return@postDelayed
-                    list[aiIdx] = prev.copy(text = reply.aiText.take(
-                        chunks.take(i + 2).sumOf { it.length }
-                    ), isStreaming = i < chunks.size - 2)
+                if (replyIdx < list.size) {
+                    val prev = list[replyIdx] as? MessageItem.ScenarioReply ?: return@postDelayed
+                    list[replyIdx] = prev.copy(
+                        text = reply.aiText,
+                        scenarioCards = reply.scenarioCards,   // ← 展示场景卡片
+                        products = reply.products,
+                        followTags = reply.followTags
+                    )
+                    _messages.value = list
+                }
+                _isStreaming.value = false
+                history.add(HistoryItem("user", userText))
+                history.add(HistoryItem("assistant", reply.aiText))
+
+                // 追问标签作为独立消息追加到气泡外
+                if (reply.followTags.isNotEmpty()) {
+                    addItem(MessageItem.FollowTags(reply.followTags))
+                }
+            }, totalDelay)
+            return
+        }
+
+        // ── 无场景卡片：仍使用 ScenarioReply，保证商品卡片展示在同一对话气泡内 ─────────
+        val chunks = reply.aiText.chunked(6)
+        addItem(
+            MessageItem.ScenarioReply(
+                text = chunks.firstOrNull() ?: "",
+                scenarioCards = emptyList(),
+                products = emptyList(),   // 先不显示商品卡片，等流式文字结束后展示
+                followTags = reply.followTags
+            )
+        )
+        val replyIdx = currentList().lastIndex
+
+        chunks.drop(1).forEachIndexed { i, _ ->
+            mainHandler.postDelayed({
+                val list = currentList()
+                if (replyIdx < list.size) {
+                    val prev = list[replyIdx] as? MessageItem.ScenarioReply ?: return@postDelayed
+                    list[replyIdx] = prev.copy(
+                        text = reply.aiText.take(chunks.take(i + 2).sumOf { it.length })
+                    )
                     _messages.value = list
                 }
             }, (i + 1) * 60L)
@@ -174,16 +250,19 @@ class ChatViewModel : ViewModel() {
 
         val totalDelay = chunks.size * 60L + 100L
         mainHandler.postDelayed({
-            // 添加商品卡片
-            if (reply.products.isNotEmpty()) addItem(MessageItem.ProductCards(reply.products))
-            // 添加追问标签
-            if (reply.followTags.isNotEmpty()) addItem(MessageItem.FollowTags(reply.followTags))
-            // 结束流式状态
             val list = currentList()
-            (list.getOrNull(aiIdx) as? MessageItem.AiMsg)?.let {
-                list[aiIdx] = it.copy(isStreaming = false)
+            if (replyIdx < list.size) {
+                val prev = list[replyIdx] as? MessageItem.ScenarioReply ?: return@postDelayed
+                list[replyIdx] = prev.copy(
+                    text = reply.aiText,
+                    scenarioCards = emptyList(),
+                    products = reply.products,
+                    followTags = reply.followTags
+                )
                 _messages.value = list
             }
+
+            if (reply.followTags.isNotEmpty()) addItem(MessageItem.FollowTags(reply.followTags))
             _isStreaming.value = false
             history.add(HistoryItem("user", userText))
             history.add(HistoryItem("assistant", reply.aiText))

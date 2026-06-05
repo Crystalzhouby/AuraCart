@@ -17,6 +17,7 @@ import com.ecomguide.model.UserReview
 import com.ecomguide.network.RetrofitClient
 import com.ecomguide.repository.CartRepository
 import com.ecomguide.ui.cart.CartActivity
+import com.ecomguide.ui.detail.HalfScreenProductDetailActivity
 import com.google.android.material.chip.Chip
 import kotlinx.coroutines.launch
 
@@ -42,10 +43,12 @@ class ProductDetailActivity : AppCompatActivity() {
         b.btnDetailCart.setOnClickListener {
             startActivity(android.content.Intent(this, CartActivity::class.java))
         }
-        b.btnAddToCart.setOnClickListener { addToCart() }
+        // 全屏详情页底部“加入购物车”改为进入半屏加入购物车页
+        b.btnAddToCart.setOnClickListener {
+            product?.let { p -> HalfScreenProductDetailActivity.start(this, p) }
+        }
         b.btnBuyNow.setOnClickListener {
-            addToCart()
-            Toast.makeText(this, getString(R.string.toast_buy_success), Toast.LENGTH_SHORT).show()
+            product?.let { p -> HalfScreenProductDetailActivity.start(this, p) }
         }
 
         // Fetch full product details (FAQ + reviews) from API

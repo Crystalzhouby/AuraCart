@@ -12,13 +12,17 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.ecomguide.R
 import com.ecomguide.databinding.FragmentChatBinding
 import com.ecomguide.model.ApiProduct
+import com.ecomguide.model.ScenarioCard
 import com.ecomguide.repository.CartRepository
+import com.ecomguide.ui.detail.CategoryProductsActivity
+import com.ecomguide.ui.detail.HalfScreenProductDetailActivity
 import com.ecomguide.ui.detail.ProductDetailActivity
 import com.google.android.material.chip.Chip
 import java.util.Calendar
@@ -136,7 +140,9 @@ class ChatFragment : Fragment() {
                 CartRepository.add(product)
                 Toast.makeText(requireContext(), "✅ 已加入购物车", Toast.LENGTH_SHORT).show()
             },
-            onTagClick = { tag -> sendMessage(tag) }
+            onTagClick     = { tag -> sendMessage(tag) },
+            onScenarioClick = { card -> openCategoryProducts(card) },
+            onHorizontalProductClick = { product -> openHalfScreenDetail(product) }
         )
         b.rvMessages.apply {
             adapter = messageAdapter
@@ -189,6 +195,16 @@ class ChatFragment : Fragment() {
         startActivity(Intent(requireContext(), ProductDetailActivity::class.java).apply {
             putExtra(ProductDetailActivity.EXTRA_PRODUCT, product)
         })
+    }
+
+    /** 点击场景推荐卡片 → 跳转到品类商品落地页 */
+    private fun openCategoryProducts(card: ScenarioCard) {
+        CategoryProductsActivity.start(requireContext(), card)
+    }
+
+    /** 点击聊天内横向商品卡片 → 跳转半屏商品详情页 */
+    private fun openHalfScreenDetail(product: ApiProduct) {
+        HalfScreenProductDetailActivity.start(requireActivity() as AppCompatActivity, product)
     }
 
     override fun onDestroyView() {

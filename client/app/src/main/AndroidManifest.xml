@@ -28,6 +28,20 @@
             android:exported="false"
             android:parentActivityName=".ui.MainActivity" />
 
+        <!-- Category products page (场景推荐落地页) -->
+        <activity
+            android:name=".ui.detail.CategoryProductsActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Half-screen product detail page (半屏商品详情页) -->
+        <activity
+            android:name=".ui.detail.HalfScreenProductDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.EcomGuide"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Shopping cart -->
         <activity
             android:name=".ui.cart.CartActivity"
