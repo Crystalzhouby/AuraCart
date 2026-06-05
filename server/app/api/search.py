@@ -67,12 +67,12 @@ def get_llm_service() -> LLMService:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/search")
+@router.get("/search/{conversation_id}")
 async def search(
     request: Request,
+    conversation_id: str,
     q: str = Query(..., min_length=1, description="搜索查询字符串"),
     stream: bool = Query(True, description="是否开启 SSE 流式回答，默认 True"),
-    conversation_id: str | None = Query(None, description="会话ID，用于多轮对话记忆"),
     db: AsyncSession = Depends(get_db),
     emb: EmbeddingService = Depends(get_embedding_service),
     llm: LLMService = Depends(get_llm_service),
@@ -86,13 +86,13 @@ async def search(
       3. Retrieval — 多策略检索 + RRF 融合
       4. OptionGen — 生成后续选项
 
-    接口: GET /api/search?q=...&stream=true
+    接口: GET /api/search/{conversation_id}?q=...&stream=true
 
     参数:
         request (Request):       FastAPI Request 对象，用于连接管理。
+        conversation_id (str):    会话ID（路径参数，必填），用于多轮对话记忆。
         q (str):                 用户提供的搜索查询字符串。
         stream (bool):           是否以 SSE 流式返回；保留参数向后兼容，始终走 Agent 工作流。
-        conversation_id (str|None): 会话ID，用于多轮对话记忆。
         db (AsyncSession):       通过依赖注入获取的异步 SQLAlchemy 会话。
         emb (EmbeddingService):  通过依赖注入获取的嵌入服务。
         llm (LLMService):        通过依赖注入获取的 LLM 服务。
@@ -149,20 +149,20 @@ async def _agent_event_stream(
     graph,
     queue: asyncio.Queue,
     total_timeout: float = 60.0,
-    conversation_id: str | None = None,
+    conversation_id: str = "",
 ):
     """LangGraph Agent 工作流的 SSE 事件消费循环。
 
     启动 graph.ainvoke 作为后台任务，消费 Queue 中的 SSE 事件，
-    在完成后发送 next_options。若传入 conversation_id，则从 DB
-    加载历史记忆注入初始状态，并在图执行完成后写回。
+    在完成后发送 next_options。先从 DB 校验 conversation_id 并加载
+    历史记忆注入初始状态，在图执行完成后写回。
 
     参数:
         user_query: 用户查询字符串。
         graph: 编译后的 LangGraph StateGraph。
         queue: 节点间传递 SSE 事件的 asyncio.Queue。
         total_timeout: 总体超时（秒），默认 60s。
-        conversation_id: 可选会话 ID，用于多轮对话记忆持久化。
+        conversation_id: 会话 ID，用于多轮对话记忆持久化。
 
     Yields:
         dict: SSE 事件 {"event": str, "data": str}。
@@ -171,40 +171,41 @@ async def _agent_event_stream(
 
     stream_log = structlog.get_logger("agent_stream")
 
-    # ---- 加载会话记忆 ----
+    # ---- 校验 conversation 存在性 + 加载会话记忆 ----
     initial_session_memory: list[dict] = []
-    if conversation_id:
-        try:
-            from app.database import async_session
-            from sqlalchemy import select
-            from app.models.conversation import Conversation
+    try:
+        from app.database import async_session
+        from sqlalchemy import select
+        from app.models.conversation import Conversation
 
-            async with async_session() as session:
-                result = await session.execute(
-                    select(Conversation.memory).where(
-                        Conversation.conversation_id == conversation_id
-                    )
+        async with async_session() as session:
+            result = await session.execute(
+                select(Conversation.memory).where(
+                    Conversation.conversation_id == conversation_id
                 )
-                row = result.scalar_one_or_none()
-                if row is not None:
-                    # asyncpg JSONB → Python list[dict] 自动反序列化
-                    initial_session_memory = row
-                    stream_log.debug(
-                        "会话记忆已加载",
-                        conversation_id=conversation_id,
-                        groups=len(initial_session_memory),
-                    )
-                else:
-                    stream_log.warning(
-                        "会话不存在，降级为空记忆",
-                        conversation_id=conversation_id,
-                    )
-        except Exception as e:
-            stream_log.warning(
-                "加载会话记忆失败，降级为空记忆",
-                conversation_id=conversation_id,
-                error=str(e),
             )
+            row = result.scalar_one_or_none()
+            if row is None:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"detail": "conversation not found"}),
+                }
+                yield {"event": "done", "data": "{}"}
+                return
+            # asyncpg JSONB → Python list[dict] 自动反序列化
+            initial_session_memory = row
+            stream_log.debug(
+                "会话记忆已加载",
+                conversation_id=conversation_id,
+                groups=len(initial_session_memory),
+            )
+    except Exception as e:
+        yield {
+            "event": "error",
+            "data": json.dumps({"detail": str(e)}),
+        }
+        yield {"event": "done", "data": "{}"}
+        return
 
     # 构建初始状态
     initial_state: AgentState = {
@@ -300,7 +301,7 @@ async def _agent_event_stream(
                 pass
 
         # ---- 持久化会话记忆 ----
-        if conversation_id and final_state:
+        if final_state:
             try:
                 from app.database import async_session
                 from sqlalchemy.dialects.postgresql import insert as pg_insert

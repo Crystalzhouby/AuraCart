@@ -15,30 +15,30 @@ from app.services.retriever_service import SKUHit
 
 @pytest.mark.asyncio
 async def test_search_sse_route_exists():
-    """验证 GET /api/search?q=...&stream=true 是已注册的路由（SSE 模式）。
+    """验证 GET /api/search/{conversation_id}?q=...&stream=true 是已注册的路由（SSE 模式）。
 
     根据下游服务是否运行，预期返回 200（成功）、500（内部错误）或 503（不可用）。
     """
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         try:
-            resp = await client.get("/api/search?q=防晒霜&stream=true")
-            assert resp.status_code in (200, 500, 503)
+            resp = await client.get("/api/search/test-cid?q=防晒霜&stream=true")
+            assert resp.status_code in (200, 404, 500, 503)
         except Exception:
             pass
 
 
 @pytest.mark.asyncio
 async def test_search_nonstream_route_exists():
-    """验证 GET /api/search?q=...&stream=false 是已注册的路由（JSON 模式）。
+    """验证 GET /api/search/{conversation_id}?q=...&stream=false 是已注册的路由（JSON 模式）。
 
     根据下游服务是否运行，预期返回 200（成功）、500（内部错误）或 503（不可用）。
     """
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         try:
-            resp = await client.get("/api/search?q=防晒霜&stream=false")
-            assert resp.status_code in (200, 500, 503)
+            resp = await client.get("/api/search/test-cid?q=防晒霜&stream=false")
+            assert resp.status_code in (200, 404, 500, 503)
         except Exception:
             pass
 

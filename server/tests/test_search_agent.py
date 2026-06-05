@@ -9,12 +9,36 @@
 import json
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, ANY
 
 # Mock 重依赖避免在无 langgraph 环境崩溃
 import sys
 sys.modules["langgraph"] = MagicMock()
 sys.modules["langgraph.graph"] = MagicMock()
+
+_TEST_CONVERSATION_ID = "550e8400-e29b-41d4-a716-446655440000"
+
+
+def _create_mock_db_session(memory=None):
+    """创建 mock DB session，模拟 conversation 查询返回 memory 记录。"""
+    if memory is None:
+        memory = []
+    mock_row = memory
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_row
+    mock_session = MagicMock()
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    return mock_session
+
+
+@pytest.fixture(autouse=True)
+def _mock_conversation_db():
+    """所有测试自动 mock conversation DB 查询。"""
+    mock_session = _create_mock_db_session()
+    with patch("app.database.async_session", return_value=mock_session):
+        yield
 
 
 # ---------------------------------------------------------------------------
@@ -46,6 +70,7 @@ async def test_event_stream_yields_done_on_completion():
             graph=mock_graph,
             queue=queue,
             total_timeout=5.0,
+            conversation_id=_TEST_CONVERSATION_ID,
         ):
             events.append(event)
     except Exception as e:
@@ -73,6 +98,7 @@ async def test_event_stream_sends_next_options_after_done():
     events = []
     async for event in _agent_event_stream(
         user_query="test", graph=mock_graph, queue=queue, total_timeout=5.0,
+        conversation_id=_TEST_CONVERSATION_ID,
     ):
         events.append(event)
 
@@ -99,6 +125,7 @@ async def test_event_stream_sends_error_on_timeout():
     async for event in _agent_event_stream(
         user_query="test", graph=mock_graph, queue=queue,
         total_timeout=0.1,  # 100ms timeout
+        conversation_id=_TEST_CONVERSATION_ID,
     ):
         events.append(event)
 
@@ -122,6 +149,7 @@ async def test_event_stream_handles_graph_exception():
     try:
         async for event in _agent_event_stream(
             user_query="test", graph=mock_graph, queue=queue, total_timeout=5.0,
+            conversation_id=_TEST_CONVERSATION_ID,
         ):
             events.append(event)
     except Exception:
@@ -148,6 +176,7 @@ async def test_agent_event_stream_includes_next_options_when_present():
     events = []
     async for event in _agent_event_stream(
         user_query="test", graph=mock_graph, queue=queue, total_timeout=5.0,
+        conversation_id=_TEST_CONVERSATION_ID,
     ):
         events.append(event)
 
@@ -155,6 +184,36 @@ async def test_agent_event_stream_includes_next_options_when_present():
     assert len(next_opt_events) == 1
     data = json.loads(next_opt_events[0]["data"])
     assert data == ["A", "B", "C"]
+
+
+@pytest.mark.asyncio
+async def test_event_stream_returns_error_when_conversation_not_found():
+    """conversation 不存在时应返回 error + done 事件。"""
+    queue = asyncio.Queue()
+
+    mock_graph = MagicMock()
+
+    # 模拟 DB 返回 None（conversation 不存在）
+    mock_row = None
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_row
+    mock_session = MagicMock()
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("app.database.async_session", return_value=mock_session):
+        events = []
+        async for event in _agent_event_stream(
+            user_query="test", graph=mock_graph, queue=queue, total_timeout=5.0,
+            conversation_id="non-existent-uuid",
+        ):
+            events.append(event)
+
+    event_types = [e["event"] for e in events]
+    assert event_types == ["error", "done"]
+    error_data = json.loads(events[0]["data"])
+    assert error_data["detail"] == "conversation not found"
 
 
 # ---------------------------------------------------------------------------

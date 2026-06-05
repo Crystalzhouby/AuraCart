@@ -781,7 +781,6 @@ SSE 事件（品类顺序式，由 retrieval_node 统一发送）:
 ### Memory 隔离
 
 Memory 根据 `conversation_id` 分别存储和检索：
-
 ```
 Memory Store: {conversation_id → session_memory}
 
