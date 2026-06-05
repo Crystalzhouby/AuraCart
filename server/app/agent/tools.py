@@ -239,3 +239,88 @@ async def query_field_values(
         return []
 
     return [row[0] for row in rows]
+
+
+async def get_brands_by_category(
+    db: AsyncSession,
+    category: str | None,
+    sub_category: str | None,
+) -> list[str]:
+    """查询指定品类下的品牌列表（单品类便捷封装）。
+
+    参数:
+        db: 异步 SQLAlchemy 会话。
+        category: 品类大类。为 None 时不加过滤。
+        sub_category: 品类细类。为 None 时不加过滤。
+
+    返回值:
+        品牌名列表（去重）。全部为 None 时返回全部品牌。
+    """
+    filters = {}
+    if category:
+        filters["category"] = category
+    if sub_category:
+        filters["sub_category"] = sub_category
+    return await query_field_values(db, "product", "brand", filters)
+
+
+async def get_brands_by_categories(
+    db: AsyncSession,
+    pairs: list[tuple[str, str]],
+) -> dict[tuple[str, str], list[str]]:
+    """批量查询多个品类的品牌列表。
+
+    一次 SQL 查询全部品牌，按 (category, sub_category) 分组后
+    每品类截断 top-20（按商品数量降序）。
+
+    参数:
+        db: 异步 SQLAlchemy 会话。
+        pairs: (category, sub_category) 元组列表。
+
+    返回值:
+        {(category, sub_category): [brand1, brand2, ...]}。
+        请求的 pair 即使无品牌也返回空列表。
+    """
+    if not pairs:
+        return {}
+
+    pair_set = set(pairs)
+    placeholders = []
+    params: dict[str, str] = {}
+    for i, (cat, sub) in enumerate(pair_set):
+        cp = f"c_{i}"
+        sp = f"s_{i}"
+        placeholders.append(f"(:{cp}, :{sp})")
+        params[cp] = cat
+        params[sp] = sub
+
+    sql = text(f"""
+        SELECT category, sub_category, brand, COUNT(*) AS cnt
+        FROM product
+        WHERE (category, sub_category) IN ({", ".join(placeholders)})
+          AND brand IS NOT NULL AND brand != ''
+          AND is_active = TRUE
+        GROUP BY category, sub_category, brand
+        ORDER BY category, sub_category, cnt DESC
+    """)
+
+    try:
+        result = await db.execute(sql, params)
+        rows = result.fetchall()
+    except Exception as e:
+        logger.warning("get_brands_by_categories 查询失败", error=str(e))
+        return {}
+
+    grouped: dict[tuple[str, str], list[str]] = {}
+    for row in rows:
+        key = (row.category, row.sub_category)
+        if key not in grouped:
+            grouped[key] = []
+        if len(grouped[key]) < 20:
+            grouped[key].append(row.brand)
+
+    for pair in pair_set:
+        if pair not in grouped:
+            grouped[pair] = []
+
+    return grouped

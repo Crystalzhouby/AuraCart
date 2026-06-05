@@ -184,17 +184,21 @@ async def _extract_categories_and_brands(
 async def _extract_intents_per_category(
     context: str,
     llm: LLMService,
+    brand_reference: str = "",
 ) -> list[dict]:
     """Step 3: 从拼接文本中按品类分组提取结构化+语义意图。
 
     参数:
         context: Step 2 输出的拼接文本。
         llm: LLMService 实例。
+        brand_reference: 格式化的品牌参考文本，注入到 prompt。
 
     返回值:
         [{category, sub_category, text, min_price, max_price, order_num, brand}, ...]
     """
-    prompt = EXTRACTION_STEP3_SYSTEM.replace("{context}", context)
+    prompt = (EXTRACTION_STEP3_SYSTEM
+              .replace("{brand_reference}", brand_reference or "(品牌数据暂不可用)")
+              .replace("{context}", context))
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": "请提取意图"},
@@ -217,7 +221,7 @@ async def _extract_intents_per_category(
             "min_price": int(item.get("min_price", 0) or 0),
             "max_price": int(item.get("max_price", 4294967295) or 4294967295),
             "order_num": int(item.get("order_num", 1) or 1),
-            "brand": item.get("brand") if item.get("brand") else None,
+            "brand": item.get("brand") if item.get("brand") else [],
         })
 
     return result
@@ -258,8 +262,30 @@ async def extraction_node(
     # ---- Step 2: 检索历史并拼接 ----
     context = _build_context_with_memory(rewritten_query, categories, session_memory)
 
+    # ---- 查询品牌列表并注入 Step3 context ----
+    brand_reference = ""
+    try:
+        pairs = [
+            (c.get("category"), c.get("sub_category"))
+            for c in categories
+            if c.get("category") and c.get("sub_category")
+        ]
+        if pairs:
+            from app.agent.tools import get_brands_by_categories
+            async with db_session_factory() as session:
+                brand_map = await get_brands_by_categories(session, pairs)
+            brand_lines = []
+            for (cat, sub), brands in brand_map.items():
+                if brands:
+                    brand_lines.append(f"- {cat}/{sub}: {', '.join(brands)}")
+                else:
+                    brand_lines.append(f"- {cat}/{sub}: (该品类暂无品牌数据)")
+            brand_reference = "\n".join(brand_lines) if brand_lines else ""
+    except Exception as e:
+        logger.warning("Step3 品牌查询失败", error=str(e))
+
     # ---- Step 3: 分组提取意图 ----
-    requirements = await _extract_intents_per_category(context, llm)
+    requirements = await _extract_intents_per_category(context, llm, brand_reference)
 
     if not requirements:
         logger.warning("extraction Step3 未提取到意图，使用 fallback")
@@ -270,7 +296,7 @@ async def extraction_node(
             "min_price": 0,
             "max_price": 4294967295,
             "order_num": 1,
-            "brand": None,
+            "brand": [],
         }]
 
     logger.info("extraction 完成", category_count=len(categories),

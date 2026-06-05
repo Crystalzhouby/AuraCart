@@ -143,9 +143,28 @@ async def scenario_gen_node(
         rewritten_query, category_list, session_memory
     )
 
+    # ---- 查询全部品类品牌映射表 ----
+    brand_map_text = "(品牌数据暂不可用)"
+    pairs = list(_parse_category_list(category_list))
+    if pairs and db_session_factory:
+        try:
+            from app.agent.tools import get_brands_by_categories
+            async with db_session_factory() as session:
+                brand_map = await get_brands_by_categories(session, pairs)
+            lines = []
+            for (cat, sub), brands in sorted(brand_map.items()):
+                if brands:
+                    lines.append(f"- {cat}/{sub}: {', '.join(brands[:10])}")
+                else:
+                    lines.append(f"- {cat}/{sub}: (暂无)")
+            brand_map_text = "\n".join(lines) if lines else "(无品类数据)"
+        except Exception as e:
+            logger.warning("scenario_gen 品牌查询失败", error=str(e))
+
     prompt = (SCENARIO_GEN_SYSTEM
               .replace("{category_list}", category_list)
               .replace("{history_context}", history_context)
+              .replace("{brand_map}", brand_map_text)
               .replace("{user_query}", rewritten_query))
     messages = [
         {"role": "system", "content": prompt},
@@ -189,7 +208,7 @@ async def scenario_gen_node(
             "min_price": int(sq.get("min_price", 0) or 0),
             "max_price": int(sq.get("max_price", 4294967295) or 4294967295),
             "order_num": int(sq.get("order_num", 1) or 1),
-            "brand": sq.get("brand") if sq.get("brand") else None,
+            "brand": sq.get("brand") if sq.get("brand") else [],
         })
 
     return {
