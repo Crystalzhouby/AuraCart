@@ -1,14 +1,15 @@
 """
-Product Retrieval 节点 — 重构后。
+Product Retrieval 节点。
 
 流水线：
-1. 按品类分组检索（requirements 已按品类分组）
-2. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-25）并行
-3. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
-4. bge-reranker 精排（top-5）+ fallback
-5. 按品类生成推荐理由（LLM，复用 GENERATOR_SYSTEM 提示词）
-6. 品类顺序式 SSE 发送（products → chat_reply）+ 聚合
-7. Memory 更新（原始查询按品类追加到 session_memory）
+1. 欢迎语（LLM，基于 requirements 生成）
+2. 按品类分组检索（requirements 已按品类分组）
+3. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-25）并行
+4. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
+5. bge-reranker 精排（top-5）+ fallback
+6. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + chat_reply 推荐理由）
+7. 结束语（LLM）+ done 事件
+8. Memory 更新（原始查询按品类追加到 session_memory）
 """
 import asyncio
 import traceback
@@ -19,7 +20,10 @@ from app.config import settings
 from app.services.retriever_service import Retriever, SubQuery, Merger
 from app.services.sku_utils_service import _truncate_texts
 from app.agent.memory import append_query
-from app.agent.prompts.generator_prompt import GENERATOR_SYSTEM
+from app.agent.prompts.show_prompt import (
+    WELCOME_SYSTEM, CATEGORY_INTRO_SYSTEM,
+    PRODUCT_REASON_SYSTEM, ENDING_SYSTEM,
+)
 
 logger = structlog.get_logger("agent.retrieval")
 
@@ -165,19 +169,17 @@ async def _category_task(
     async_session_factory,
     emb_service,
     reranker=None,
-    llm=None,
 ) -> dict:
-    """单个品类的检索任务：SQL 条件 → 双路检索 → RRF → reranker → 推荐理由生成。
+    """单个品类的检索任务：SQL 条件 → 双路检索 → RRF → reranker。
 
     参数:
         intent: 单品类意图 {category, sub_category, text, min_price, max_price, order_num, brand}
         async_session_factory: async_session 工厂函数。
         emb_service: EmbeddingService 实例。
         reranker: RerankerService 实例（可选）。
-        llm: LLMService 实例（可选），用于生成推荐理由。
 
     返回值:
-        {category, sub_category, skus, product_ids, reasoning_text, error}
+        {category, sub_category, skus, product_ids, error}
     """
     category = intent.get("category") or ""
     sub_category = intent.get("sub_category") or ""
@@ -219,7 +221,7 @@ async def _category_task(
                 return {
                     "category": category, "sub_category": sub_category,
                     "skus": [], "product_ids": [],
-                    "reasoning_text": "", "error": None,
+                    "error": None,
                 }
 
             # 4. bge-reranker 精排
@@ -275,36 +277,6 @@ async def _category_task(
             logger.info(f"品类 [{category}/{sub_category}] 检索完成",
                         final_sku_count=len(skus))
 
-            # 6. 生成推荐理由：检索结束后立刻按品类独立生成
-            reasoning_text = ""
-            if skus and llm:
-                try:
-                    context = _build_product_context(skus)
-                    user_intent = text or ""
-                    cat_label = f"{category}/{sub_category}".strip("/")
-                    requirements_summary = f"品类: {cat_label}"
-                    if user_intent:
-                        requirements_summary += f"\n用户关注: {user_intent}"
-
-                    system_prompt = GENERATOR_SYSTEM.format(
-                        product_context=context,
-                        requirements_summary=requirements_summary,
-                        reasoning_max_chars=settings.search.reasoning_max_chars,
-                    )
-                    user_msg = f"请根据以上商品信息，为用户推荐：{user_intent or cat_label + '推荐'}"
-
-                    messages = [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_msg},
-                    ]
-                    reasoning_text = await llm.chat(messages, temperature=0.3)
-                    logger.info(f"品类 [{category}/{sub_category}] 推荐理由生成完成",
-                                chars=len(reasoning_text))
-                except Exception as e:
-                    logger.warning(f"品类 [{category}/{sub_category}] 推荐理由生成失败",
-                                   error=str(e))
-                    reasoning_text = ""
-
             return {
                 "category": category,
                 "sub_category": sub_category,
@@ -314,7 +286,6 @@ async def _category_task(
                      "category": category, "sub_category": sub_category}
                     for s in skus
                 ],
-                "reasoning_text": reasoning_text,
                 "error": None,
             }
 
@@ -324,8 +295,186 @@ async def _category_task(
         return {
             "category": category, "sub_category": sub_category,
             "skus": [], "product_ids": [],
-            "reasoning_text": "", "error": str(e),
+            "error": str(e),
         }
+
+
+async def _generate_welcome(
+    requirements: list[dict],
+    scenario_description: str,
+    llm,
+) -> str:
+    """生成欢迎语。基于 requirements 数量判断单/多品类风格。
+
+    参数:
+        requirements: 意图列表。
+        scenario_description: 场景描述（scenario 路径有值，explicit 路径为空）。
+        llm: LLMService 实例。
+
+    返回值:
+        str: 欢迎语文本，失败时返回空字符串。
+    """
+    if not llm:
+        return ""
+    try:
+        lines = []
+        for req in requirements:
+            cat = req.get("category", "")
+            sub = req.get("sub_category", "")
+            text = req.get("text") or f"{cat}/{sub}"
+            lines.append(f"- {text}")
+        requirements_summary = "\n".join(lines)
+        prompt = WELCOME_SYSTEM.format(
+            category_count=len(requirements),
+            requirements_summary=requirements_summary,
+            scenario_description=scenario_description or "无",
+        )
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": "请生成欢迎语"},
+        ]
+        text = await llm.chat(messages, temperature=0.3)
+        return text.strip() if text else ""
+    except Exception as e:
+        logger.warning("欢迎语生成失败", error=str(e))
+        return ""
+
+
+async def _generate_category_intro(
+    category: str,
+    sub_category: str,
+    index: int,
+    total: int,
+    scenario_description: str,
+    llm,
+) -> str:
+    """生成品类介绍过渡语。
+
+    参数:
+        category: 品类名。
+        sub_category: 子品类名。
+        index: 当前品类序号（1-based，按有效品类编号）。
+        total: 有效品类总数。
+        scenario_description: 场景描述。
+        llm: LLMService 实例。
+
+    返回值:
+        str: 品类介绍语，失败时返回空字符串。
+    """
+    if not llm:
+        return ""
+    try:
+        prompt = CATEGORY_INTRO_SYSTEM.format(
+            category=category or "",
+            sub_category=sub_category or "",
+            index=index,
+            total=total,
+            scenario_description=scenario_description or "无",
+        )
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": "请生成品类介绍"},
+        ]
+        text = await llm.chat(messages, temperature=0.3)
+        return text.strip() if text else ""
+    except Exception as e:
+        logger.warning("品类介绍生成失败", category=category, error=str(e))
+        return ""
+
+
+async def _generate_product_reason(
+    sku: dict,
+    user_intent: str,
+    category_skus: list[dict],
+    llm,
+) -> str:
+    """为单个商品生成推荐理由。注入同品类全部商品概览作为横向对比上下文。
+
+    参数:
+        sku: 单个 SKU 字典。
+        user_intent: 用户原始查询或需求文本。
+        category_skus: 同品类下全部 SKU 列表（用于构建横向对比概览）。
+        llm: LLMService 实例。
+
+    返回值:
+        str: 推荐理由文本，失败时返回空字符串。
+    """
+    if not llm:
+        return ""
+    try:
+        product_detail = _build_product_context([sku])
+        category_overview = (
+            _build_product_context(category_skus)
+            if len(category_skus) > 1
+            else product_detail
+        )
+        prompt = PRODUCT_REASON_SYSTEM.format(
+            user_intent=user_intent or "推荐合适的商品",
+            total_in_category=len(category_skus),
+            category_overview=category_overview,
+            product_detail=product_detail,
+            max_chars=settings.search.reasoning_max_chars,
+        )
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": "请推荐这件商品"},
+        ]
+        text = await llm.chat(messages, temperature=0.3)
+        return text.strip() if text else ""
+    except Exception as e:
+        logger.warning("商品推荐理由生成失败", sku=sku.get("sku_id"), error=str(e))
+        return ""
+
+
+async def _generate_ending(
+    category_results: list[dict],
+    requirements: list[dict],
+    llm,
+) -> str:
+    """生成结束语。汇总推荐结果，引导用户下一步互动。
+
+    参数:
+        category_results: _category_task 的返回列表。
+        requirements: 意图列表。
+        llm: LLMService 实例。
+
+    返回值:
+        str: 结束语文本，失败时返回空字符串。
+    """
+    if not llm:
+        return ""
+    try:
+        categories = []
+        total_products = 0
+        for r in category_results:
+            if not r.get("error"):
+                cat = r.get("category", "")
+                sub = r.get("sub_category", "")
+                if cat and sub:
+                    categories.append(f"{cat}/{sub}")
+                total_products += len(r.get("skus", []))
+
+        categories_summary = "、".join(categories) if categories else "无"
+        scenario = ""
+        for req in requirements:
+            if req.get("text"):
+                scenario = req["text"]
+                break
+
+        prompt = ENDING_SYSTEM.format(
+            categories_summary=categories_summary,
+            product_count=total_products,
+            scenario_description=scenario or "无",
+        )
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": "请生成结束语"},
+        ]
+        text = await llm.chat(messages, temperature=0.3)
+        return text.strip() if text else ""
+    except Exception as e:
+        logger.warning("结束语生成失败", error=str(e))
+        return ""
 
 
 async def retrieval_node(
@@ -336,11 +485,13 @@ async def retrieval_node(
     reranker=None,
     _sse_queue=None,
 ) -> dict:
-    """Product Retrieval 节点函数 — 重构版。
+    """Product Retrieval 节点函数。
+
+    流水线：欢迎语 → 并行检索 → 品类介绍(多品类) → 逐商品推荐 → 结束语 + done。
 
     参数:
         state: AgentState 字典。
-        llm: LLMService 实例，传递给 _category_task 用于生成推荐理由。
+        llm: LLMService 实例，用于生成欢迎语/品类介绍/推荐理由/结束语。
         emb_service: EmbeddingService 实例。
         async_session_factory: async_session 工厂函数。
         reranker: RerankerService 实例（可选）。
@@ -351,21 +502,28 @@ async def retrieval_node(
     """
     user_query = state.get("user_query", "")
     requirements = state.get("requirements", [])
+    scenario_description = state.get("scenario_description", "")
     queue = _sse_queue or state.get("_sse_queue")
 
     if not requirements:
-        return {"retrieval_results": [], "failed_categories": [], "session_memory": state.get("session_memory", [])}
+        return {"retrieval_results": [], "failed_categories": [],
+                "session_memory": state.get("session_memory", [])}
 
     logger.info("Retrieval 节点开始", user_query=user_query,
                 requirement_count=len(requirements))
 
-    # 并行检索（多品类 + asyncio.Semaphore 限流）
+    # 1. 欢迎语
+    welcome_text = await _generate_welcome(requirements, scenario_description, llm)
+    if queue and welcome_text:
+        await queue.put({"event": "welcome", "data": welcome_text})
+
+    # 2. 并行检索（多品类 + asyncio.Semaphore 限流）
     semaphore = asyncio.Semaphore(settings.search.max_category_concurrency)
 
     async def _bounded_task(intent):
         async with semaphore:
             return await _category_task(
-                intent, async_session_factory, emb_service, reranker, llm
+                intent, async_session_factory, emb_service, reranker
             )
 
     tasks = [_bounded_task(req) for req in requirements]
@@ -380,36 +538,76 @@ async def retrieval_node(
                 "category": req.get("category", ""),
                 "sub_category": req.get("sub_category", ""),
                 "skus": [], "product_ids": [],
-                "reasoning_text": "", "error": str(r),
+                "error": str(r),
             })
         else:
             safe_results.append(r)
 
-    # SSE 发送 + 聚合
+    # 3. SSE 逐品类 → 逐商品发送
     retrieval_results = []
     failed_categories = []
-    for r in safe_results:
+    total_valid = len([r for r in safe_results if not r.get("error")])
+
+    for idx, r in enumerate(safe_results):
         if r.get("error"):
             failed_categories.append({
                 "category": r.get("category", ""),
                 "sub_category": r.get("sub_category", ""),
                 "error": r["error"],
             })
-        else:
-            retrieval_results.extend(r.get("skus", []))
+            continue
 
-            # SSE: products（商品 ID 列表）
-            if queue:
-                product_ids = r.get("product_ids", [])
-                if product_ids:
-                    await queue.put({"event": "products", "data": product_ids})
+        skus = r.get("skus", [])
+        retrieval_results.extend(skus)
+        category = r.get("category", "")
+        sub_category = r.get("sub_category", "")
 
-                # SSE: chat_reply（该品类的推荐理由文案）
-                reasoning = r.get("reasoning_text", "")
-                if reasoning:
-                    await queue.put({"event": "chat_reply", "data": reasoning})
+        # 3a. 品类介绍语（仅多品类）
+        if total_valid > 1:
+            intro = await _generate_category_intro(
+                category, sub_category, idx + 1, total_valid,
+                scenario_description, llm,
+            )
+            if queue and intro:
+                await queue.put({"event": "chat_reply", "data": intro})
 
-    # Memory 更新：原始查询按品类追加到 session_memory
+        # 3b. 逐商品推荐
+        if skus:
+            # 并行生成推荐理由
+            reason_tasks = [
+                _generate_product_reason(sku, user_query, skus, llm)
+                for sku in skus
+            ]
+            reasons = await asyncio.gather(*reason_tasks, return_exceptions=True)
+
+            # 串行 SSE 发送（保证前端展示顺序）
+            for i, sku in enumerate(skus):
+                if queue:
+                    await queue.put({
+                        "event": "products",
+                        "data": {
+                            "product_id": sku["product_id"],
+                            "sku_id": sku["sku_id"],
+                            "category": category,
+                            "sub_category": sub_category,
+                        },
+                    })
+                    reason = reasons[i] if (
+                        i < len(reasons)
+                        and isinstance(reasons[i], str)
+                    ) else ""
+                    if reason:
+                        await queue.put({"event": "chat_reply", "data": reason})
+
+    # 4. 结束语 + done
+    ending_text = await _generate_ending(safe_results, requirements, llm)
+    if queue:
+        await queue.put({
+            "event": "done",
+            "data": {"text": ending_text or ""},
+        })
+
+    # 5. Memory 更新
     new_memory = state.get("session_memory", [])
     if requirements and user_query:
         categories_list = [

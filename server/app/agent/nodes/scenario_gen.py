@@ -149,7 +149,7 @@ async def scenario_gen_node(
               .replace("{user_query}", rewritten_query))
     messages = [
         {"role": "system", "content": prompt},
-        {"role": "user", "content": rewritten_query},
+        {"role": "user", "content": "请根据场景描述生成品类需求拆解"},
     ]
 
     try:
