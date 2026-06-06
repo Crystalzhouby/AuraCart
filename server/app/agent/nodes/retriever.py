@@ -4,7 +4,7 @@ Product Retrieval 节点。
 流水线：
 1. 欢迎语（LLM，基于 requirements 生成）
 2. 按品类分组检索（requirements 已按品类分组）
-3. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-25）并行
+3. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-15）并行
 4. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
 5. bge-reranker 精排（top-5）+ fallback
 6. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + chat_reply 推荐理由）
@@ -21,7 +21,7 @@ from app.services.retriever_service import Retriever, SubQuery, Merger
 from app.services.sku_utils_service import _truncate_texts
 from app.agent.memory import append_query
 from app.agent.prompts.show_prompt import (
-    WELCOME_SYSTEM, CATEGORY_INTRO_SYSTEM,
+    CATEGORY_INTRO_SYSTEM,
     PRODUCT_REASON_SYSTEM, ENDING_SYSTEM,
 )
 
@@ -299,47 +299,6 @@ async def _category_task(
         }
 
 
-async def _generate_welcome(
-    requirements: list[dict],
-    scenario_description: str,
-    llm,
-) -> str:
-    """生成欢迎语。基于 requirements 数量判断单/多品类风格。
-
-    参数:
-        requirements: 意图列表。
-        scenario_description: 场景描述（scenario 路径有值，explicit 路径为空）。
-        llm: LLMService 实例。
-
-    返回值:
-        str: 欢迎语文本，失败时返回空字符串。
-    """
-    if not llm:
-        return ""
-    try:
-        lines = []
-        for req in requirements:
-            cat = req.get("category", "")
-            sub = req.get("sub_category", "")
-            text = req.get("text") or f"{cat}/{sub}"
-            lines.append(f"- {text}")
-        requirements_summary = "\n".join(lines)
-        prompt = WELCOME_SYSTEM.format(
-            category_count=len(requirements),
-            requirements_summary=requirements_summary,
-            scenario_description=scenario_description or "无",
-        )
-        messages = [
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": "请生成欢迎语"},
-        ]
-        text = await llm.chat(messages, temperature=0.3)
-        return text.strip() if text else ""
-    except Exception as e:
-        logger.warning("欢迎语生成失败", error=str(e))
-        return ""
-
-
 async def _generate_category_intro(
     category: str,
     sub_category: str,
@@ -387,14 +346,16 @@ async def _generate_product_reason(
     user_intent: str,
     category_skus: list[dict],
     llm,
+    session_memory: list[dict] | None = None,
 ) -> str:
-    """为单个商品生成推荐理由。注入同品类全部商品概览作为横向对比上下文。
+    """为单个商品生成推荐理由。注入同品类全部商品概览和用户历史关注。
 
     参数:
         sku: 单个 SKU 字典。
         user_intent: 用户原始查询或需求文本。
         category_skus: 同品类下全部 SKU 列表（用于构建横向对比概览）。
         llm: LLMService 实例。
+        session_memory: 会话记忆（可选），用于提取该品类历史查询。
 
     返回值:
         str: 推荐理由文本，失败时返回空字符串。
@@ -402,6 +363,19 @@ async def _generate_product_reason(
     if not llm:
         return ""
     try:
+        # 提取该品类历史查询
+        user_history = ""
+        if session_memory:
+            from app.agent.memory import get_queries_by_category
+            cat = sku.get("category", "")
+            sub = sku.get("sub_category", "")
+            queries = get_queries_by_category(session_memory, cat, sub)
+            if queries:
+                user_history = (
+                    "用户此前对该品类的关注：\n"
+                    + "\n".join(f"- {q['query']}" for q in queries)
+                )
+
         product_detail = _build_product_context([sku])
         category_overview = (
             _build_product_context(category_skus)
@@ -414,6 +388,7 @@ async def _generate_product_reason(
             category_overview=category_overview,
             product_detail=product_detail,
             max_chars=settings.search.reasoning_max_chars,
+            user_history=user_history or "无",
         )
         messages = [
             {"role": "system", "content": prompt},
@@ -430,6 +405,7 @@ async def _generate_ending(
     category_results: list[dict],
     requirements: list[dict],
     llm,
+    session_memory: list[dict] | None = None,
 ) -> str:
     """生成结束语。汇总推荐结果，引导用户下一步互动。
 
@@ -437,6 +413,7 @@ async def _generate_ending(
         category_results: _category_task 的返回列表。
         requirements: 意图列表。
         llm: LLMService 实例。
+        session_memory: 会话记忆（可选），用于注入跨品类对话历史。
 
     返回值:
         str: 结束语文本，失败时返回空字符串。
@@ -461,10 +438,22 @@ async def _generate_ending(
                 scenario = req["text"]
                 break
 
+        # 提取跨品类对话历史
+        recent_text = "(无历史记录)"
+        if session_memory:
+            from app.agent.memory import get_recent_queries
+            from app.config import settings as _settings
+            n_rounds = _settings.search.memory_recent_rounds
+            recent = get_recent_queries(session_memory, n_rounds)
+            if recent:
+                sorted_q = sorted(recent, key=lambda x: x["timestamp"])
+                recent_text = "\n".join(f"- {q['query']}" for q in sorted_q)
+
         prompt = ENDING_SYSTEM.format(
             categories_summary=categories_summary,
             product_count=total_products,
             scenario_description=scenario or "无",
+            recent_queries=recent_text,
         )
         messages = [
             {"role": "system", "content": prompt},
@@ -512,8 +501,8 @@ async def retrieval_node(
     logger.info("Retrieval 节点开始", user_query=user_query,
                 requirement_count=len(requirements))
 
-    # 1. 欢迎语
-    welcome_text = await _generate_welcome(requirements, scenario_description, llm)
+    # 1. 欢迎语（由 router 节点生成，从 state 读取）
+    welcome_text = state.get("welcome_text", "")
     if queue and welcome_text:
         await queue.put({"event": "welcome", "data": welcome_text})
 
@@ -575,7 +564,8 @@ async def retrieval_node(
         if skus:
             # 并行生成推荐理由
             reason_tasks = [
-                _generate_product_reason(sku, user_query, skus, llm)
+                _generate_product_reason(sku, user_query, skus, llm,
+                                         session_memory=state.get("session_memory"))
                 for sku in skus
             ]
             reasons = await asyncio.gather(*reason_tasks, return_exceptions=True)
@@ -600,7 +590,8 @@ async def retrieval_node(
                         await queue.put({"event": "chat_reply", "data": reason})
 
     # 4. 结束语 + done
-    ending_text = await _generate_ending(safe_results, requirements, llm)
+    ending_text = await _generate_ending(safe_results, requirements, llm,
+                                         session_memory=state.get("session_memory"))
     if queue:
         await queue.put({
             "event": "done",

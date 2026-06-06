@@ -211,6 +211,7 @@ async def _agent_event_stream(
     initial_state: AgentState = {
         "user_query": user_query,
         "rewritten_query": "",
+        "welcome_text": "",
         "session_memory": initial_session_memory,
         "intent": "explicit",
         "requirements": [],               # 新格式: list[dict]
@@ -328,6 +329,36 @@ async def _agent_event_stream(
             except Exception as e:
                 stream_log.warning(
                     "保存会话记忆失败",
+                    conversation_id=conversation_id,
+                    error=str(e),
+                )
+
+            # ---- 持久化聊天记录 ----
+            try:
+                user_query = final_state.get("user_query", "")
+                chat_reply = final_state.get("chat_reply", "")
+                if user_query and chat_reply:
+                    from app.database import async_session as _chat_async_session
+                    from app.models.chat_message import ChatMessage
+                    async with _chat_async_session() as chat_session:
+                        chat_session.add(ChatMessage(
+                            conversation_id=conversation_id,
+                            role="user",
+                            content=user_query,
+                        ))
+                        chat_session.add(ChatMessage(
+                            conversation_id=conversation_id,
+                            role="assistant",
+                            content=chat_reply,
+                        ))
+                        await chat_session.commit()
+                    stream_log.debug(
+                        "聊天记录已保存",
+                        conversation_id=conversation_id,
+                    )
+            except Exception as e:
+                stream_log.warning(
+                    "保存聊天记录失败",
                     conversation_id=conversation_id,
                     error=str(e),
                 )

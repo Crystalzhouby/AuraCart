@@ -201,7 +201,7 @@ class TimeoutSettings(BaseSettings):
     retrieval: float = 1.0
     """跨源向量检索的超时时间（秒）。"""
 
-    generation: float = 15.0
+    generation: float = 25.0
     """LLM 答案生成的超时时间（秒）。"""
 
     rerank: float = 5.0

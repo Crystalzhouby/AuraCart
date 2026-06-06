@@ -402,6 +402,7 @@ class Retriever:
         logger.debug("semantic_search 结果",
                      row_count=len(rows),
                      top_rows=[{"sku_id": r.sku_id,
+                                "score": round(float(r.score), 4),
                                 "content": (r.matched_texts_json or [{}])[0].get("content", "")[:100]}
                                for r in rows[:3]])
 
@@ -505,7 +506,7 @@ class Retriever:
                 logger.debug("keyword_search 结果",
                              sub_text=sub.text[:80],
                              row_count=len(rows),
-                             top_rows=[{"sku_id": r.sku_id, "content": r.content[:100]}
+                             top_rows=[{"sku_id": r.sku_id, "score": round(float(r.score), 4), "content": r.content[:100]}
                                         for r in rows[:3]])
 
             for r in rows:

@@ -12,6 +12,7 @@ import structlog
 from app.config import settings
 from app.agent.prompts.router_prompt import ROUTER_SYSTEM
 from app.agent.prompts.rewrite_prompt import REWRITE_SYSTEM
+from app.agent.prompts.show_prompt import WELCOME_SYSTEM
 from app.agent.memory import get_recent_queries
 from app.services.llm_service import LLMService
 
@@ -74,6 +75,46 @@ def _format_recent_queries(recent_queries: list[dict]) -> str:
     for i, q in enumerate(sorted_queries, 1):
         lines.append(f"#{i} [{q['timestamp']}] {q['query']}")
     return "\n".join(lines)
+
+
+async def _generate_welcome(
+    user_query: str,
+    rewritten_query: str,
+    recent_queries: list[dict],
+    scenario_description: str,
+    llm,
+) -> str:
+    """在 router 节点生成欢迎词。基于当前查询+改写结果+对话历史。
+
+    参数:
+        user_query: 原始用户查询。
+        rewritten_query: 改写后的查询。
+        recent_queries: 最近 N 轮历史原始查询。
+        scenario_description: 场景描述（当前阶段始终为空，由下游 scenario_gen 产出）。
+        llm: LLMService 实例。
+
+    返回值:
+        str: 欢迎词文本。LLM 不可用或失败时返回空字符串。
+    """
+    if not llm:
+        return ""
+    try:
+        history_text = _format_recent_queries(recent_queries)
+        prompt = WELCOME_SYSTEM.format(
+            user_query=user_query,
+            rewritten_query=rewritten_query,
+            recent_queries=history_text,
+            scenario_description=scenario_description or "无",
+        )
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": "请生成欢迎语"},
+        ]
+        text = await llm.chat(messages, temperature=0.3)
+        return text.strip() if text else ""
+    except Exception as e:
+        logger.warning("欢迎语生成失败", error=str(e))
+        return ""
 
 
 async def _rewrite_query(
@@ -161,8 +202,22 @@ async def router_node(state: dict, llm: LLMService) -> dict:
         rewritten_query = await _rewrite_query(user_query, recent_queries, llm)
     else:
         rewritten_query = user_query
+        recent_queries = []
+
+    # ---- Step 3: 生成欢迎词（explicit / scenario 路径） ----
+    welcome_text = ""
+    if intent in ("explicit", "scenario"):
+        scenario_desc = state.get("scenario_description") or ""
+        welcome_text = await _generate_welcome(
+            user_query=user_query,
+            rewritten_query=rewritten_query,
+            recent_queries=recent_queries,
+            scenario_description=scenario_desc,
+            llm=llm,
+        )
 
     return {
         "intent": intent,
         "rewritten_query": rewritten_query,
+        "welcome_text": welcome_text,
     }
