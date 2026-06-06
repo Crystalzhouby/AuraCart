@@ -68,7 +68,7 @@ timeout:
   retrieval: 1.0
   generation: 60.0
   rerank: 5.0
-  total_request: 80.0
+  total_request: 300.0
 
 # ---- 精排模型 ----
 reranker:
