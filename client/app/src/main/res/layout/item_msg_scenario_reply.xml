@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  场景回复消息 — 一条合并的 AI 消息，包含：
+    头像 + [AI气泡：开头语 + 场景卡片列表 + 商品卡片列表 + 追问标签]
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingStart="14dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <!-- AI 头像 -->
+    <ImageView
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:src="@drawable/guide_face"
+        android:background="@drawable/bg_avatar"
+        android:scaleType="centerCrop"
+        android:clipToOutline="true"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="2dp"/>
+
+    <!-- AI 气泡主体：包含全部内容 -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:background="@drawable/bg_ai_bubble"
+        android:elevation="2dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <!-- ① 开头语文本 -->
+        <TextView
+            android:id="@+id/tvReplyText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/colorTextPrimary"
+            android:textSize="14sp"
+            android:lineSpacingMultiplier="1.55"/>
+
+        <!-- ② 场景卡片容器（动态添加） -->
+        <LinearLayout
+            android:id="@+id/scenarioCardsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="10dp"/>
+
+        <!-- ③ 商品卡片横向列表（复用现有 ProductCardAdapter） -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvReplyProducts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:clipToPadding="false"
+            android:overScrollMode="never"/>
+
+        <!-- ④ 追问标签容器（动态添加 Chip） -->
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupReplyTags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"/>
+
+    </LinearLayout>
+</LinearLayout>

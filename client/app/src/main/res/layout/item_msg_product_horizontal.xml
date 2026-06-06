@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  聊天消息内的横向商品卡片 — 左图 + 右信息 + 购物车图标
+  参考图2/图3的横排商品展示样式
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/bg_card"
+    android:padding="10dp"
+    android:layout_marginEnd="8dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="4dp"
+    android:elevation="2dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <!-- 左侧商品图片 -->
+    <ImageView
+        android:id="@+id/ivProduct"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:background="@color/colorBackground"
+        android:scaleType="centerCrop"
+        android:layout_marginEnd="10dp"/>
+
+    <!-- 右侧商品信息 -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
+
+        <!-- 商品名称 -->
+        <TextView
+            android:id="@+id/tvName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/colorTextPrimary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end"/>
+
+        <!-- 价格行：价格 + 购物车图标 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp">
+
+            <TextView
+                android:id="@+id/tvPrice"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/colorPrice"
+                android:textSize="15sp"
+                android:textStyle="bold"/>
+
+            <!-- 购物车图标按钮 -->
+            <ImageButton
+                android:id="@+id/btnCart"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_cart"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="加入购物车"
+                android:padding="8dp"
+                android:scaleType="centerInside"
+                android:tint="@color/colorPrimary"/>
+        </LinearLayout>
+
+        <!-- 评分 -->
+        <TextView
+            android:id="@+id/tvRating"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/colorTextTertiary"
+            android:textSize="10sp"
+            android:layout_marginTop="3dp"/>
+    </LinearLayout>
+</LinearLayout>

@@ -3,6 +3,7 @@ package com.ecomguide.repository
 import com.ecomguide.model.ApiProduct
 import com.ecomguide.model.FaqItem
 import com.ecomguide.model.RagKnowledge
+import com.ecomguide.model.ScenarioCard
 import com.ecomguide.model.SkuOption
 import com.ecomguide.model.UserReview
 
@@ -223,4 +224,75 @@ object DemoProducts {
     val allProducts = beautyProducts + digitalProducts + sportsProducts
 
     fun findById(id: String): ApiProduct? = allProducts.find { it.productId == id }
+
+    // ─── 场景推荐卡片（ScenarioCard）Mock 数据 ──────────────────────────────
+    // 参考图3：聊天消息流中的品类入口形式
+
+    /** 春日连衣裙场景 */
+    val scenarioSpringDress = ScenarioCard(
+        scenarioId = "scenario_spring_dress",
+        scenarioName = "春日连衣裙",
+        emoji = "🌸",
+        subtitle = "（一件搞定懒人必备）",
+        category = "服饰运动",
+        products = listOf(clothes007, clothes009),
+        firstProductTitle = "春游连衣裙",
+        firstProductPrice = 143.90,
+        firstProductImage = clothes007.imageUrl,
+        productCount = 12,
+        shopHint = "夕蒙seemon等多店在售"
+    )
+
+    /** 春游穿搭场景 */
+    val scenarioSpringOutfit = ScenarioCard(
+        scenarioId = "scenario_spring_outfit",
+        scenarioName = "春游穿搭",
+        emoji = "👗",
+        subtitle = "（百搭耐看）",
+        category = "服饰运动",
+        products = listOf(clothes007, clothes009),
+        firstProductTitle = "春游百搭上衣",
+        firstProductPrice = 38.20,
+        firstProductImage = clothes009.imageUrl,
+        productCount = 8,
+        shopHint = "韩妮彩o等多店在售"
+    )
+
+    /** 抗初老精华场景 */
+    val scenarioAntiAging = ScenarioCard(
+        scenarioId = "scenario_anti_aging",
+        scenarioName = "抗初老精华",
+        emoji = "✨",
+        subtitle = "（不用纠结 直接抄）",
+        category = "美妆护肤",
+        products = beautyProducts,
+        firstProductTitle = "小棕瓶精华露",
+        firstProductPrice = 720.0,
+        firstProductImage = beauty001.imageUrl,
+        productCount = 6,
+        shopHint = "雅诗兰黛官方旗舰店在售"
+    )
+
+    /** 降噪耳机场景 */
+    val scenarioHeadphone = ScenarioCard(
+        scenarioId = "scenario_headphone",
+        scenarioName = "旗舰降噪耳机",
+        emoji = "🎧",
+        subtitle = "（音质天花板）",
+        category = "数码电子",
+        products = digitalProducts,
+        firstProductTitle = "AirPods Pro 3",
+        firstProductPrice = 1899.0,
+        firstProductImage = digital018.imageUrl,
+        productCount = 5,
+        shopHint = "苹果官方旗舰店在售"
+    )
+
+    /** 所有场景卡片列表 */
+    val allScenarioCards = listOf(
+        scenarioSpringDress,
+        scenarioSpringOutfit,
+        scenarioAntiAging,
+        scenarioHeadphone
+    )
 }

@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  落地页宽版商品卡片 — 适配页面宽度（参考图2双列大卡片）
+  比聊天内竖卡片更大：图片更高、文字更大、按钮更醒目
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="148dp"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/bg_card"
-    android:padding="10dp"
+    android:padding="12dp"
     android:layout_marginEnd="10dp"
     android:layout_marginTop="4dp"
     android:layout_marginBottom="4dp"
@@ -15,7 +19,7 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="128dp">
+        android:layout_height="160dp">
         <ImageView
             android:id="@+id/ivProduct"
             android:layout_width="match_parent"
@@ -43,10 +47,10 @@
     <TextView
         android:id="@+id/tvName"
         android:layout_width="match_parent"
-        android:layout_height="30dp"
-        android:layout_marginTop="7dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="8dp"
         android:textColor="@color/colorTextPrimary"
-        android:textSize="11sp"
+        android:textSize="13sp"
         android:maxLines="2"
         android:ellipsize="end"/>
 
@@ -54,28 +58,28 @@
         android:id="@+id/tvPrice"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="6dp"
         android:textColor="@color/colorPrice"
-        android:textSize="15sp"
+        android:textSize="18sp"
         android:textStyle="bold"/>
 
     <TextView
         android:id="@+id/tvRating"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="3dp"
         android:textColor="@color/colorTextTertiary"
-        android:textSize="10sp"/>
+        android:textSize="11sp"/>
 
     <Button
         android:id="@+id/btnAddCart"
         android:layout_width="match_parent"
-        android:layout_height="28dp"
+        android:layout_height="34dp"
         android:layout_marginTop="8dp"
         android:background="@drawable/bg_button_primary"
         android:text="加入购物车"
         android:textColor="@color/colorWhite"
-        android:textSize="11sp"
+        android:textSize="13sp"
         android:insetTop="0dp"
         android:insetBottom="0dp"/>
 </LinearLayout>
