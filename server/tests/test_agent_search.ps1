@@ -27,7 +27,7 @@
 
 param(
     [string]$BaseUrl = "http://127.0.0.1:8000",
-    [int]$Timeout = 60
+    [int]$Timeout = 300
 )
 
 $ErrorActionPreference = "Stop"
@@ -132,6 +132,13 @@ function Write-SseSummary {
         return
     }
 
+    # welcome 事件
+    $welcomeIdx = [array]::IndexOf($lines, 'event: welcome')
+    if ($welcomeIdx -ge 0 -and ($welcomeIdx + 1) -lt $lines.Count) {
+        $welcomeData = $lines[$welcomeIdx + 1] -replace '^data:', '' -replace '^"', '' -replace '"$', ''
+        Write-Host "  welcome: ${welcomeData}"
+    }
+
     # products 事件
     $productCount = ($lines | Where-Object { $_ -eq 'event: products' }).Count
     Write-Host "  products 事件: ${productCount} 次"
@@ -183,23 +190,68 @@ function Write-SseSummary {
 # ==================== 测试 1: 单轮对话 ====================
 function Test-SingleTurn {
     Write-Divider
-    Write-Host "  测试 1: 单轮对话 - `"200 元以下的蓝牙耳机有哪些？`""
+    Write-Host "  测试 1: 单轮对话 (2 个查询)"
     Write-Divider
 
+    $pass = $true
+
+    # --- 查询 1a: 推荐一款200元以下的防晒霜 ---
+    Write-Host ""
+    Write-Info "--- 查询 1a: `"推荐一款200元以下的防晒霜`" ---"
     $cid = New-Conversation
     Write-Ok "conversation_id: ${cid}"
 
-    $tmpfile = Join-Path $env:TEMP "test_search_1_$(Get-Random).sse"
-    Invoke-SseSearch -Query "200 元以下的蓝牙耳机有哪些？" -ConversationId $cid -OutFile $tmpfile
+    $tmpfile = Join-Path $env:TEMP "test_search_1a_$(Get-Random).sse"
+    Invoke-SseSearch -Query "推荐一款200元以下的防晒霜" -ConversationId $cid -OutFile $tmpfile
     Write-SseSummary $tmpfile
 
-    if (Select-String -Path $tmpfile -Pattern 'event: products' -Quiet -ErrorAction SilentlyContinue) {
-        Write-Ok "测试 1 通过: products 事件存在"
-    } else {
-        Write-Fail "测试 1 失败: 缺少 products 事件"
+    if (-not (Select-String -Path $tmpfile -Pattern 'event: welcome' -Quiet -ErrorAction SilentlyContinue)) {
+        Write-Fail "查询 1a: 缺少 welcome 事件"; $pass = $false
     }
-
+    if (Select-String -Path $tmpfile -Pattern 'event: products' -Quiet -ErrorAction SilentlyContinue) {
+        Write-Ok "查询 1a: products 事件存在"
+    } else {
+        Write-Fail "查询 1a: 缺少 products 事件"; $pass = $false
+    }
+    if (-not (Select-String -Path $tmpfile -Pattern 'event: next_options' -Quiet -ErrorAction SilentlyContinue)) {
+        Write-Fail "查询 1a: 缺少 next_options 事件"; $pass = $false
+    } else {
+        Write-Ok "查询 1a: next_options 事件存在"
+    }
     Remove-Item $tmpfile -Force -ErrorAction SilentlyContinue
+
+    Start-Sleep -Seconds 2
+
+    # --- 查询 1b: 推荐一款不含酒精的防晒霜 ---
+    Write-Host ""
+    Write-Info "--- 查询 1b: `"推荐一款不含酒精的防晒霜`" ---"
+    $cid = New-Conversation
+    Write-Ok "conversation_id: ${cid}"
+
+    $tmpfile = Join-Path $env:TEMP "test_search_1b_$(Get-Random).sse"
+    Invoke-SseSearch -Query "推荐一款不含酒精的防晒霜" -ConversationId $cid -OutFile $tmpfile
+    Write-SseSummary $tmpfile
+
+    if (-not (Select-String -Path $tmpfile -Pattern 'event: welcome' -Quiet -ErrorAction SilentlyContinue)) {
+        Write-Fail "查询 1b: 缺少 welcome 事件"; $pass = $false
+    }
+    if (Select-String -Path $tmpfile -Pattern 'event: products' -Quiet -ErrorAction SilentlyContinue) {
+        Write-Ok "查询 1b: products 事件存在"
+    } else {
+        Write-Fail "查询 1b: 缺少 products 事件"; $pass = $false
+    }
+    if (-not (Select-String -Path $tmpfile -Pattern 'event: next_options' -Quiet -ErrorAction SilentlyContinue)) {
+        Write-Fail "查询 1b: 缺少 next_options 事件"; $pass = $false
+    } else {
+        Write-Ok "查询 1b: next_options 事件存在"
+    }
+    Remove-Item $tmpfile -Force -ErrorAction SilentlyContinue
+
+    if ($pass) {
+        Write-Ok "测试 1 通过"
+    } else {
+        Write-Fail "测试 1 失败"
+    }
 }
 
 # ==================== 测试 2: 多轮对话 ====================
@@ -271,10 +323,22 @@ function Test-Scenario {
     Write-SseSummary $tmpfile
 
     $pc = (Select-String -Path $tmpfile -Pattern 'event: products' -ErrorAction SilentlyContinue).Count
+    $pass = $true
     if ($pc -ge 1) {
-        Write-Ok "测试 3 通过: ${pc} 个 products 事件"
+        Write-Ok "${pc} 个 products 事件"
     } else {
-        Write-Fail "测试 3 失败: 缺少 products 事件"
+        Write-Fail "缺少 products 事件"; $pass = $false
+    }
+    if (-not (Select-String -Path $tmpfile -Pattern 'event: welcome' -Quiet -ErrorAction SilentlyContinue)) {
+        Write-Fail "缺少 welcome 事件"; $pass = $false
+    }
+    if (-not (Select-String -Path $tmpfile -Pattern 'event: next_options' -Quiet -ErrorAction SilentlyContinue)) {
+        Write-Fail "缺少 next_options 事件"; $pass = $false
+    }
+    if ($pass) {
+        Write-Ok "测试 3 通过"
+    } else {
+        Write-Fail "测试 3 失败"
     }
 
     Remove-Item $tmpfile -Force -ErrorAction SilentlyContinue

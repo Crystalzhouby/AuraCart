@@ -65,14 +65,13 @@ def route_intent(state: AgentState) -> str:
     return target
 
 
-def build_graph(llm, emb_service, async_session_factory, category_list_provider=None, reranker_service=None):
+def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
     """构建编译后的 StateGraph。
 
     参数:
         llm: LLMService 实例。
         emb_service: EmbeddingService 实例。
         async_session_factory: async_session 工厂函数。
-        category_list_provider: 可选，提供品类列表的异步函数（用于 Scenario Gen）。
         reranker_service: 可选，RerankerService 实例（用于精排）。
 
     返回值:
@@ -96,31 +95,17 @@ def build_graph(llm, emb_service, async_session_factory, category_list_provider=
 
     async def _extraction(state: AgentState) -> dict:
         logger.debug("extraction 输入", state=_preview(state))
-        # 加载品类上下文（Step 1 内部使用 fetch_category_context）
-        category_list = ""
-        valid_categories = None
-        try:
-            from app.services.category_lookup_service import fetch_category_context
-            async with async_session_factory() as session:
-                category_list, valid_categories = await fetch_category_context(session)
-        except Exception as e:
-            logger.warning("extraction 品类加载失败，降级为无约束", error=str(e))
         result = await extraction_node(
             state, llm=llm,
             db_session_factory=async_session_factory,
-            category_list=category_list,
-            valid_categories=valid_categories,
         )
         logger.debug("extraction 输出", result=_preview(result))
         return result
 
     async def _scenario_gen(state: AgentState) -> dict:
         logger.debug("scenario_gen 输入", state=_preview(state))
-        category_list = ""
-        if category_list_provider:
-            category_list = await category_list_provider()
         result = await scenario_gen_node(
-            state, llm=llm, category_list=category_list,
+            state, llm=llm,
             db_session_factory=async_session_factory,
         )
         logger.debug("scenario_gen 输出", result=_preview(result))

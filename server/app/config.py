@@ -141,13 +141,6 @@ class SearchSettings(BaseSettings):
     memory_recent_rounds: int = 10
     """Router 改写时检索的最近历史查询轮数。"""
 
-    # --- 保留的旧参数（向后兼容，逐步迁移） ---
-    top_k_per_query: int = 20
-    """[已废弃] 单次查询从每条路径检索的最大候选数量。请使用 semantic_top_k / keyword_top_k。"""
-
-    final_sku_limit: int = 10
-    """[已废弃] RRF 融合后返回给用户的最大 SKU 数量。请使用 rrf_top_k。"""
-
     # --- 不变的参数 ---
     max_match_texts_per_sku: int = 3
     """每个 SKU 最多附带几条 product_review 评论文本。"""

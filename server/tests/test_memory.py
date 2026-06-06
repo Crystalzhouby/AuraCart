@@ -1,66 +1,117 @@
 """MCL-A2: Memory 工具函数测试。
 
-验证 count_tokens 和 truncate_by_tokens 两个纯函数。
+验证 session_memory 相关的纯函数。
 """
-import json
-from app.agent.memory import count_tokens, truncate_by_tokens
+from app.agent.memory import (
+    get_recent_queries,
+    get_queries_by_category,
+    append_query,
+)
 
 
-def test_count_tokens_empty_list():
-    """空历史的 token 数应为 0。"""
-    assert count_tokens([]) == 0
+class TestGetRecentQueries:
+    """验证 get_recent_queries 跨品类按时间排序取最近 N 条。"""
+
+    def test_empty_memory(self):
+        assert get_recent_queries([], 5) == []
+
+    def test_n_zero(self):
+        memory = [{"category": "c1", "sub_category": "s1",
+                    "queries": [{"query": "q1", "timestamp": "2026-01-01T00:00:00"}]}]
+        assert get_recent_queries(memory, 0) == []
+
+    def test_orders_by_timestamp_desc(self):
+        memory = [
+            {"category": "a", "sub_category": "a1",
+             "queries": [
+                 {"query": "old", "timestamp": "2026-01-01T00:00:00"},
+                 {"query": "new", "timestamp": "2026-06-01T00:00:00"},
+             ]},
+        ]
+        result = get_recent_queries(memory, 2)
+        assert result[0]["query"] == "new"
+        assert result[1]["query"] == "old"
+
+    def test_limits_to_n(self):
+        memory = [
+            {"category": "a", "sub_category": "a1",
+             "queries": [
+                 {"query": "q1", "timestamp": "2026-01-01T00:00:00"},
+                 {"query": "q2", "timestamp": "2026-02-01T00:00:00"},
+                 {"query": "q3", "timestamp": "2026-03-01T00:00:00"},
+             ]},
+        ]
+        result = get_recent_queries(memory, 2)
+        assert len(result) == 2
 
 
-def test_count_tokens_basic():
-    """基本 token 计数：char/4 估算。"""
-    history = [{"sub_queries": [{"text": "蓝牙耳机", "strategy": "keyword"}]}]
-    serialized = json.dumps(history, ensure_ascii=False)
-    expected = len(serialized) // 4
-    assert count_tokens(history) == expected
+class TestGetQueriesByCategory:
+    """验证 get_queries_by_category 按品类精确检索。"""
+
+    def test_exact_match(self):
+        memory = [
+            {"category": "面部护肤", "sub_category": "防晒霜",
+             "queries": [{"query": "防晒", "timestamp": "2026-01-01T00:00:00"}]},
+        ]
+        result = get_queries_by_category(memory, "面部护肤", "防晒霜")
+        assert len(result) == 1
+        assert result[0]["query"] == "防晒"
+
+    def test_no_match(self):
+        memory = [
+            {"category": "面部护肤", "sub_category": "防晒霜",
+             "queries": [{"query": "防晒", "timestamp": "2026-01-01T00:00:00"}]},
+        ]
+        result = get_queries_by_category(memory, "服饰运动", "跑步鞋")
+        assert result == []
+
+    def test_empty_memory(self):
+        assert get_queries_by_category([], "a", "b") == []
 
 
-def test_count_tokens_returns_int():
-    """count_tokens 应返回 int 类型。"""
-    assert isinstance(count_tokens([{"sub_queries": [{"text": "test"}]}]), int)
+class TestAppendQuery:
+    """验证 append_query 纯函数行为。"""
 
+    def test_adds_to_existing_group(self):
+        memory = [
+            {"category": "面部护肤", "sub_category": "防晒霜",
+             "queries": [{"query": "防晒", "timestamp": "2026-01-01T00:00:00"}]},
+        ]
+        result = append_query(
+            memory, "轻薄的",
+            [{"category": "面部护肤", "sub_category": "防晒霜"}],
+            "2026-06-01T00:00:00",
+        )
+        assert len(result) == 1
+        assert len(result[0]["queries"]) == 2
 
-def test_truncate_by_tokens_no_truncation_needed():
-    """token 数不超阈值时不截断。"""
-    history = [{"sub_queries": [{"text": "短文本", "strategy": "keyword"}]}]
-    result = truncate_by_tokens(history, max_tokens=10000)
-    assert len(result) == len(history)
+    def test_creates_new_group(self):
+        result = append_query(
+            [], "跑鞋",
+            [{"category": "服饰运动", "sub_category": "跑步鞋"}],
+            "2026-06-01T00:00:00",
+        )
+        assert len(result) == 1
+        assert result[0]["category"] == "服饰运动"
 
+    def test_does_not_mutate_original(self):
+        memory = [
+            {"category": "a", "sub_category": "b",
+             "queries": [{"query": "q1", "timestamp": "2026-01-01T00:00:00"}]},
+        ]
+        result = append_query(
+            memory, "q2",
+            [{"category": "a", "sub_category": "b"}],
+            "2026-06-01T00:00:00",
+        )
+        assert len(memory[0]["queries"]) == 1
+        assert len(result[0]["queries"]) == 2
 
-def test_truncate_by_tokens_removes_oldest_first():
-    """截断时应从最旧的元素开始丢弃（FIFO）。"""
-    history = [
-        {"sub_queries": [{"text": "A" * 2000}]},  # ~500 tokens
-        {"sub_queries": [{"text": "B" * 2000}]},  # ~500 tokens
-        {"sub_queries": [{"text": "C" * 2000}]},  # ~500 tokens
-    ]
-    # 总 token ~1500，阈值 ~600 token → 应保留最后 2 个
-    result = truncate_by_tokens(history, max_tokens=600)
-    assert len(result) < len(history)
-    # 最旧的被丢弃
-    assert result[0]["sub_queries"][0]["text"][0] != "A"
-
-
-def test_truncate_by_tokens_keeps_at_least_one():
-    """即使第一个元素就超出阈值，也应保留至少 1 个元素。"""
-    history = [{"sub_queries": [{"text": "X" * 10000}]}]
-    result = truncate_by_tokens(history, max_tokens=10)
-    assert len(result) >= 1
-
-
-def test_truncate_by_tokens_empty_list():
-    """空历史截断后仍为空。"""
-    result = truncate_by_tokens([], max_tokens=100)
-    assert result == []
-
-
-def test_truncate_by_tokens_edge_case_exact_threshold():
-    """恰好等于阈值时不截断。"""
-    history = [{"sub_queries": [{"text": "T" * 40}]}]  # ~10 tokens
-    total = count_tokens(history)
-    result = truncate_by_tokens(history, max_tokens=total)
-    assert len(result) == len(history)
+    def test_unknown_category(self):
+        result = append_query(
+            [], "闲聊",
+            [],
+            "2026-06-01T00:00:00",
+        )
+        assert len(result) == 1
+        assert result[0]["category"] is None

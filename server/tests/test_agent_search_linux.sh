@@ -8,14 +8,11 @@
 #   3. 场景化推荐："下周去三亚度假，帮我搭配一套从防晒到穿搭的方案"
 #
 # 用法:
-#   cd server && bash tests/test_agent_search_linux.sh
+#   cd server && bash tests/test_agent_search.sh
 #   或指定服务地址:
-#   BASE_URL=http://localhost:8080 bash tests/test_agent_search_linux.sh
+#   BASE_URL=http://localhost:8080 bash tests/test_agent_search.sh
 #
-# 前置依赖 (Linux):
-#   - curl  (系统自带或 apt install curl)
-#   - jq    (apt install jq)
-#   - python3 (系统自带)
+# 依赖: curl, jq (解析 JSON)
 # =============================================================================
 
 set -euo pipefail
@@ -104,7 +101,13 @@ print_sse_summary() {
     info "SSE 事件汇总:"
     echo "  ──────────────────────────────────────────────"
 
-    # products 事件
+    # welcome 事件
+    if grep -q 'event: welcome' "$outfile" 2>/dev/null; then
+        echo -n "  welcome: "
+        grep -A1 'event: welcome' "$outfile" | grep '^data:' | sed 's/^data://' | sed 's/^"//' | sed 's/"$//'
+    fi
+
+    # products 事件（逐商品单对象）
     local product_count
     product_count=$(grep -c 'event: products' "$outfile" 2>/dev/null || true)
     echo "  products 事件: ${product_count} 次"
@@ -118,7 +121,7 @@ print_sse_summary() {
         echo "  ───────────────"
     fi
 
-    # done 事件
+    # done 事件（含 text 结束语）
     if grep -q 'event: done' "$outfile" 2>/dev/null; then
         echo ""
         echo -n "  done: "
@@ -158,10 +161,36 @@ test_single_turn() {
     print_sse_summary "$tmpfile"
 
     # 检查关键事件
-    if grep -q 'event: products' "$tmpfile"; then
-        ok "测试 1 通过: products 事件存在"
+    local pass=true
+    if grep -q 'event: welcome' "$tmpfile"; then
+        ok "welcome 事件存在"
     else
-        fail "测试 1 失败: 缺少 products 事件"
+        fail "缺少 welcome 事件"
+        pass=false
+    fi
+    if grep -q 'event: products' "$tmpfile"; then
+        ok "products 事件存在"
+    else
+        fail "缺少 products 事件"
+        pass=false
+    fi
+    if grep -q 'event: done' "$tmpfile" 2>/dev/null && grep -A1 'event: done' "$tmpfile" | grep -q '"text"'; then
+        ok "done 事件含结束语 text"
+    else
+        fail "done 事件缺少结束语 text"
+        pass=false
+    fi
+    if grep -q 'event: next_options' "$tmpfile"; then
+        ok "next_options 事件存在"
+    else
+        fail "缺少 next_options 事件"
+        pass=false
+    fi
+
+    if $pass; then
+        ok "测试 1 通过"
+    else
+        fail "测试 1 失败"
     fi
 
     rm -f "$tmpfile"
@@ -241,13 +270,33 @@ test_scenario() {
     sse_search "下周去三亚度假，帮我搭配一套从防晒到穿搭的方案" "$cid" "$tmpfile"
     print_sse_summary "$tmpfile"
 
-    # 场景化推荐预期多品类 → 多个 products 事件
+    # 场景化推荐预期多品类 → 多个 products 事件 + welcome + next_options
+    local pass=true
     local pc
     pc=$(grep -c 'event: products' "$tmpfile" 2>/dev/null || echo 0)
     if [[ $pc -ge 1 ]]; then
-        ok "测试 3 通过: ${pc} 个 products 事件"
+        ok "${pc} 个 products 事件"
     else
-        fail "测试 3 失败: 缺少 products 事件"
+        fail "缺少 products 事件"
+        pass=false
+    fi
+    if grep -q 'event: welcome' "$tmpfile"; then
+        ok "welcome 事件存在"
+    else
+        fail "缺少 welcome 事件"
+        pass=false
+    fi
+    if grep -q 'event: next_options' "$tmpfile"; then
+        ok "next_options 事件存在"
+    else
+        fail "缺少 next_options 事件"
+        pass=false
+    fi
+
+    if $pass; then
+        ok "测试 3 通过"
+    else
+        fail "测试 3 失败"
     fi
 
     rm -f "$tmpfile"

@@ -132,7 +132,7 @@ async def test_retrieval_node_writes_session_memory():
              "order_num": 1, "brand": None},
         ],
         "session_memory": [],
-        "conversation_history": [],
+        
     }
 
     # Mock async_session

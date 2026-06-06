@@ -18,5 +18,4 @@ ROUTER_SYSTEM = """#你是电商导购意图分类器。只判断当前用户意
 - {"intent": "explicit"}
 - {"intent": "scenario"}
 
-# 对话历史
-{conversation_history}"""
+"""

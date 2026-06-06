@@ -35,9 +35,6 @@ search:
   rerank_top_k: 5
   max_reviews_per_product: 5
   memory_recent_rounds: 10
-  # 旧参数（向后兼容，逐步废弃）
-  top_k_per_query: 20
-  final_sku_limit: 10
   # 不变参数
   max_match_texts_per_sku: 3
   max_match_chars_per_sku: 500
@@ -46,7 +43,7 @@ search:
     faq: 1.0
     user_review: 0.7
     property: 1.0
-  reasoning_max_chars: 500
+  reasoning_max_chars: 100
   max_category_concurrency: 5
   max_batch_ids: 20
   memory_max_tokens: 2000
@@ -71,7 +68,7 @@ timeout:
   retrieval: 1.0
   generation: 60.0
   rerank: 5.0
-  total_request: 60.0
+  total_request: 80.0
 
 # ---- 精排模型 ----
 reranker:

@@ -10,7 +10,7 @@
 - 结构化过滤：对产品和 SKU 字段进行精确/模糊匹配
 - 回退机制：全文搜索无结果时进行基本的 ILIKE 匹配
 
-本模块与 QueryParser 生成的 SubQuery 数据类配合使用。
+本模块与 SubQuery 数据类配合使用。
 """
 
 from dataclasses import dataclass, field

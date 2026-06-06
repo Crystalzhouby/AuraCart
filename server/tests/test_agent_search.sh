@@ -19,7 +19,7 @@ set -euo pipefail
 
 # ---- 配置 ----
 BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
-TIMEOUT="${TIMEOUT:-60}"
+TIMEOUT="${TIMEOUT:-300}"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -101,7 +101,13 @@ print_sse_summary() {
     info "SSE 事件汇总:"
     echo "  ──────────────────────────────────────────────"
 
-    # products 事件
+    # welcome 事件
+    if grep -q 'event: welcome' "$outfile" 2>/dev/null; then
+        echo -n "  welcome: "
+        grep -A1 'event: welcome' "$outfile" | grep '^data:' | sed 's/^data://' | sed 's/^"//' | sed 's/"$//'
+    fi
+
+    # products 事件（逐商品单对象）
     local product_count
     product_count=$(grep -c 'event: products' "$outfile" 2>/dev/null || true)
     echo "  products 事件: ${product_count} 次"
@@ -115,7 +121,7 @@ print_sse_summary() {
         echo "  ───────────────"
     fi
 
-    # done 事件
+    # done 事件（含 text 结束语）
     if grep -q 'event: done' "$outfile" 2>/dev/null; then
         echo ""
         echo -n "  done: "
@@ -142,26 +148,92 @@ print_sse_summary() {
 # ==================== 测试 1: 单轮对话 ====================
 test_single_turn() {
     divider
-    echo "  测试 1: 单轮对话 — "200 元以下的蓝牙耳机有哪些？""
+    echo "  测试 1: 单轮对话 (2 个查询)"
     divider
 
+    local pass=true
+
+    # --- 查询 1a: 推荐一款200元以下的防晒霜 ---
+    echo ""
+    info "--- 查询 1a: \"推荐一款200元以下的防晒霜\" ---"
     local cid
     cid=$(new_conversation)
     ok "conversation_id: ${cid}"
 
     local tmpfile
-    tmpfile=$(mktemp /tmp/test_search_1_XXXXXX.sse)
-    sse_search "200 元以下的蓝牙耳机有哪些？" "$cid" "$tmpfile"
+    tmpfile=$(mktemp /tmp/test_search_1a_XXXXXX.sse)
+    sse_search "推荐一款200元以下的防晒霜" "$cid" "$tmpfile"
     print_sse_summary "$tmpfile"
 
-    # 检查关键事件
-    if grep -q 'event: products' "$tmpfile"; then
-        ok "测试 1 通过: products 事件存在"
+    if grep -q 'event: welcome' "$tmpfile"; then
+        ok "查询 1a: welcome 事件存在"
     else
-        fail "测试 1 失败: 缺少 products 事件"
+        fail "查询 1a: 缺少 welcome 事件"
+        pass=false
     fi
-
+    if grep -q 'event: products' "$tmpfile"; then
+        ok "查询 1a: products 事件存在"
+    else
+        fail "查询 1a: 缺少 products 事件"
+        pass=false
+    fi
+    if grep -q 'event: done' "$tmpfile" 2>/dev/null && grep -A1 'event: done' "$tmpfile" | grep -q '"text"'; then
+        ok "查询 1a: done 事件含结束语 text"
+    else
+        fail "查询 1a: done 事件缺少结束语 text"
+        pass=false
+    fi
+    if grep -q 'event: next_options' "$tmpfile"; then
+        ok "查询 1a: next_options 事件存在"
+    else
+        fail "查询 1a: 缺少 next_options 事件"
+        pass=false
+    fi
     rm -f "$tmpfile"
+
+    sleep 2
+
+    # --- 查询 1b: 推荐一款不含酒精的防晒霜 ---
+    echo ""
+    info "--- 查询 1b: \"推荐一款不含酒精的防晒霜\" ---"
+    cid=$(new_conversation)
+    ok "conversation_id: ${cid}"
+
+    tmpfile=$(mktemp /tmp/test_search_1b_XXXXXX.sse)
+    sse_search "推荐一款不含酒精的防晒霜" "$cid" "$tmpfile"
+    print_sse_summary "$tmpfile"
+
+    if grep -q 'event: welcome' "$tmpfile"; then
+        ok "查询 1b: welcome 事件存在"
+    else
+        fail "查询 1b: 缺少 welcome 事件"
+        pass=false
+    fi
+    if grep -q 'event: products' "$tmpfile"; then
+        ok "查询 1b: products 事件存在"
+    else
+        fail "查询 1b: 缺少 products 事件"
+        pass=false
+    fi
+    if grep -q 'event: done' "$tmpfile" 2>/dev/null && grep -A1 'event: done' "$tmpfile" | grep -q '"text"'; then
+        ok "查询 1b: done 事件含结束语 text"
+    else
+        fail "查询 1b: done 事件缺少结束语 text"
+        pass=false
+    fi
+    if grep -q 'event: next_options' "$tmpfile"; then
+        ok "查询 1b: next_options 事件存在"
+    else
+        fail "查询 1b: 缺少 next_options 事件"
+        pass=false
+    fi
+    rm -f "$tmpfile"
+
+    if $pass; then
+        ok "测试 1 通过"
+    else
+        fail "测试 1 失败"
+    fi
 }
 
 # ==================== 测试 2: 多轮对话 ====================
@@ -238,13 +310,33 @@ test_scenario() {
     sse_search "下周去三亚度假，帮我搭配一套从防晒到穿搭的方案" "$cid" "$tmpfile"
     print_sse_summary "$tmpfile"
 
-    # 场景化推荐预期多品类 → 多个 products 事件
+    # 场景化推荐预期多品类 → 多个 products 事件 + welcome + next_options
+    local pass=true
     local pc
     pc=$(grep -c 'event: products' "$tmpfile" 2>/dev/null || echo 0)
     if [[ $pc -ge 1 ]]; then
-        ok "测试 3 通过: ${pc} 个 products 事件"
+        ok "${pc} 个 products 事件"
     else
-        fail "测试 3 失败: 缺少 products 事件"
+        fail "缺少 products 事件"
+        pass=false
+    fi
+    if grep -q 'event: welcome' "$tmpfile"; then
+        ok "welcome 事件存在"
+    else
+        fail "缺少 welcome 事件"
+        pass=false
+    fi
+    if grep -q 'event: next_options' "$tmpfile"; then
+        ok "next_options 事件存在"
+    else
+        fail "缺少 next_options 事件"
+        pass=false
+    fi
+
+    if $pass; then
+        ok "测试 3 通过"
+    else
+        fail "测试 3 失败"
     fi
 
     rm -f "$tmpfile"

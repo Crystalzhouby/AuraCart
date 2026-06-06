@@ -25,7 +25,6 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
     """
     requirements = json.dumps(state.get("requirements", {}), ensure_ascii=False)
     retrieval_results = json.dumps(state.get("retrieval_results", []), ensure_ascii=False)
-    conversation_history = json.dumps(state.get("conversation_history", []), ensure_ascii=False)
     scenario_description = state.get("scenario_description") or "无"
     failed_categories = state.get("failed_categories", [])
     failed_categories_str = json.dumps(failed_categories, ensure_ascii=False) if failed_categories else "无"
@@ -34,7 +33,6 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
         OPTION_GEN_SYSTEM
         .replace("{requirements}", requirements)
         .replace("{retrieval_results}", retrieval_results)
-        .replace("{conversation_history}", conversation_history)
         .replace("{scenario_description}", scenario_description)
         .replace("{failed_categories}", failed_categories_str)
     )
@@ -60,5 +58,10 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
     # 截断到最多 4 条
     if len(options) > 4:
         options = options[:4]
+
+    # SSE 发送 next_options 事件
+    queue = state.get("_sse_queue")
+    if queue and options:
+        await queue.put({"event": "next_options", "data": options})
 
     return {"next_options": options}

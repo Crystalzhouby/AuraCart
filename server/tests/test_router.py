@@ -16,7 +16,7 @@ async def test_router_explicit():
 
     state = {
         "user_query": "200元以下的蓝牙耳机",
-        "conversation_history": [],
+        
     }
     result = await router_node(state, llm=mock_llm)
 
@@ -32,7 +32,7 @@ async def test_router_scenario():
 
     state = {
         "user_query": "去三亚度假需要准备什么",
-        "conversation_history": [],
+        
     }
     result = await router_node(state, llm=mock_llm)
 
@@ -48,7 +48,7 @@ async def test_router_chat():
 
     state = {
         "user_query": "讲个笑话",
-        "conversation_history": [],
+        
     }
     result = await router_node(state, llm=mock_llm)
 
@@ -65,7 +65,7 @@ async def test_router_fallback_on_llm_error():
 
     state = {
         "user_query": "蓝牙耳机",
-        "conversation_history": [],
+        
     }
     result = await router_node(state, llm=mock_llm)
 
@@ -80,7 +80,7 @@ async def test_router_fallback_on_bad_json():
 
     state = {
         "user_query": "蓝牙耳机",
-        "conversation_history": [],
+        
     }
     result = await router_node(state, llm=mock_llm)
 
@@ -131,7 +131,7 @@ async def test_router_handles_markdown_fence_response():
     mock_llm = AsyncMock()
     mock_llm.chat.return_value = '```json\n{"intent": "chat"}\n```'
 
-    state = {"user_query": "你好", "conversation_history": []}
+    state = {"user_query": "你好"}
     result = await router_node(state, llm=mock_llm)
 
     assert result["intent"] == "chat"

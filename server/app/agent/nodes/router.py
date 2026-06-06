@@ -135,16 +135,10 @@ async def router_node(state: dict, llm: LLMService) -> dict:
         dict: {"intent", "rewritten_query"}，写入 AgentState。
     """
     user_query = state.get("user_query", "")
-    conversation_history = state.get("conversation_history", [])
     session_memory = state.get("session_memory", [])
 
     # ---- Step 1: 三分类 ----
-    history_str = ""
-    if conversation_history:
-        history_str = json.dumps(conversation_history, ensure_ascii=False)
-
     prompt = (ROUTER_SYSTEM
-              .replace("{conversation_history}", history_str)
               .replace("{user_query}", user_query))
     messages = [
         {"role": "system", "content": prompt},

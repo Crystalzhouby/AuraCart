@@ -210,7 +210,6 @@ async def _agent_event_stream(
     # 构建初始状态
     initial_state: AgentState = {
         "user_query": user_query,
-        "conversation_history": [],       # 旧格式，保留兼容（LangGraph add reducer）
         "rewritten_query": "",
         "session_memory": initial_session_memory,
         "intent": "explicit",

@@ -30,5 +30,4 @@ OPTION_GEN_SYSTEM = """你是一个电商导购推荐选项生成器。基于用
 ## 检索失败的品类（避免生成这些品类的选项）
 {failed_categories}
 
-## 对话历史
-{conversation_history}"""
+"""

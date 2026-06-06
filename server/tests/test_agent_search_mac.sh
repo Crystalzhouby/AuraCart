@@ -8,14 +8,11 @@
 #   3. 场景化推荐："下周去三亚度假，帮我搭配一套从防晒到穿搭的方案"
 #
 # 用法:
-#   cd server && bash tests/test_agent_search_mac.sh
+#   cd server && bash tests/test_agent_search.sh
 #   或指定服务地址:
-#   BASE_URL=http://localhost:8080 bash tests/test_agent_search_mac.sh
+#   BASE_URL=http://localhost:8080 bash tests/test_agent_search.sh
 #
-# 前置依赖 (macOS):
-#   - curl  (系统自带)
-#   - jq    (brew install jq)
-#   - python3 (系统自带)
+# 依赖: curl, jq (解析 JSON)
 # =============================================================================
 
 set -euo pipefail
@@ -33,7 +30,7 @@ NC='\033[0m' # No Color
 
 divider() {
     echo ""
-    printf '%*s\n' "80" '' | tr ' ' '='
+    printf '%*s\n' "80" '' | tr ' ' '═'
     echo ""
 }
 
@@ -69,7 +66,7 @@ sse_search() {
 
     curl -sS -N --connect-timeout 5 --max-time "$TIMEOUT" \
         -H "Accept: text/event-stream" \
-        "${BASE_URL}/api/search?q=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$query")&stream=true&conversation_id=${cid}" \
+        "${BASE_URL}/api/search?q=$(python3 -c 'import urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$query")&stream=true&conversation_id=${cid}" \
         > "$outfile" 2>/dev/null &
 
     local pid=$!
@@ -97,29 +94,34 @@ sse_search() {
 }
 
 # 解析并打印 SSE 事件摘要
-# macOS: BSD grep 兼容写法
 print_sse_summary() {
     local outfile="$1"
 
     echo ""
     info "SSE 事件汇总:"
-    echo "  ---------------------------------------------"
+    echo "  ──────────────────────────────────────────────"
 
-    # products 事件
+    # welcome 事件
+    if grep -q 'event: welcome' "$outfile" 2>/dev/null; then
+        echo -n "  welcome: "
+        grep -A1 'event: welcome' "$outfile" | grep '^data:' | sed 's/^data://' | sed 's/^"//' | sed 's/"$//'
+    fi
+
+    # products 事件（逐商品单对象）
     local product_count
     product_count=$(grep -c 'event: products' "$outfile" 2>/dev/null || true)
     echo "  products 事件: ${product_count} 次"
 
     # chat_reply 事件（收集文本）
     if grep -q 'event: chat_reply' "$outfile" 2>/dev/null; then
-        echo "  -- chat_reply --"
+        echo "  ── chat_reply ──"
         grep -A1 'event: chat_reply' "$outfile" | grep '^data:' | \
             sed 's/^data://' | sed 's/^"//' | sed 's/"$//' | \
             fold -w 76 -s | sed 's/^/  | /'
-        echo "  ---------------"
+        echo "  ───────────────"
     fi
 
-    # done 事件
+    # done 事件（含 text 结束语）
     if grep -q 'event: done' "$outfile" 2>/dev/null; then
         echo ""
         echo -n "  done: "
@@ -138,7 +140,7 @@ print_sse_summary() {
         grep -A1 'event: error' "$outfile" | grep '^data:' | sed 's/^data://'
     fi
 
-    echo "  ---------------------------------------------"
+    echo "  ──────────────────────────────────────────────"
 }
 
 # ---- 测试用例 ----
@@ -146,7 +148,7 @@ print_sse_summary() {
 # ==================== 测试 1: 单轮对话 ====================
 test_single_turn() {
     divider
-    echo "  测试 1: 单轮对话 - \"200 元以下的蓝牙耳机有哪些？\""
+    echo "  测试 1: 单轮对话 — "200 元以下的蓝牙耳机有哪些？""
     divider
 
     local cid
@@ -158,10 +160,37 @@ test_single_turn() {
     sse_search "200 元以下的蓝牙耳机有哪些？" "$cid" "$tmpfile"
     print_sse_summary "$tmpfile"
 
-    if grep -q 'event: products' "$tmpfile"; then
-        ok "测试 1 通过: products 事件存在"
+    # 检查关键事件
+    local pass=true
+    if grep -q 'event: welcome' "$tmpfile"; then
+        ok "welcome 事件存在"
     else
-        fail "测试 1 失败: 缺少 products 事件"
+        fail "缺少 welcome 事件"
+        pass=false
+    fi
+    if grep -q 'event: products' "$tmpfile"; then
+        ok "products 事件存在"
+    else
+        fail "缺少 products 事件"
+        pass=false
+    fi
+    if grep -q 'event: done' "$tmpfile" 2>/dev/null && grep -A1 'event: done' "$tmpfile" | grep -q '"text"'; then
+        ok "done 事件含结束语 text"
+    else
+        fail "done 事件缺少结束语 text"
+        pass=false
+    fi
+    if grep -q 'event: next_options' "$tmpfile"; then
+        ok "next_options 事件存在"
+    else
+        fail "缺少 next_options 事件"
+        pass=false
+    fi
+
+    if $pass; then
+        ok "测试 1 通过"
+    else
+        fail "测试 1 失败"
     fi
 
     rm -f "$tmpfile"
@@ -170,7 +199,7 @@ test_single_turn() {
 # ==================== 测试 2: 多轮对话 ====================
 test_multi_turn() {
     divider
-    echo "  测试 2: 多轮对话 - \"帮我推荐跑鞋\" → \"要轻量的\" → \"预算 500 以内\""
+    echo "  测试 2: 多轮对话 — "帮我推荐跑鞋" → "要轻量的" → "预算 500 以内""
     divider
 
     local cid
@@ -179,8 +208,8 @@ test_multi_turn() {
 
     local pass=true
 
-    # Turn 1
-    info "--- Turn 1 ---"
+    # Turn 1: 帮我推荐跑鞋
+    info "━━━ Turn 1 ━━━"
     local tmp1
     tmp1=$(mktemp /tmp/test_search_2a_XXXXXX.sse)
     sse_search "帮我推荐跑鞋" "$cid" "$tmp1"
@@ -193,8 +222,8 @@ test_multi_turn() {
 
     sleep 2
 
-    # Turn 2
-    info "--- Turn 2 ---"
+    # Turn 2: 要轻量的
+    info "━━━ Turn 2 ━━━"
     local tmp2
     tmp2=$(mktemp /tmp/test_search_2b_XXXXXX.sse)
     sse_search "要轻量的" "$cid" "$tmp2"
@@ -207,8 +236,8 @@ test_multi_turn() {
 
     sleep 2
 
-    # Turn 3
-    info "--- Turn 3 ---"
+    # Turn 3: 预算 500 以内
+    info "━━━ Turn 3 ━━━"
     local tmp3
     tmp3=$(mktemp /tmp/test_search_2c_XXXXXX.sse)
     sse_search "预算 500 以内" "$cid" "$tmp3"
@@ -229,7 +258,7 @@ test_multi_turn() {
 # ==================== 测试 3: 场景化推荐 ====================
 test_scenario() {
     divider
-    echo "  测试 3: 场景化推荐 - \"下周去三亚度假，帮我搭配一套从防晒到穿搭的方案\""
+    echo "  测试 3: 场景化推荐 — "下周去三亚度假，帮我搭配一套从防晒到穿搭的方案""
     divider
 
     local cid
@@ -241,12 +270,33 @@ test_scenario() {
     sse_search "下周去三亚度假，帮我搭配一套从防晒到穿搭的方案" "$cid" "$tmpfile"
     print_sse_summary "$tmpfile"
 
+    # 场景化推荐预期多品类 → 多个 products 事件 + welcome + next_options
+    local pass=true
     local pc
     pc=$(grep -c 'event: products' "$tmpfile" 2>/dev/null || echo 0)
     if [[ $pc -ge 1 ]]; then
-        ok "测试 3 通过: ${pc} 个 products 事件"
+        ok "${pc} 个 products 事件"
     else
-        fail "测试 3 失败: 缺少 products 事件"
+        fail "缺少 products 事件"
+        pass=false
+    fi
+    if grep -q 'event: welcome' "$tmpfile"; then
+        ok "welcome 事件存在"
+    else
+        fail "缺少 welcome 事件"
+        pass=false
+    fi
+    if grep -q 'event: next_options' "$tmpfile"; then
+        ok "next_options 事件存在"
+    else
+        fail "缺少 next_options 事件"
+        pass=false
+    fi
+
+    if $pass; then
+        ok "测试 3 通过"
+    else
+        fail "测试 3 失败"
     fi
 
     rm -f "$tmpfile"
@@ -256,7 +306,7 @@ test_scenario() {
 
 main() {
     divider
-    echo "  AuraCart Agent 搜索服务集成测试 (macOS)"
+    echo "  AuraCart Agent 搜索服务集成测试"
     echo "  服务地址: ${BASE_URL}"
     divider
 
@@ -265,19 +315,14 @@ main() {
     if ! curl -sS --connect-timeout 5 "${BASE_URL}/health" > /dev/null 2>&1; then
         fail "服务不可达: ${BASE_URL}/health"
         echo ""
-        echo "  请先启动服务: cd server && python3 run.py"
+        echo "  请先启动服务: cd server && python run.py"
         exit 1
     fi
     ok "服务可达"
 
-    # 检查依赖
+    # 检查 jq
     if ! command -v jq &>/dev/null; then
-        warn "未安装 jq，请运行: brew install jq"
-        exit 1
-    fi
-    if ! command -v python3 &>/dev/null; then
-        warn "未安装 python3，请安装 Xcode Command Line Tools: xcode-select --install"
-        exit 1
+        warn "未安装 jq，部分解析功能可能受限"
     fi
 
     # 运行测试

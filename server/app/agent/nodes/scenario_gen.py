@@ -181,10 +181,6 @@ async def scenario_gen_node(
         scenario_description = data.get("scenario_description", rewritten_query)
         requirements = data.get("requirements", [])
 
-        # 如果 requirements 是旧格式 {sub_queries: [...]}，做兼容提取
-        if isinstance(requirements, dict):
-            requirements = requirements.get("sub_queries", [])
-
     except Exception as e:
         logger.warning("Scenario Gen LLM 调用失败", error=str(e))
         return {

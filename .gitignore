@@ -94,3 +94,4 @@ Thumbs.db
 .superpowers/*
 .mcp.json
 server/docs/.archrive/*
+server/tests/TMP/*

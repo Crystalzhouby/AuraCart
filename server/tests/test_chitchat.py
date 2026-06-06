@@ -24,7 +24,7 @@ async def test_chitchat_returns_reply():
 
     state = {
         "user_query": "你好",
-        "conversation_history": [],
+        
     }
     result = await chitchat_node(state, llm=mock_llm)
 
@@ -41,7 +41,7 @@ async def test_chitchat_fallback_on_error():
 
     state = {
         "user_query": "你好",
-        "conversation_history": [],
+        
     }
     result = await chitchat_node(state, llm=mock_llm)
 
@@ -59,7 +59,7 @@ async def test_chitchat_sends_sse_chat_reply_event():
     queue = asyncio.Queue()
     state = {
         "user_query": "你好",
-        "conversation_history": [],
+        
         "_sse_queue": queue,
     }
     await chitchat_node(state, llm=mock_llm)
@@ -81,7 +81,7 @@ async def test_chitchat_no_sse_when_no_queue():
 
     state = {
         "user_query": "你好",
-        "conversation_history": [],
+        
     }
     result = await chitchat_node(state, llm=mock_llm)
 
@@ -97,7 +97,7 @@ async def test_chitchat_handles_empty_stream_response():
 
     state = {
         "user_query": "测试",
-        "conversation_history": [],
+        
     }
     result = await chitchat_node(state, llm=mock_llm)
 

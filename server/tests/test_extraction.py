@@ -124,7 +124,7 @@ async def test_extraction_new_format_output():
         "user_query": "200元以下的蓝牙耳机",
         "rewritten_query": "200元以下的蓝牙耳机",
         "session_memory": [],
-        "conversation_history": [],
+        
     }
 
     with patch("app.services.category_lookup_service.fetch_category_context",
@@ -155,7 +155,7 @@ async def test_extraction_fallback_on_llm_error():
         "user_query": "蓝牙耳机",
         "rewritten_query": "蓝牙耳机",
         "session_memory": [],
-        "conversation_history": [],
+        
     }
 
     result = await extraction_node(
@@ -196,7 +196,7 @@ async def test_extraction_uses_rewritten_query():
         "user_query": "要轻量的",           # 不完整查询
         "rewritten_query": "要轻量的跑鞋",   # 改写后
         "session_memory": [],
-        "conversation_history": [],
+        
     }
 
     with patch("app.services.category_lookup_service.fetch_category_context",

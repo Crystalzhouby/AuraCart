@@ -231,8 +231,6 @@ async def extraction_node(
     state: dict,
     llm: LLMService,
     db_session_factory,
-    category_list: str = "",
-    valid_categories: set | None = None,
 ) -> dict:
     """Intent Extraction 节点函数 — 三步流程。
 
@@ -240,8 +238,6 @@ async def extraction_node(
         state: AgentState 字典。
         llm: LLMService 实例。
         db_session_factory: async_session 工厂函数（用于 Tools 调用）。
-        category_list: [已废弃] 旧品类清单字符串，保留兼容但不使用。
-        valid_categories: [已废弃] 旧品类校验集合，保留兼容但不使用。
 
     返回值:
         dict: {"requirements": [新格式]}，写入 AgentState。

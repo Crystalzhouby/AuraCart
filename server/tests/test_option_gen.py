@@ -22,7 +22,7 @@ async def test_option_gen_basic():
             {"product_id": "p001", "sku_id": "sk001", "title": "安踏C202", "price": 399,
              "category": "运动户外", "sub_category": "跑鞋"}
         ],
-        "conversation_history": [],
+        
         "scenario_description": None,
     }
     result = await option_gen_node(state, llm=mock_llm)
@@ -40,7 +40,7 @@ async def test_option_gen_fallback_on_error():
     state = {
         "requirements": {"sub_queries": [{"text": "test"}]},
         "retrieval_results": [],
-        "conversation_history": [],
+        
         "scenario_description": None,
     }
     result = await option_gen_node(state, llm=mock_llm)
@@ -60,7 +60,7 @@ async def test_option_gen_truncates_too_many():
     state = {
         "requirements": {"sub_queries": []},
         "retrieval_results": [],
-        "conversation_history": [],
+        
         "scenario_description": None,
     }
     result = await option_gen_node(state, llm=mock_llm)
@@ -90,7 +90,7 @@ async def test_option_gen_injects_failed_categories_into_prompt():
     state = {
         "requirements": {"sub_queries": [{"text": "test"}]},
         "retrieval_results": [],
-        "conversation_history": [],
+        
         "scenario_description": None,
         "failed_categories": ["防晒霜", "墨镜"],  # 检索失败的品类
     }
@@ -117,7 +117,7 @@ async def test_option_gen_omits_failed_categories_when_empty():
     state = {
         "requirements": {"sub_queries": []},
         "retrieval_results": [],
-        "conversation_history": [],
+        
         "scenario_description": None,
         "failed_categories": [],
     }
@@ -137,7 +137,7 @@ async def test_option_gen_empty_failed_categories():
     state = {
         "requirements": {"sub_queries": []},
         "retrieval_results": [],
-        "conversation_history": [],
+        
         "scenario_description": None,
         "failed_categories": [],
     }
