@@ -100,8 +100,39 @@ class MessageAdapter(
         fun bind(item: MessageItem.UserMsg) { b.tvText.text = item.text }
     }
 
+    /**
+     * AI 消息 ViewHolder — 渲染文本 + 内嵌商品卡片
+     *
+     * 商品卡片紧跟在推荐理由文字下方展示，每个商品一张横向卡片（左图+右信息+购物车图标）。
+     * 数据来自 AiMsg.inlineProducts，由 ChatViewModel 在 SSE 配对后通过 batch API 异步填入。
+     */
     inner class AiVH(val b: ItemMsgAiBinding) : RecyclerView.ViewHolder(b.root) {
-        fun bind(item: MessageItem.AiMsg) { b.tvText.text = item.text }
+
+        private val inlineProductAdapter = HorizontalProductCardInReplyAdapter(
+            onProductClick = onProductClick,
+            onHorizontalProductClick = onHorizontalProductClick
+        )
+
+        init {
+            b.rvInlineProducts.apply {
+                layoutManager = LinearLayoutManager(b.root.context, LinearLayoutManager.VERTICAL, false)
+                adapter = inlineProductAdapter
+                isNestedScrollingEnabled = false
+            }
+        }
+
+        fun bind(item: MessageItem.AiMsg) {
+            // 文本内容
+            b.tvText.text = item.text
+
+            // 内嵌商品卡片
+            if (item.inlineProducts.isNotEmpty()) {
+                inlineProductAdapter.submitList(item.inlineProducts)
+                b.rvInlineProducts.visibility = View.VISIBLE
+            } else {
+                b.rvInlineProducts.visibility = View.GONE
+            }
+        }
     }
 
     inner class TypingVH(val b: ItemMsgTypingBinding) : RecyclerView.ViewHolder(b.root) {
