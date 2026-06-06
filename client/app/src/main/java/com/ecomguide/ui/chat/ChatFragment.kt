@@ -59,6 +59,9 @@ class ChatFragment : Fragment() {
         setupRecyclerView()
         setupInput()
         observeViewModel()
+
+        // 页面加载时自动创建会话（后端 Agent 工作流需要 conversation_id）
+        vm.createConversation()
     }
 
     /** 横幅：时段问候文案 + 礼物呼吸动效 */
@@ -170,7 +173,9 @@ class ChatFragment : Fragment() {
     private fun observeViewModel() {
         vm.messages.observe(viewLifecycleOwner) { items ->
             messageAdapter.submitMessages(items)
-            b.rvMessages.scrollToPosition(messageAdapter.itemCount - 1)
+            if (messageAdapter.itemCount > 0) {
+                b.rvMessages.scrollToPosition(messageAdapter.itemCount - 1)
+            }
         }
 
         vm.showWelcome.observe(viewLifecycleOwner) { show ->

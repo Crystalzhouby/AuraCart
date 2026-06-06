@@ -73,13 +73,42 @@ data class UserReview(
     val content: String = ""
 ) : Parcelable
 
-// ─── SSE events ────────────────────────────────────────────────────────────────
+// ─── SSE events (后端 Agent 工作流 v2 协议) ─────────────────────────────────────
 
+/**
+ * 后端 /api/search/{conversation_id} 返回的 SSE 事件类型：
+ *   welcome     → 欢迎语文本
+ *   products    → 单个商品对象 {product_id, sku_id, category, sub_category}
+ *   chat_reply  → 品类介绍或推荐理由文本
+ *   done        → 结束语 + conversation_id
+ *   next_options → 后续追问选项列表
+ *   error       → 错误信息
+ */
 sealed class ChatStreamEvent {
-    data class Delta(val text: String) : ChatStreamEvent()
-    data class ProductCards(val productsJson: String) : ChatStreamEvent()
-    data class CartUpdate(val cartJson: String) : ChatStreamEvent()
-    data class Done(val sessionId: String?) : ChatStreamEvent()
+    /** 欢迎语 — Retrieval 节点第一条事件 */
+    data class Welcome(val text: String) : ChatStreamEvent()
+
+    /** 单个商品对象 — 后跟该商品的 chat_reply 推荐理由 */
+    data class ProductEvent(
+        val productId: String,
+        val skuId: String,
+        val category: String = "",
+        val subCategory: String = ""
+    ) : ChatStreamEvent()
+
+    /** 品类介绍过渡语（多品类）或单商品推荐理由 */
+    data class ChatReply(val text: String) : ChatStreamEvent()
+
+    /** 流结束 — 含结束语 text 和 conversation_id */
+    data class Done(
+        val text: String? = null,
+        val conversationId: String? = null
+    ) : ChatStreamEvent()
+
+    /** 后续追问选项 */
+    data class NextOptions(val options: List<String>) : ChatStreamEvent()
+
+    /** 错误信息 */
     data class Error(val message: String) : ChatStreamEvent()
 }
 
@@ -114,7 +143,19 @@ data class ScenarioCard(
 
 sealed class MessageItem {
     data class UserMsg(val text: String) : MessageItem()
-    data class AiMsg(val text: String, val isStreaming: Boolean = false) : MessageItem()
+    /**
+     * AI 文本消息 — 支持内嵌商品卡片（紧跟在推荐理由后展示）
+     *
+     * @param text           AI 回复文本（欢迎语 + 推荐理由流式拼接 + 结束语）
+     * @param isStreaming    是否仍在接收 SSE 流
+     * @param inlineProducts 内嵌商品卡片列表，每个商品紧跟在其推荐理由之后展示。
+     *                       数据由 batch API (/api/products/batch) 异步获取后填入。
+     */
+    data class AiMsg(
+        val text: String,
+        val isStreaming: Boolean = false,
+        val inlineProducts: List<ApiProduct> = emptyList()
+    ) : MessageItem()
     object Typing : MessageItem()
     data class ProductCards(val products: List<ApiProduct>) : MessageItem()
     data class FollowTags(val tags: List<String>) : MessageItem()
