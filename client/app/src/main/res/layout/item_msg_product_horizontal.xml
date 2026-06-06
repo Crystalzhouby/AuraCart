@@ -20,8 +20,8 @@
     <!-- 左侧商品图片 -->
     <ImageView
         android:id="@+id/ivProduct"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
         android:background="@color/colorBackground"
         android:scaleType="centerCrop"
         android:layout_marginEnd="10dp"/>
@@ -59,7 +59,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:textColor="@color/colorPrice"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold"/>
 
             <!-- 购物车图标按钮 -->

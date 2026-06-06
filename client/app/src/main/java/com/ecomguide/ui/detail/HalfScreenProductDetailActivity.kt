@@ -79,12 +79,17 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
         if (product == null) return
 
         // 大图
-        val primaryUrl = resolveImageUrl(product!!.imageUrl)
-        val fallbackUrl = product!!.img
-        val loadUrl = primaryUrl ?: fallbackUrl
+        val primaryUrl = com.ecomguide.network.RetrofitClient.resolveImageUrl(product!!.resolvedImageUrl)
+        val endpointUrl = com.ecomguide.network.RetrofitClient.productImageUrl(product!!.resolvedId)
+        val fallbackUrl = com.ecomguide.network.RetrofitClient.resolveImageUrl(product!!.img)
+        val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
         if (loadUrl != null) {
-            Glide.with(this).load(loadUrl).centerCrop()
-                .placeholder(android.R.color.darker_gray).into(b.ivProductImage)
+            Glide.with(this)
+                .load(loadUrl)
+                .error(Glide.with(this).load(endpointUrl ?: fallbackUrl))
+                .centerCrop()
+                .placeholder(android.R.color.darker_gray)
+                .into(b.ivProductImage)
         } else {
             b.ivProductImage.setImageResource(android.R.color.darker_gray)
         }
@@ -154,12 +159,6 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
     }
 
     // ─── 工具方法 ──────────────────────────────────────────────────────────────
-
-    private fun resolveImageUrl(url: String?): String? {
-        if (url == null) return null
-        return if (url.startsWith("http")) url
-        else "${com.ecomguide.network.RetrofitClient.BASE_URL.trimEnd('/')}$url"
-    }
 
     private fun formatPrice(price: Double): String =
         if (price == price.toLong().toDouble()) "¥${price.toLong()}"

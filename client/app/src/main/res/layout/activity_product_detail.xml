@@ -39,7 +39,7 @@
             <!-- Product image -->
             <ImageView android:id="@+id/ivDetailImage"
                 android:layout_width="match_parent" android:layout_height="360dp"
-                android:background="@color/colorBackground" android:scaleType="centerCrop"/>
+                android:background="@color/colorBackground" android:scaleType="fitCenter"/>
 
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical" android:padding="16dp">

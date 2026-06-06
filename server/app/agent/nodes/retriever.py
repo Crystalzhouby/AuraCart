@@ -562,32 +562,28 @@ async def retrieval_node(
 
         # 3b. 逐商品推荐
         if skus:
-            # 并行生成推荐理由
-            reason_tasks = [
-                _generate_product_reason(sku, user_query, skus, llm,
-                                         session_memory=state.get("session_memory"))
-                for sku in skus
-            ]
-            reasons = await asyncio.gather(*reason_tasks, return_exceptions=True)
+            # 为了提升前端“边到边渲染”体验，逐商品生成推荐理由并立即发送，
+            # 避免等待整批推荐理由全部生成后一次性下发。
+            for sku in skus:
+                if not queue:
+                    continue
 
-            # 串行 SSE 发送（保证前端展示顺序）
-            for i, sku in enumerate(skus):
-                if queue:
-                    await queue.put({
-                        "event": "products",
-                        "data": {
-                            "product_id": sku["product_id"],
-                            "sku_id": sku["sku_id"],
-                            "category": category,
-                            "sub_category": sub_category,
-                        },
-                    })
-                    reason = reasons[i] if (
-                        i < len(reasons)
-                        and isinstance(reasons[i], str)
-                    ) else ""
-                    if reason:
-                        await queue.put({"event": "chat_reply", "data": reason})
+                await queue.put({
+                    "event": "products",
+                    "data": {
+                        "product_id": sku["product_id"],
+                        "sku_id": sku["sku_id"],
+                        "category": category,
+                        "sub_category": sub_category,
+                    },
+                })
+
+                reason = await _generate_product_reason(
+                    sku, user_query, skus, llm,
+                    session_memory=state.get("session_memory"),
+                )
+                if reason:
+                    await queue.put({"event": "chat_reply", "data": reason})
 
     # 4. 结束语 + done
     ending_text = await _generate_ending(safe_results, requirements, llm,

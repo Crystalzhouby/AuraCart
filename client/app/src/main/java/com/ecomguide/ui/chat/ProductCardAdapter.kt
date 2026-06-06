@@ -39,20 +39,27 @@ class ProductCardAdapter(
             }
             b.tvRating.text = if (avgRating != null) "⭐ ${"%.1f".format(avgRating)}" else ""
 
-            // Image：优先本地 API，失败时 fallback 到 picsum
-            val primaryUrl = resolveImageUrl(product.imageUrl)
-            val fallbackUrl = product.img  // picsum placeholder
-            val loadUrl = primaryUrl ?: fallbackUrl
+            // Image：优先商品字段，其次 /api/products/image/{id} 兜底，最后 fallback 图
+            val primaryUrl = RetrofitClient.resolveImageUrl(product.resolvedImageUrl)
+            val endpointUrl = RetrofitClient.productImageUrl(product.resolvedId)
+            val fallbackUrl = RetrofitClient.resolveImageUrl(product.img)
+            val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
             if (loadUrl != null) {
                 val req = Glide.with(b.root.context)
-                if (primaryUrl != null && fallbackUrl != null) {
-                    req.load(primaryUrl)
+                when {
+                    primaryUrl != null -> req.load(primaryUrl)
+                        .error(req.load(endpointUrl ?: fallbackUrl))
+                        .centerCrop()
+                        .placeholder(android.R.color.darker_gray)
+                        .into(b.ivProduct)
+
+                    endpointUrl != null -> req.load(endpointUrl)
                         .error(req.load(fallbackUrl))
                         .centerCrop()
                         .placeholder(android.R.color.darker_gray)
                         .into(b.ivProduct)
-                } else {
-                    req.load(loadUrl).centerCrop()
+
+                    else -> req.load(loadUrl).centerCrop()
                         .placeholder(android.R.color.darker_gray)
                         .into(b.ivProduct)
                 }
@@ -71,9 +78,4 @@ class ProductCardAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) =
         holder.bind(getItem(position), position == 0)
 
-    private fun resolveImageUrl(url: String?): String? {
-        if (url == null) return null
-        return if (url.startsWith("http")) url
-        else "${RetrofitClient.BASE_URL.trimEnd('/')}$url"
-    }
 }
