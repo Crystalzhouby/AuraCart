@@ -58,8 +58,8 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
         options = []
 
     # 截断到最多 4 条
-    if len(options) > 4:
-        options = options[:4]
+    if len(options) > 3:
+        options = options[:3]
 
     # 通过 SSE 队列发送 done 事件（推荐路径的终端节点）
     queue = state.get("_sse_queue")
