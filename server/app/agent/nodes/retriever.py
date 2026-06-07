@@ -332,6 +332,7 @@ async def retrieval_node(
     requirements = state.get("requirements", [])
     scenario_description = state.get("scenario_description", "")
     queue = _sse_queue or state.get("_sse_queue")
+    stream = state.get("stream", True)
 
     if not requirements:
         return {"retrieval_results": [], "failed_categories": [],
@@ -340,10 +341,11 @@ async def retrieval_node(
     logger.info("Retrieval 节点开始", user_query=user_query,
                 requirement_count=len(requirements))
 
-    # 1. 欢迎语
-    welcome_text = state.get("welcome_text", "")
-    if queue and welcome_text:
-        await queue.put({"event": "welcome", "data": welcome_text})
+    # 1. 欢迎语（仅非流式模式: Router 已写入 state，此处读取并发送）
+    if not stream:
+        welcome_text = state.get("welcome_text", "")
+        if queue and welcome_text:
+            await queue.put({"event": "welcome", "data": welcome_text})
 
     # 2. 并行检索
     semaphore = asyncio.Semaphore(settings.search.max_category_concurrency)
@@ -391,12 +393,34 @@ async def retrieval_node(
 
         # 3a. 品类介绍语
         if total_valid > 1:
-            intro = await _generate_category_intro(
-                category, sub_category, idx + 1, total_valid,
-                scenario_description, llm,
-            )
-            if queue and intro:
-                await queue.put({"event": "category_intro", "data": intro})
+            if stream and queue:
+                # 流式路径: 逐 token 推送 category_intro_stream
+                try:
+                    prompt = CATEGORY_INTRO_SYSTEM.format(
+                        category=category or "",
+                        sub_category=sub_category or "",
+                        index=idx + 1,
+                        total=total_valid,
+                        scenario_description=scenario_description or "无",
+                    )
+                    messages = [
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": "请生成品类介绍"},
+                    ]
+                    await queue.put({"event": "category_intro_stream", "data": {"type": "start"}})
+                    async for token in llm.chat_stream(messages, temperature=0.3):
+                        await queue.put({"event": "category_intro_stream", "data": {"type": "delta", "text": token}})
+                    await queue.put({"event": "category_intro_stream", "data": {"type": "end"}})
+                except Exception as e:
+                    logger.warning("流式品类介绍生成失败", category=category, error=str(e))
+            else:
+                # 非流式路径
+                intro = await _generate_category_intro(
+                    category, sub_category, idx + 1, total_valid,
+                    scenario_description, llm,
+                )
+                if queue and intro:
+                    await queue.put({"event": "category_intro", "data": intro})
 
         # 3b. 逐商品推荐
         if products:

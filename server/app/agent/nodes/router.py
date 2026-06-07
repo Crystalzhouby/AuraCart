@@ -113,22 +113,27 @@ async def _generate_welcome(
         return ""
 
 
-async def router_node(state: dict, llm: LLMService) -> dict:
+async def router_node(state: dict, llm: LLMService, _sse_queue=None) -> dict:
     """Intent Router 节点函数。
 
     流程:
     1. LLM 三分类: chat / explicit / scenario
     2. 若为 explicit 或 scenario: 生成欢迎语
+       - stream=true: 逐 token 推送 welcome_stream 事件
+       - stream=false: 完整文本写入 state["welcome_text"]
 
     参数:
         state: AgentState 字典。
         llm: LLMService 实例。
+        _sse_queue: 可选，asyncio.Queue，用于 SSE 推送。
 
     返回值:
         dict: {"intent", "welcome_text"}，写入 AgentState。
     """
     user_query = state.get("user_query", "")
     session_memory = state.get("session_memory", [])
+    stream = state.get("stream", True)
+    queue = _sse_queue or state.get("_sse_queue")
 
     # ---- Step 1: 三分类 ----
     prompt = (ROUTER_SYSTEM
@@ -154,12 +159,34 @@ async def router_node(state: dict, llm: LLMService) -> dict:
         n_rounds = settings.search.memory_recent_rounds
         recent_queries = get_recent_queries(session_memory, n_rounds)
         scenario_desc = state.get("scenario_description") or ""
-        welcome_text = await _generate_welcome(
-            user_query=user_query,
-            recent_queries=recent_queries,
-            scenario_description=scenario_desc,
-            llm=llm,
-        )
+
+        if stream and queue:
+            # 流式路径: 逐 token 推送 welcome_stream 事件
+            try:
+                history_text = _format_recent_queries(recent_queries)
+                prompt = WELCOME_SYSTEM.format(
+                    user_query=user_query,
+                    recent_queries=history_text,
+                    scenario_description=scenario_desc or "无",
+                )
+                messages = [
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": "请生成欢迎语"},
+                ]
+                await queue.put({"event": "welcome_stream", "data": {"type": "start"}})
+                async for token in llm.chat_stream(messages, temperature=0.3):
+                    await queue.put({"event": "welcome_stream", "data": {"type": "delta", "text": token}})
+                await queue.put({"event": "welcome_stream", "data": {"type": "end"}})
+            except Exception as e:
+                logger.warning("流式欢迎语生成失败", error=str(e))
+        else:
+            # 非流式路径: 完整文本写入 state
+            welcome_text = await _generate_welcome(
+                user_query=user_query,
+                recent_queries=recent_queries,
+                scenario_description=scenario_desc,
+                llm=llm,
+            )
 
     return {
         "intent": intent,

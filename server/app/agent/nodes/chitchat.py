@@ -28,6 +28,7 @@ async def chitchat_node(state: dict, llm: LLMService) -> dict:
     """
     user_query = state.get("user_query", "")
     queue = state.get("_sse_queue")
+    stream = state.get("stream", True)
 
     prompt = CHITCHAT_SYSTEM.format(user_query=user_query)
     messages = [
@@ -35,21 +36,36 @@ async def chitchat_node(state: dict, llm: LLMService) -> dict:
         {"role": "user", "content": user_query},
     ]
 
-    try:
-        # 使用流式调用收集回复
-        parts = []
-        async for token in llm.chat_stream(messages, temperature=0.3):
-            parts.append(token)
-        reply = "".join(parts)
+    if stream and queue:
+        # 流式路径: 逐 token 推送 chat_reply_stream 事件
+        await queue.put({"event": "chat_reply_stream", "data": {"type": "start"}})
+        reply_parts = []
+        try:
+            async for token in llm.chat_stream(messages, temperature=0.3):
+                reply_parts.append(token)
+                await queue.put({"event": "chat_reply_stream", "data": {"type": "delta", "text": token}})
+        except Exception as e:
+            logger.warning("ChitChat 流式调用失败", error=str(e))
+        await queue.put({"event": "chat_reply_stream", "data": {"type": "end"}})
+        reply = "".join(reply_parts)
         if not reply or not reply.strip():
             reply = FALLBACK_REPLY
-    except Exception as e:
-        logger.warning("ChitChat LLM 调用失败，使用 fallback", error=str(e))
-        reply = FALLBACK_REPLY
-
-    # 通过 SSE 队列发送 chat_reply 事件，然后发送 done
-    if queue:
-        await queue.put({"event": "chat_reply", "data": reply})
         await queue.put({"event": "done", "data": {}})
+    else:
+        # 非流式路径: 缓冲后一次性发送
+        try:
+            parts = []
+            async for token in llm.chat_stream(messages, temperature=0.3):
+                parts.append(token)
+            reply = "".join(parts)
+            if not reply or not reply.strip():
+                reply = FALLBACK_REPLY
+        except Exception as e:
+            logger.warning("ChitChat LLM 调用失败，使用 fallback", error=str(e))
+            reply = FALLBACK_REPLY
+
+        if queue:
+            await queue.put({"event": "chat_reply", "data": reply})
+            await queue.put({"event": "done", "data": {}})
 
     return {"chat_reply": reply}

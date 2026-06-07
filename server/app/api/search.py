@@ -123,6 +123,7 @@ async def search(
                 queue=queue,
                 total_timeout=settings.timeout.total_request,
                 conversation_id=conversation_id,
+                stream=stream,
             ):
                 yield event
 
@@ -150,6 +151,7 @@ async def _agent_event_stream(
     queue: asyncio.Queue,
     total_timeout: float = 60.0,
     conversation_id: str = "",
+    stream: bool = True,
 ):
     """LangGraph Agent 工作流的 SSE 事件消费循环。
 
@@ -211,6 +213,7 @@ async def _agent_event_stream(
     initial_state: AgentState = {
         "user_query": user_query,
         "welcome_text": "",
+        "stream": stream,
         "session_memory": initial_session_memory,
         "intent": "explicit",
         "requirements": [],               # 新格式: list[dict]

@@ -102,6 +102,7 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
     options: list[str] = []
     ending: str = ""
     queue = state.get("_sse_queue")
+    stream = state.get("stream", True)
 
     try:
         # 1. 构建结束语上下文
@@ -144,20 +145,41 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
         logger.debug("option_gen prompt", prompt_len=len(prompt),
                      product_count=product_count)
 
-        raw_response = await llm.chat(messages, temperature=0.3)
+        if stream and queue:
+            # 流式路径: chat_stream() + stream_json_field() 实时推送 ending 并解析 options
+            from app.agent.utils.stream_json import stream_json_field
 
-        start = raw_response.find("{")
-        end = raw_response.rfind("}") + 1
-        if start >= 0 and end > start:
-            data = json.loads(raw_response[start:end])
-            ending = data.get("ending", "")
-            options = data.get("next_options", [])
+            await queue.put({"event": "ending_stream", "data": {"type": "start"}})
+
+            async def _on_delta(ch: str):
+                await queue.put({"event": "ending_stream", "data": {"type": "delta", "text": ch}})
+
+            token_stream = llm.chat_stream(messages, temperature=0.3)
+            _stream_events, parsed = await stream_json_field(token_stream, "ending", on_delta=_on_delta)
+
+            await queue.put({"event": "ending_stream", "data": {"type": "end"}})
+
+            if parsed:
+                ending = parsed.get("ending", "")
+                options = parsed.get("next_options", [])
+            else:
+                logger.warning("Option Gen 流式 JSON 解析失败，options 为空")
         else:
-            logger.warning("Option Gen 响应不含 JSON", raw=raw_response[:200])
+            # 非流式路径: 保持现有逻辑
+            raw_response = await llm.chat(messages, temperature=0.3)
 
-        # 5. 通过 queue 发送 ending 事件
-        if queue and ending:
-            await queue.put({"event": "ending", "data": ending})
+            start = raw_response.find("{")
+            end = raw_response.rfind("}") + 1
+            if start >= 0 and end > start:
+                data = json.loads(raw_response[start:end])
+                ending = data.get("ending", "")
+                options = data.get("next_options", [])
+            else:
+                logger.warning("Option Gen 响应不含 JSON", raw=raw_response[:200])
+
+            # 5. 通过 queue 发送 ending 事件
+            if queue and ending:
+                await queue.put({"event": "ending", "data": ending})
 
     except Exception as e:
         logger.warning("Option Gen 调用失败", error=str(e))

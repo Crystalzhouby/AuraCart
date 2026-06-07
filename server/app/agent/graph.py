@@ -83,7 +83,7 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
 
     async def _router(state: AgentState) -> dict:
         logger.debug("router 输入", state=_preview(state))
-        result = await router_node(state, llm=llm)
+        result = await router_node(state, llm=llm, _sse_queue=state.get("_sse_queue"))
         logger.debug("router 输出", result=_preview(result))
         return result
 
