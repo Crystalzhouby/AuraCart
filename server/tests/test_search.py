@@ -1,5 +1,5 @@
 # tests/test_search.py
-"""测试搜索接口的流式与非流式两种模式，以及 _truncate_texts 截断函数。
+"""测试搜索接口的流式与非流式两种模式，以及 truncate_texts 截断函数。
 
 使用 ASGI transport（无需启动真实服务器）验证 GET /api/search
 的查询参数要求、状态码以及基本可达性。
@@ -9,7 +9,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient, ASGITransport
 from app.main import app
-from app.services.sku_utils_service import _truncate_texts, _get_products
+from app.utils.search_util import truncate_texts
+from app.utils.product_util import get_products
 from app.services.retriever_service import ProductHit
 
 
@@ -44,12 +45,12 @@ async def test_search_nonstream_route_exists():
 
 
 # ======================================================================
-# _truncate_texts 单元测试
+# truncate_texts 单元测试
 # ======================================================================
 
 
 class TestTruncateTexts:
-    """测试 _truncate_texts 纯函数的截断与排序行为。"""
+    """测试 truncate_texts 纯函数的截断与排序行为。"""
 
     def test_sort_by_source_priority(self):
         """faq 应排在 marketing 前面，user_review 应排在最后（faq > marketing > user_review）。"""
@@ -58,7 +59,7 @@ class TestTruncateTexts:
             {"content": "用户评价X", "source": "user_review", "metadata": None},
             {"content": "FAQ内容B", "source": "faq", "metadata": None},
         ]
-        result = _truncate_texts(texts, max_count=10, max_chars=1000)
+        result = truncate_texts(texts, max_count=10, max_chars=1000)
         sources = [t["source"] for t in result]
         assert sources == ["faq", "marketing", "user_review"]
 
@@ -70,7 +71,7 @@ class TestTruncateTexts:
             {"content": "评价3", "source": "user_review", "metadata": None},
             {"content": "评价4", "source": "user_review", "metadata": None},
         ]
-        result = _truncate_texts(texts, max_count=2, max_chars=1000)
+        result = truncate_texts(texts, max_count=2, max_chars=1000)
         assert len(result) == 2
 
     def test_truncate_by_max_chars(self):
@@ -79,14 +80,14 @@ class TestTruncateTexts:
             {"content": "很长的评价内容ABCDEFGHIJ", "source": "user_review", "metadata": None},
             {"content": "第二条评价", "source": "user_review", "metadata": None},
         ]
-        result = _truncate_texts(texts, max_count=10, max_chars=10)
+        result = truncate_texts(texts, max_count=10, max_chars=10)
         # 第一条 10 字符刚好等于 max_chars=10，第二条不会加入
         assert len(result) >= 1
         assert len(result) <= 2
 
     def test_empty_list(self):
         """空列表直接返回空列表。"""
-        result = _truncate_texts([], max_count=3, max_chars=500)
+        result = truncate_texts([], max_count=3, max_chars=500)
         assert result == []
 
     def test_unknown_source_falls_to_last(self):
@@ -96,7 +97,7 @@ class TestTruncateTexts:
             {"content": "官方描述", "source": "marketing", "metadata": None},
             {"content": "用户评价", "source": "user_review", "metadata": None},
         ]
-        result = _truncate_texts(texts, max_count=10, max_chars=1000)
+        result = truncate_texts(texts, max_count=10, max_chars=1000)
         sources = [t["source"] for t in result]
         # marketing(1) > user_review(2) > unknown_type(99)
         assert sources[0] == "marketing"
@@ -108,12 +109,12 @@ class TestTruncateTexts:
             {"content": "A" * 100, "source": "faq", "metadata": None},
             {"content": "B" * 50, "source": "user_review", "metadata": None},
         ]
-        result = _truncate_texts(texts, max_count=10, max_chars=5)
+        result = truncate_texts(texts, max_count=10, max_chars=5)
         assert len(result) >= 1
 
 
 # ======================================================================
-# _get_products 单元测试（mock DB）
+# get_products 单元测试（mock DB）
 # ======================================================================
 
 
@@ -128,7 +129,7 @@ class _MockRow:
 def _make_mock_db(rows: list[dict]) -> AsyncMock:
     """构造一个返回指定行的 mock AsyncSession。
 
-    _get_products 中 await db.execute(...) 返回的 Result 对象
+    get_products 中 await db.execute(...) 返回的 Result 对象
     会被直接 for 迭代，因此 mock 返回 list[_MockRow] 即可。
     """
     mock_db = AsyncMock()
@@ -137,13 +138,13 @@ def _make_mock_db(rows: list[dict]) -> AsyncMock:
 
 
 class TestGetProducts:
-    """测试 _get_products 的 SQL 扩展与聚合行为。"""
+    """测试 get_products 的 SQL 扩展与聚合行为。"""
 
     @pytest.mark.asyncio
     async def test_empty_hits(self):
         """空列表直接返回空列表。"""
         db = _make_mock_db([])
-        result = await _get_products(db, [])
+        result = await get_products(db, [])
         assert result == []
 
     @pytest.mark.asyncio
@@ -156,7 +157,7 @@ class TestGetProducts:
              "content": None, "source": None, "extra_data": None},
         ])
         hits = [ProductHit(product_id="P1", score=0.9)]
-        result = await _get_products(db, hits)
+        result = await get_products(db, hits)
         assert len(result) == 1
         assert result[0]["matched_texts"] == []
 
@@ -178,7 +179,7 @@ class TestGetProducts:
              "content": "Q:适合干皮吗 A:适合", "source": "faq", "extra_data": None},
         ])
         hits = [ProductHit(product_id="P1", score=0.9)]
-        result = await _get_products(db, hits)
+        result = await get_products(db, hits)
         assert len(result) == 1
         assert len(result[0]["matched_texts"]) == 3
 
@@ -200,7 +201,7 @@ class TestGetProducts:
             ProductHit(product_id="P2", score=0.95),
             ProductHit(product_id="P1", score=0.90),
         ]
-        result = await _get_products(db, hits)
+        result = await get_products(db, hits)
         assert result[0]["product_id"] == "P2"
         assert result[1]["product_id"] == "P1"
 
@@ -209,5 +210,5 @@ class TestGetProducts:
         """DB 中不存在的 product_id 被跳过。"""
         db = _make_mock_db([])
         hits = [ProductHit(product_id="NONEXIST", score=0.5)]
-        result = await _get_products(db, hits)
+        result = await get_products(db, hits)
         assert result == []

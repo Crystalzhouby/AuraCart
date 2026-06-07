@@ -16,12 +16,10 @@ import structlog
 
 from app.config import settings
 from app.services.retriever_service import Retriever, SubQuery, Merger
-from app.services.sku_utils_service import _truncate_texts
+from app.utils.search_util import truncate_texts
 from app.agent.memory import append_query
-from app.agent.prompts.show_prompt import (
-    CATEGORY_INTRO_SYSTEM,
-    PRODUCT_REASON_SYSTEM,
-)
+from app.agent.prompts.category_intro_prompt import CATEGORY_INTRO_SYSTEM
+from app.agent.prompts.product_reason_prompt import PRODUCT_REASON_SYSTEM
 
 logger = structlog.get_logger("agent.retrieval")
 
@@ -204,7 +202,7 @@ async def _category_task(
                 if data is None:
                     continue
                 raw_texts = data.get("matched_texts", [])
-                truncated = _truncate_texts(
+                truncated = truncate_texts(
                     raw_texts,
                     settings.search.max_match_texts_per_product,
                     settings.search.max_match_chars_per_product,

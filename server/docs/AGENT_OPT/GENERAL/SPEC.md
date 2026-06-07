@@ -371,7 +371,8 @@ server/app/
 │   │   └── option_gen.py     # Option Gen（合并 ending + next_options，流式推送 ending_stream）
 │   └── prompts/
 │       ├── unified_router_prompt.py   # 统一 Router 提示词（合并分类 + 闲聊 + 欢迎语）
-│       ├── show_prompt.py             # CATEGORY_INTRO_SYSTEM / PRODUCT_REASON_SYSTEM
+│       ├── category_intro_prompt.py   # CATEGORY_INTRO_SYSTEM（品类介绍过渡语）
+│       ├── product_reason_prompt.py   # PRODUCT_REASON_SYSTEM（单商品推荐理由）
 │       ├── extraction_prompt.py       # 三步提取提示词（Step1 + Step3）
 │       ├── scenario_gen_prompt.py     # 场景生成提示词
 │       └── option_gen_prompt.py       # 合并结束语 + 选项提示词（ENDING_OPTION_SYSTEM）
@@ -379,14 +380,17 @@ server/app/
 │       └── stream_json.py    # 流式 JSON 字段提取器（stream_json_field）
 ├── api/
 │   ├── search.py             # SSE 搜索端点 + _agent_event_stream 消费循环
-│   ├── frontend.py           # 前端补充接口（history / review / all_skus）
-│   ├── products.py           # 商品查询 + 批量查询
+│   ├── products.py           # 产品/SKU 查询 + 前端补充接口（history / review / all_skus）
+│   ├── admin.py              # 管理后台接口（sync）
+│   ├── conversation.py       # 会话管理接口
 │   └── ...
 ├── services/
 │   ├── retriever_service.py   # Retriever / SubQuery / Merger / ProductHit（商品级检索）
 │   ├── reranker.py            # RerankerService（bge-reranker-v2-m3 API 客户端）
-│   ├── sku_utils_service.py   # _get_products / _truncate_texts（商品查询 + 文本截断）
 │   └── ...
+├── utils/
+│   ├── search_util.py        # truncate_texts（文本截断工具）
+│   └── product_util.py       # get_products（商品查询填充工具）
 ├── models/
 │   ├── conversation.py       # Conversation 模型（conversation_id + memory JSONB）
 │   ├── chat_message.py       # ChatMessage 模型（对话历史持久化）

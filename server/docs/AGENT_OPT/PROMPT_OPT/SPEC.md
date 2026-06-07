@@ -1,6 +1,0 @@
-我修改了scenario_gen_prompt和extraction_prompt，主要是强调了一下brand、category和sub_category的字段值都需要是数据库表中真实存在的值。
-
-
-特别是brand字段，它的值需要出现在品类为(category,sub_category)的商品品牌集合中，为了查询这个集合，我在提示词中声明了一个工具函数，进行实现这个工具函数，并在提示词中补充相应的function calling提示词。
-
-此外，我修改了一些返回格式之类的，也请你与当前的设计做对齐。
