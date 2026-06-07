@@ -1,6 +1,6 @@
-"""MCL-I4: search_util / product_util 工具函数测试。
+"""MCL-I4: search_util 工具函数测试。
 
-验证 truncate_texts 和 get_products 从 services/sku_utils.py 迁移到 utils/ 后的正确性。
+验证 truncate_texts 从 services/sku_utils.py 迁移到 utils/search_util.py 后的正确性。
 """
 import pytest
 
@@ -9,18 +9,6 @@ def test_search_util_module_importable():
     """验证 app.utils.search_util 模块可导入。"""
     from app.utils import search_util
     assert search_util is not None
-
-
-def test_product_util_module_importable():
-    """验证 app.utils.product_util 模块可导入。"""
-    from app.utils import product_util
-    assert product_util is not None
-
-
-def test_get_products_function_exists():
-    """验证 get_products 函数可从 product_util 导入。"""
-    from app.utils.product_util import get_products
-    assert callable(get_products)
 
 
 def test_truncate_texts_function_exists():
@@ -36,16 +24,6 @@ def test_source_priority_constant_exists():
     assert "faq" in _SOURCE_PRIORITY
     assert "marketing" in _SOURCE_PRIORITY
     assert "user_review" in _SOURCE_PRIORITY
-
-
-def test_get_products_signature():
-    """验证 get_products 函数签名接受 db 和 hits 参数。"""
-    from app.utils.product_util import get_products
-    import inspect
-    sig = inspect.signature(get_products)
-    params = list(sig.parameters.keys())
-    assert "db" in params
-    assert "hits" in params
 
 
 def test_truncate_texts_basic_behavior():

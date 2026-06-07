@@ -13,7 +13,7 @@
 本模块与 SubQuery 数据类配合使用。
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
@@ -480,69 +480,6 @@ class Retriever:
 
         ranked = sorted(deduped.values(), key=lambda h: h.score, reverse=True)
         return ranked[:top_k], hit_metadata
-
-    async def _structured_filter(self, sub: SubQuery, top_k: int) -> list[dict]:
-        """对产品或 SKU 字段执行结构化过滤。"""
-        if sub.field in ("brand", "category", "sub_category"):
-            table = "product"
-        elif sub.field in ("price", "stock"):
-            table = "sku"
-        else:
-            return []
-
-        values = sub.expanded_values if sub.expanded_values else (
-            [sub.value] if sub.value is not None else []
-        )
-
-        if sub.operator in ("in", "not_in") and values:
-            placeholders = ", ".join([f":v{i}" for i in range(len(values))])
-            col = f"p.{sub.field}" if table == "product" else f"s.{sub.field}"
-            if sub.operator == "in":
-                where_clause = f"{col} IN ({placeholders})"
-            else:
-                where_clause = f"{col} NOT IN ({placeholders})"
-            params = {f"v{i}": v for i, v in enumerate(values)}
-        elif sub.operator == "lt" and sub.value is not None:
-            col = f"p.{sub.field}" if table == "product" else f"s.{sub.field}"
-            where_clause = f"{col} < :val"
-            params = {"val": sub.value}
-        elif sub.operator == "gt" and sub.value is not None:
-            col = f"p.{sub.field}" if table == "product" else f"s.{sub.field}"
-            where_clause = f"{col} > :val"
-            params = {"val": sub.value}
-        elif sub.operator in ("contains", "not_contains") and sub.value:
-            col = f"p.{sub.field}" if table == "product" else f"s.{sub.field}"
-            pattern = f"%{sub.value}%"
-            if sub.operator == "contains":
-                where_clause = f"{col} ILIKE :pat"
-            else:
-                where_clause = f"{col} NOT ILIKE :pat"
-            params = {"pat": pattern}
-        else:
-            return []
-
-        if table == "product":
-            sql = text(f"""
-                SELECT DISTINCT p.product_id, 'basic_info' AS source, 1.0 AS score
-                FROM product p
-                WHERE p.is_active = TRUE AND {where_clause}
-                LIMIT :limit
-            """)
-        else:
-            sql = text(f"""
-                SELECT DISTINCT s.product_id, 'sku' AS source, 1.0 AS score
-                FROM sku s
-                JOIN product p ON p.product_id = s.product_id AND p.is_active = TRUE
-                WHERE {where_clause}
-                LIMIT :limit
-            """)
-
-        params["limit"] = top_k
-        result = await self.db.execute(sql, params)
-        return [
-            {"product_id": r.product_id, "source": r.source, "score": float(r.score)}
-            for r in result.fetchall()
-        ]
 
 
 # ---------------------------------------------------------------------------

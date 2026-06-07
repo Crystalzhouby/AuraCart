@@ -389,8 +389,7 @@ server/app/
 │   ├── reranker.py            # RerankerService（bge-reranker-v2-m3 API 客户端）
 │   └── ...
 ├── utils/
-│   ├── search_util.py        # truncate_texts（文本截断工具）
-│   └── product_util.py       # get_products（商品查询填充工具）
+│   └── search_util.py        # truncate_texts（文本截断工具）
 ├── models/
 │   ├── conversation.py       # Conversation 模型（conversation_id + memory JSONB）
 │   ├── chat_message.py       # ChatMessage 模型（对话历史持久化）
