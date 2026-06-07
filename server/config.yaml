@@ -34,10 +34,11 @@ search:
   rrf_top_k: 25
   rerank_top_k: 5
   max_reviews_per_product: 5
+  max_chunks_per_product: 5
   memory_recent_rounds: 10
   # 不变参数
-  max_match_texts_per_sku: 3
-  max_match_chars_per_sku: 500
+  max_match_texts_per_product: 3
+  max_match_chars_per_product: 500
   source_weights:
     marketing: 1.0
     faq: 1.0

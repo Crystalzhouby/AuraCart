@@ -33,38 +33,30 @@ def test_subquery_structured_filter_operator_handles_negation():
     assert sq.expanded_values == ["SK-II", "资生堂"]
 
 
-def _make_kw_row(sku_id="S001", product_id="P001", score=0.5,
-                 content="测试内容", source="user_review", metadata=None,
+def _make_kw_row(product_id="P001", score=0.5,
                  title="测试商品", brand="测试品牌", category="美妆",
                  sub_category="防晒", base_price=99.0,
-                 properties=None, price=79.0, stock=100):
-    """创建模拟 keyword 检索返回行的 MagicMock，含所有扩展字段。"""
+                 skus_json=None, matched_texts_json=None):
+    """创建模拟 keyword 检索返回行的 MagicMock，含 product 级别字段。"""
     row = MagicMock()
-    row.sku_id = sku_id
     row.product_id = product_id
     row.score = score
-    row.content = content
-    row.source = source
-    row.metadata = metadata
     row.title = title
     row.brand = brand
     row.category = category
     row.sub_category = sub_category
     row.base_price = base_price
-    row.properties = properties
-    row.price = price
-    row.stock = stock
+    row.skus_json = skus_json or [{"sku_id": "S001", "properties": None, "price": 79.0, "stock": 100}]
+    row.matched_texts_json = matched_texts_json or [{"content": "测试内容", "source": "user_review", "metadata": None}]
     return row
 
 
-def _make_sem_row(sku_id="S001", product_id="P001", score=0.5,
+def _make_sem_row(product_id="P001", score=0.5,
                   title="测试商品", brand="测试品牌", category="美妆",
                   sub_category="防晒", base_price=99.0,
-                  properties=None, price=79.0, stock=100,
-                  matched_texts_json=None):
-    """创建模拟 semantic 检索返回行的 MagicMock，含所有扩展字段。"""
+                  skus_json=None, matched_texts_json=None):
+    """创建模拟 semantic 检索返回行的 MagicMock，含 product 级别字段。"""
     row = MagicMock()
-    row.sku_id = sku_id
     row.product_id = product_id
     row.score = score
     row.title = title
@@ -72,10 +64,8 @@ def _make_sem_row(sku_id="S001", product_id="P001", score=0.5,
     row.category = category
     row.sub_category = sub_category
     row.base_price = base_price
-    row.properties = properties
-    row.price = price
-    row.stock = stock
-    row.matched_texts_json = matched_texts_json or []
+    row.skus_json = skus_json or [{"sku_id": "S001", "properties": None, "price": 79.0, "stock": 100}]
+    row.matched_texts_json = matched_texts_json or [{"content": "测试内容", "source": "user_review", "metadata": None}]
     return row
 
 
@@ -103,17 +93,17 @@ def mock_emb():
 
 @pytest.mark.asyncio
 async def test_retrieve_semantic(mock_db, mock_emb):
-    """验证语义检索使用 pgvector 余弦相似度并返回带评分的 SKUHit。
+    """验证语义检索使用 pgvector 余弦相似度并返回带评分的 ProductHit。
 
     - 调用 embed() 将子查询文本向量化。
     - 查询数据库中相似的 product_review 行。
-    - 返回 SKUHit 列表。
+    - 返回 ProductHit 列表。
     """
     from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_sem_row(sku_id="SKU001", product_id="PROD001", score=0.85)
+    mock_row = _make_sem_row(product_id="PROD001", score=0.85)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -125,7 +115,7 @@ async def test_retrieve_semantic(mock_db, mock_emb):
     assert len(hits) == 1
     assert hits[0].product_id == "PROD001"
     assert hits[0].score == 0.85
-    assert "SKU001" in meta
+    assert "PROD001" in meta
     mock_emb.embed.assert_called_once_with("防晒霜")
 
 
@@ -134,13 +124,13 @@ async def test_retrieve_keyword(mock_db, mock_emb):
     """验证关键词检索使用 PostgreSQL 全文搜索（ts_rank）。
 
     - 不应调用 embed()（关键词无需向量化）。
-    - 返回以归一化 rank 作为 score 的 SKUHit 结果。
+    - 返回以归一化 rank 作为 score 的 ProductHit 结果。
     """
     from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_kw_row(sku_id="SKU002", product_id="PROD002", score=0.5)
+    mock_row = _make_kw_row(product_id="PROD002", score=0.5)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -152,7 +142,7 @@ async def test_retrieve_keyword(mock_db, mock_emb):
     assert len(hits) == 1
     assert hits[0].product_id == "PROD002"
     assert hits[0].score == 0.5
-    assert "SKU002" in meta
+    assert "PROD002" in meta
 
 
 @pytest.mark.asyncio
@@ -195,7 +185,7 @@ async def test_retrieve_keyword_fallback(mock_db, mock_emb):
     empty_result.fetchall.return_value = []
 
     # ILIKE 降级返回匹配行
-    fallback_row = _make_kw_row(sku_id="SKU003", product_id="PROD003", score=0.3)
+    fallback_row = _make_kw_row(product_id="PROD003", score=0.3)
 
     fallback_result = MagicMock()
     fallback_result.fetchall.return_value = [fallback_row]
@@ -264,25 +254,24 @@ def test_retrieve_structured_not_contains():
 
 
 # ---------------------------------------------------------------------------
-# Step 2: SKUHit / Filters / FilterClause 数据类测试
+# Step 2: ProductHit / Filters / FilterClause 数据类测试
 # ---------------------------------------------------------------------------
 
 
-def test_skuhit_creation():
-    """验证 SKUHit 数据类正确存储 sku_id、product_id 和 score。"""
-    from app.services.retriever_service import SKUHit
+def test_producthit_creation():
+    """验证 ProductHit 数据类正确存储 product_id 和 score。"""
+    from app.services.retriever_service import ProductHit
 
-    hit = SKUHit(sku_id="SKU001", product_id="PROD001", score=0.95)
-    assert hit.sku_id == "SKU001"
+    hit = ProductHit(product_id="PROD001", score=0.95)
     assert hit.product_id == "PROD001"
     assert hit.score == 0.95
 
 
-def test_skuhit_defaults():
-    """验证 SKUHit 所有字段均为必填（无默认值），确保调用方显式传参。"""
-    from app.services.retriever_service import SKUHit
+def test_producthit_defaults():
+    """验证 ProductHit 所有字段均为必填（无默认值），确保调用方显式传参。"""
+    from app.services.retriever_service import ProductHit
 
-    hit = SKUHit(sku_id="SKU002", product_id="PROD002", score=0.0)
+    hit = ProductHit(product_id="PROD002", score=0.0)
     assert hit.score == 0.0
 
 
@@ -479,7 +468,7 @@ def test_build_base_query_no_filters():
     assert "JOIN product p ON p.product_id = pr.product_id AND p.is_active = TRUE" in sql
     assert "JOIN sku s ON s.product_id = p.product_id AND s.is_active = TRUE" in sql
     assert "0.5 AS score" in sql
-    assert "SELECT s.sku_id, p.product_id" in sql
+    assert "SELECT p.product_id, p.title" in sql
 
 
 def test_build_base_query_with_product_filter():
@@ -547,13 +536,13 @@ def test_build_base_query_score_expr_injection():
 
 
 @pytest.mark.asyncio
-async def test_keyword_search_returns_skuhits(mock_db, mock_emb):
-    """验证 _keyword_search 返回 list[SKUHit] 格式，score 为 ts_rank 值。"""
-    from app.services.retriever_service import Filters, SKUHit
+async def test_keyword_search_returns_producthits(mock_db, mock_emb):
+    """验证 _keyword_search 返回 list[ProductHit] 格式，score 为 ts_rank 值。"""
+    from app.services.retriever_service import Filters, ProductHit
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_kw_row(sku_id="SKU001", product_id="PROD001", score=0.75)
+    mock_row = _make_kw_row(product_id="PROD001", score=0.75)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -563,11 +552,10 @@ async def test_keyword_search_returns_skuhits(mock_db, mock_emb):
     hits, meta = await retriever._keyword_search(subs, Filters(conditions=[]), top_k=20)
 
     assert len(hits) == 1
-    assert isinstance(hits[0], SKUHit)
-    assert hits[0].sku_id == "SKU001"
+    assert isinstance(hits[0], ProductHit)
     assert hits[0].product_id == "PROD001"
     assert hits[0].score == 0.75
-    assert meta["SKU001"]["matched_texts"]
+    assert meta["PROD001"]["matched_texts"]
 
 
 @pytest.mark.asyncio
@@ -577,7 +565,7 @@ async def test_keyword_search_applies_filters(mock_db, mock_emb):
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_kw_row(sku_id="SKU002", product_id="PROD002", score=0.6)
+    mock_row = _make_kw_row(product_id="PROD002", score=0.6)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -595,7 +583,7 @@ async def test_keyword_search_applies_filters(mock_db, mock_emb):
 
 @pytest.mark.asyncio
 async def test_keyword_search_tsv_fallback(mock_db, mock_emb):
-    """验证 tsvector 无结果时降级为 ILIKE，并返回 list[SKUHit]。"""
+    """验证 tsvector 无结果时降级为 ILIKE，并返回 list[ProductHit]。"""
     from app.services.retriever_service import Filters
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
@@ -603,7 +591,7 @@ async def test_keyword_search_tsv_fallback(mock_db, mock_emb):
     empty_result = MagicMock()
     empty_result.fetchall.return_value = []
 
-    fallback_row = _make_kw_row(sku_id="SKU003", product_id="PROD003", score=0.3)
+    fallback_row = _make_kw_row(product_id="PROD003", score=0.3)
 
     fallback_result = MagicMock()
     fallback_result.fetchall.return_value = [fallback_row]
@@ -614,7 +602,7 @@ async def test_keyword_search_tsv_fallback(mock_db, mock_emb):
     hits, meta = await retriever._keyword_search(subs, Filters(conditions=[]), top_k=20)
 
     assert len(hits) == 1
-    assert hits[0].sku_id == "SKU003"
+    assert hits[0].product_id == "PROD003"
     assert hits[0].score == 0.3
 
 
@@ -625,12 +613,12 @@ async def test_keyword_search_tsv_fallback(mock_db, mock_emb):
 
 @pytest.mark.asyncio
 async def test_semantic_search_single_sub(mock_db, mock_emb):
-    """验证单条 semantic 子查询返回 list[SKUHit]，embed 被调用一次。"""
-    from app.services.retriever_service import Filters, SKUHit
+    """验证单条 semantic 子查询返回 list[ProductHit]，embed 被调用一次。"""
+    from app.services.retriever_service import Filters, ProductHit
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_sem_row(sku_id="SKU100", product_id="PROD100", score=0.88)
+    mock_row = _make_sem_row(product_id="PROD100", score=0.88)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -640,8 +628,8 @@ async def test_semantic_search_single_sub(mock_db, mock_emb):
     hits, meta = await retriever._semantic_search(subs, Filters(conditions=[]), top_k=20)
 
     assert len(hits) == 1
-    assert isinstance(hits[0], SKUHit)
-    assert hits[0].sku_id == "SKU100"
+    assert isinstance(hits[0], ProductHit)
+    assert hits[0].product_id == "PROD100"
     assert hits[0].score == 0.88
     mock_emb.embed.assert_called_once_with("保湿效果好")
 
@@ -653,7 +641,7 @@ async def test_semantic_search_multi_sub(mock_db, mock_emb):
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_sem_row(sku_id="SKU200", product_id="PROD200", score=1.5)
+    mock_row = _make_sem_row(product_id="PROD200", score=1.5)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -666,7 +654,7 @@ async def test_semantic_search_multi_sub(mock_db, mock_emb):
     hits, meta = await retriever._semantic_search(subs, Filters(conditions=[]), top_k=20)
 
     assert len(hits) == 1
-    assert hits[0].sku_id == "SKU200"
+    assert hits[0].product_id == "PROD200"
     assert hits[0].score == 1.5
     assert mock_emb.embed.call_count == 2
 
@@ -678,7 +666,7 @@ async def test_semantic_search_applies_filters(mock_db, mock_emb):
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_sem_row(sku_id="SKU300", product_id="PROD300", score=0.7)
+    mock_row = _make_sem_row(product_id="PROD300", score=0.7)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -764,7 +752,7 @@ async def test_semantic_search_includes_weight_expr(mock_db, mock_emb):
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_sem_row(sku_id="SKU100", product_id="PROD100", score=0.88)
+    mock_row = _make_sem_row(product_id="PROD100", score=0.88)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -790,7 +778,7 @@ async def test_semantic_search_weight_params_bound(mock_db, mock_emb):
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_sem_row(sku_id="SKU200", product_id="PROD200", score=1.2)
+    mock_row = _make_sem_row(product_id="PROD200", score=1.2)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -818,7 +806,7 @@ async def test_keyword_search_includes_weight_expr(mock_db, mock_emb):
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_kw_row(sku_id="SKU001", product_id="PROD001", score=0.75)
+    mock_row = _make_kw_row(product_id="PROD001", score=0.75)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -841,7 +829,7 @@ async def test_keyword_search_weight_params_bound(mock_db, mock_emb):
 
     retriever = Retriever(db=mock_db, emb=mock_emb)
 
-    mock_row = _make_kw_row(sku_id="SKU002", product_id="PROD002", score=0.6)
+    mock_row = _make_kw_row(product_id="PROD002", score=0.6)
 
     mock_result = MagicMock()
     mock_result.fetchall.return_value = [mock_row]
@@ -866,7 +854,7 @@ async def test_keyword_fallback_includes_weight_expr(mock_db, mock_emb):
     empty_result = MagicMock()
     empty_result.fetchall.return_value = []
 
-    fallback_row = _make_kw_row(sku_id="SKU003", product_id="PROD003", score=0.21)  # 0.7 * 0.3
+    fallback_row = _make_kw_row(product_id="PROD003", score=0.21)  # 0.7 * 0.3
 
     fallback_result = MagicMock()
     fallback_result.fetchall.return_value = [fallback_row]

@@ -1,6 +1,6 @@
 """MCL-I4: sku_utils 模块测试。
 
-验证 _get_skus 和 _truncate_texts 从 search.py 迁移到独立的 services/sku_utils.py。
+验证 _get_products 和 _truncate_texts 从 search.py 迁移到独立的 services/sku_utils.py。
 """
 import pytest
 
@@ -11,10 +11,10 @@ def test_sku_utils_module_importable():
     assert sku_utils_service is not None
 
 
-def test_get_skus_function_exists():
-    """验证 _get_skus 函数可从 sku_utils 导入。"""
-    from app.services.sku_utils_service import _get_skus
-    assert callable(_get_skus)
+def test_get_products_function_exists():
+    """验证 _get_products 函数可从 sku_utils 导入。"""
+    from app.services.sku_utils_service import _get_products
+    assert callable(_get_products)
 
 
 def test_truncate_texts_function_exists():
@@ -33,15 +33,15 @@ def test_source_priority_constant_exists():
 
 
 def test_search_imports_from_sku_utils():
-    """验证 search.py 可从 sku_utils 导入 _get_skus。"""
+    """验证 search.py 可从 sku_utils 导入 _get_products。"""
     # 此测试确保迁移后 search.py 的导入路径正确
-    from app.services.sku_utils_service import _get_skus
-    # 验证函数签名接受 db 和 skuhits 参数
+    from app.services.sku_utils_service import _get_products
+    # 验证函数签名接受 db 和 hits 参数
     import inspect
-    sig = inspect.signature(_get_skus)
+    sig = inspect.signature(_get_products)
     params = list(sig.parameters.keys())
     assert "db" in params
-    assert "skuhits" in params
+    assert "hits" in params
 
 
 def test_truncate_texts_basic_behavior():

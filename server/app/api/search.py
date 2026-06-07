@@ -225,53 +225,50 @@ async def _agent_event_stream(
 
     # 后台启动 graph 执行
     graph_task = asyncio.create_task(graph.ainvoke(initial_state))
-    done_received = False
     overall_deadline = asyncio.get_event_loop().time() + total_timeout
 
     try:
+        # ---- 从 queue 消费 SSE 事件，直到 graph 完成 ----
         while True:
-            # 计算剩余时间
             remaining = overall_deadline - asyncio.get_event_loop().time()
             if remaining <= 0:
                 yield {"event": "error", "data": json.dumps({"message": "请求超时"})}
                 yield {"event": "done", "data": "{}"}
-                break
+                return
 
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=min(remaining, 5.0))
             except asyncio.TimeoutError:
-                # 消费空闲超时：检查 graph 是否已完成
                 if graph_task.done():
                     if graph_task.exception():
-                        # graph 执行异常
                         exc = graph_task.exception()
                         yield {"event": "error", "data": json.dumps({"message": str(exc)})}
                         yield {"event": "done", "data": "{}"}
-                        break
-                    if done_received:
-                        break
-                    # graph 已完成但 queue 没有更多事件且未收到 done
-                    yield {"event": "error", "data": json.dumps({"message": "Graph 未发送 done 事件"})}
-                    yield {"event": "done", "data": "{}"}
-                    break
-                # graph 仍在运行但无新事件 → 继续等待
-                continue
+                        return
+                    break  # graph 正常完成 → 退出循环处理终态
+                continue  # graph 仍在运行 → 继续等待
 
-            # 序列化事件数据为 JSON 字符串
-            data = event["data"]
+            # chitchat 路径：收到 done → 立即结束
             if event["event"] == "done":
-                done_received = True
-                # 注入 conversation_id 到 done 事件
-                if isinstance(data, dict):
-                    data["conversation_id"] = conversation_id
-            data_str = json.dumps(data, ensure_ascii=False)
+                data_str = json.dumps(event["data"], ensure_ascii=False)
+                yield {"event": "done", "data": data_str}
+                return
+
+            # 常规事件：直接转发
+            data_str = json.dumps(event["data"], ensure_ascii=False)
             yield {"event": event["event"], "data": data_str}
 
-            if done_received:
+        # ---- graph 完成后：排空 queue 中的残留事件 ----
+        while not queue.empty():
+            try:
+                event = queue.get_nowait()
+                if event["event"] != "done":
+                    data_str = json.dumps(event["data"], ensure_ascii=False)
+                    yield {"event": event["event"], "data": data_str}
+            except Exception:
                 break
 
     except asyncio.CancelledError:
-        # FastAPI 客户端断开连接 → 取消 graph 任务
         if not graph_task.done():
             graph_task.cancel()
         yield {"event": "error", "data": json.dumps({"message": "客户端连接断开"})}
@@ -279,22 +276,16 @@ async def _agent_event_stream(
         return
 
     finally:
-        # 清理 graph 任务
-        if done_received:
-            # 正常完成：等待 graph 终态以获得 next_options
+        # 等待 graph 终态
+        if not graph_task.done():
             try:
                 await asyncio.wait_for(asyncio.shield(graph_task), timeout=10.0)
             except (asyncio.TimeoutError, asyncio.CancelledError):
-                if not graph_task.done():
-                    graph_task.cancel()
-        else:
-            # graph 未正常完成（错误/超时）→ 取消
-            if not graph_task.done():
                 graph_task.cancel()
 
-        # 从 graph 最终状态读取并持久化记忆
+        # 读取最终 state
         final_state = None
-        if done_received and graph_task.done() and not graph_task.cancelled():
+        if graph_task.done() and not graph_task.cancelled():
             try:
                 final_state = graph_task.result()
             except Exception:
@@ -363,7 +354,7 @@ async def _agent_event_stream(
                     error=str(e),
                 )
 
-        # 发送 next_options（从 graph 最终状态读取）
+        # ---- 发送 next_options（从 graph 最终状态读取） ----
         if final_state and final_state.get("next_options"):
             try:
                 yield {
@@ -372,6 +363,10 @@ async def _agent_event_stream(
                 }
             except Exception:
                 pass
+
+        # ---- 最后发送 done 事件 ----
+        done_data = json.dumps({"conversation_id": conversation_id})
+        yield {"event": "done", "data": done_data}
 
 
 # ---------------------------------------------------------------------------

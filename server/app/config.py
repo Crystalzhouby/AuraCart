@@ -138,15 +138,18 @@ class SearchSettings(BaseSettings):
     max_reviews_per_product: int = 5
     """单个 product_id 最多保留的 product_review 条数。"""
 
+    max_chunks_per_product: int = 5
+    """单个 product_id 在 SQL 子查询中最多保留的 product_review chunk 数。"""
+
     memory_recent_rounds: int = 10
     """Router 改写时检索的最近历史查询轮数。"""
 
     # --- 不变的参数 ---
-    max_match_texts_per_sku: int = 3
-    """每个 SKU 最多附带几条 product_review 评论文本。"""
+    max_match_texts_per_product: int = 3
+    """每个 product 最多附带几条 product_review 评论文本。"""
 
-    max_match_chars_per_sku: int = 500
-    """每个 SKU 的 matched_texts 总字符数上限。"""
+    max_match_chars_per_product: int = 500
+    """每个 product 的 matched_texts 总字符数上限。"""
 
     source_weights: dict[str, float] = {}
     """各 source 的检索得分权重，key 为 product_review.source 值。

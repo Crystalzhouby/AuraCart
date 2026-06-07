@@ -24,19 +24,17 @@ from app.config import settings
 logger = structlog.get_logger("agent.retrieval")
 
 
-__all__ = ["Retriever", "SubQuery", "SKUHit", "Filters", "FilterClause", "Merger"]
+__all__ = ["Retriever", "SubQuery", "ProductHit", "Filters", "FilterClause", "Merger"]
 
 
 @dataclass
-class SKUHit:
-    """单条 SKU 级检索命中结果。
+class ProductHit:
+    """单条 product 级检索命中结果。
 
     属性:
-        sku_id: SKU 唯一标识符。
         product_id: 所属产品 ID。
         score: 相关度分数（语义相似度、全文排名或 RRF 得分）。
     """
-    sku_id: str
     product_id: str
     score: float
 
@@ -100,40 +98,40 @@ class SubQuery:
     text: str
     strategy: str  # "semantic" | "keyword" | "structured_filter"
     field: str | None = None
-    operator: str | None = None  # "eq" | "lt" | "gt" | "in" | "not_in" | "contains" | "not_contains"
+    operator: str | None = None
     value: str | float | None = None
     expanded_values: list[str] | None = None
-    category: str | None = None       # 品类大类（如"面部护肤"）
-    sub_category: str | None = None   # 品类细类（如"防晒霜"）
+    category: str | None = None
+    sub_category: str | None = None
 
 
 def _merge_metadata(meta1: dict[str, dict], meta2: dict[str, dict]) -> dict[str, dict]:
-    """合并两个 hit_metadata dict，对同 SKU 的 matched_texts 按 content 去重。
+    """合并两个 hit_metadata dict，对同 product 的 matched_texts 按 content 去重。
 
     参数:
         meta1: keyword 或 semantic 路径的 hit_metadata。
         meta2: 另一路径的 hit_metadata。
 
     返回值:
-        合并后的 hit_metadata dict。
+        合并后的 hit_metadata dict，key 为 product_id。
     """
     merged: dict[str, dict] = {}
-    for sku_id, data in meta1.items():
-        merged[sku_id] = {
+    for pid, data in meta1.items():
+        merged[pid] = {
             **data,
             "matched_texts": list(data.get("matched_texts", [])),
         }
-    for sku_id, data in meta2.items():
-        if sku_id not in merged:
-            merged[sku_id] = {
+    for pid, data in meta2.items():
+        if pid not in merged:
+            merged[pid] = {
                 **data,
                 "matched_texts": list(data.get("matched_texts", [])),
             }
         else:
-            existing_contents = {t["content"] for t in merged[sku_id].get("matched_texts", [])}
+            existing_contents = {t["content"] for t in merged[pid].get("matched_texts", [])}
             for text in data.get("matched_texts", []):
                 if text.get("content") and text["content"] not in existing_contents:
-                    merged[sku_id]["matched_texts"].append(text)
+                    merged[pid]["matched_texts"].append(text)
                     existing_contents.add(text["content"])
     return merged
 
@@ -146,32 +144,12 @@ class Retriever:
     """
 
     def __init__(self, db: AsyncSession, emb: EmbeddingService):
-        """
-        初始化检索器。
-
-        参数：
-            db (AsyncSession)：SQLAlchemy 异步数据库会话。
-            emb (EmbeddingService)：用于在语义搜索时即时生成
-                                   查询 Embedding 的服务。
-        """
+        """初始化检索器。"""
         self.db = db
         self.emb = emb
 
     def _extract_filters(self, subs: list[SubQuery]) -> Filters:
-        """从 structured_filter 子查询中提取硬约束条件集合。
-
-        遍历所有 strategy="structured_filter" 的 SubQuery，
-        为每条生成一个 FilterClause。非 filter 子查询被忽略。
-
-        每条 FilterClause 的参数名使用全局递增计数器去重，
-        避免多个 filter 共用 :val / :pat 导致的参数覆盖。
-
-        参数:
-            subs: 所有子查询列表。
-
-        返回值:
-            Filters: 包含所有结构化过滤条件的集合。
-        """
+        """从 structured_filter 子查询中提取硬约束条件集合。"""
         field_table = {
             "brand": "product", "category": "product",
             "sub_category": "product", "title": "product",
@@ -179,7 +157,7 @@ class Retriever:
         }
 
         clauses: list[FilterClause] = []
-        counter = 0  # 全局计数器，确保每条 FilterClause 的参数名唯一
+        counter = 0
         for sub in subs:
             if sub.strategy != "structured_filter":
                 continue
@@ -228,7 +206,7 @@ class Retriever:
 
         return Filters(conditions=clauses)
 
-    def _build_base_query(self, filters: Filters, score_expr: str, extra_cols: str = "") -> str:
+    def _build_base_query(self, filters: Filters, score_expr: str) -> str:
         """构建三表 JOIN 骨架 SQL，注入 score_expr 和硬约束条件。
 
         三表结构：product_review pr → product p → sku s
@@ -237,12 +215,16 @@ class Retriever:
         参数:
             filters: 硬约束条件集合。
             score_expr: 得分表达式（注入到 SELECT 子句）。
-            extra_cols: 追加的 SELECT 列（以逗号开头），默认空串。
 
         返回值:
             完整的参数化 SQL 查询字符串。
         """
-        select_clause = f"SELECT s.sku_id, p.product_id, {score_expr}{extra_cols}"
+        select_clause = (
+            "SELECT p.product_id, p.title, p.brand, p.category, p.sub_category, p.base_price, "
+            "pr.content, pr.source, pr.metadata, "
+            f"{score_expr} AS raw_score, "
+            "jsonb_build_object('sku_id', s.sku_id, 'properties', s.properties, 'price', s.price, 'stock', s.stock) AS sku_json"
+        )
         from_clause = (
             "FROM product_review pr "
             "JOIN product p ON p.product_id = pr.product_id AND p.is_active = TRUE "
@@ -258,19 +240,7 @@ class Retriever:
 
     @staticmethod
     def _build_weight_expr(weights: dict[str, float]) -> tuple[str, dict]:
-        """根据权重配置生成 CASE WHEN 片段和参数绑定。
-
-        对每个已知 source 生成 WHEN 分支，权重值从 weights dict 读取，
-        未配置的 source 默认 1.0。ELSE 1.0 兜底所有未知 source。
-
-        参数:
-            weights: source → weight 映射，如 {"marketing": 1.0, "faq": 1.0, "user_review": 0.7}。
-
-        返回值:
-            (sql_fragment, params)
-            sql_fragment:  "CASE pr.source WHEN 'marketing' THEN :wv_mkt ... ELSE 1.0 END"
-            params:        参数绑定字典。
-        """
+        """根据权重配置生成 CASE WHEN 片段和参数绑定。"""
         known_sources = ["marketing", "faq", "user_review", "property"]
         when_parts: list[str] = []
         params: dict = {}
@@ -284,33 +254,43 @@ class Retriever:
         sql = "CASE pr.source " + " ".join(when_parts) + " ELSE 1.0 END"
         return sql, params
 
+    def _build_grouped_query(self, inner_sql: str) -> str:
+        """将子查询包装为 product 级别 GROUP BY 聚合外层查询。
+
+        子查询负责计算原始得分和 ROW_NUMBER，外层负责：
+        - 按 product 聚合 SUM 得分
+        - jsonb_agg 收集 SKU 列表和 matched_texts
+        - 限制每个 product 最多 max_chunks_per_product 行
+
+        参数:
+            inner_sql: 已包含 WHERE 条件的基础查询（来自 _build_base_query）。
+
+        返回值:
+            完整的外层 GROUP BY SQL。
+        """
+        max_chunks = settings.search.max_chunks_per_product
+        wrapped = (
+            "SELECT "
+            "sub.product_id, sub.title, sub.brand, sub.category, sub.sub_category, sub.base_price, "
+            "SUM(sub.raw_score) AS score, "
+            "jsonb_agg(DISTINCT sub.sku_json) AS skus_json, "
+            "jsonb_agg(jsonb_build_object('content', sub.content, 'source', sub.source, 'metadata', sub.metadata)) AS matched_texts_json "
+            f"FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY pr.product_id ORDER BY raw_score DESC) AS rn FROM ({inner_sql}) pr) sub "
+            f"WHERE sub.rn <= {max_chunks} "
+            "GROUP BY sub.product_id, sub.title, sub.brand, sub.category, sub.sub_category, sub.base_price "
+            "ORDER BY score DESC LIMIT :limit"
+        )
+        return wrapped
+
     async def retrieve(
         self, subs: list[SubQuery], top_k: int = 20
     ) -> dict:
-        """对 SubQuery 列表进行分组检索，返回按策略分组的 SKUHit 结果。
-
-        内部：
-        1. 提取 structured_filter 子查询为硬约束 Filters。
-        2. 分组 keyword 和 semantic 子查询。
-        3. 并行执行 keyword 和 semantic 检索（asyncio.gather）。
-
-        参数：
-            subs: 所有子查询列表。
-            top_k: 每条路径返回的最大结果数。
-
-        返回值:
-            dict: {
-                "keyword": list[SKUHit],
-                "semantic": list[SKUHit],
-                "hit_metadata": dict[str, dict],  # sku_id → {product/sku info + matched_texts}
-            }
-        """
+        """对 SubQuery 列表进行分组检索，返回按策略分组的 ProductHit 结果。"""
         filters = self._extract_filters(subs)
 
         kw_subs = [s for s in subs if s.strategy == "keyword"]
         sem_subs = [s for s in subs if s.strategy == "semantic"]
 
-        # 并行执行两路检索
         import asyncio
         kw_task = self._keyword_search(kw_subs, filters, top_k) if kw_subs else None
         sem_task = self._semantic_search(sem_subs, filters, top_k) if sem_subs else None
@@ -332,14 +312,11 @@ class Retriever:
 
     async def _semantic_search(
         self, sem_subs: list[SubQuery], filters: Filters, top_k: int
-    ) -> tuple[list[SKUHit], dict[str, dict]]:
-        """对多条 semantic 子查询执行向量相似度搜索，独立打分后加和为综合得分。
+    ) -> tuple[list[ProductHit], dict[str, dict]]:
+        """对多条 semantic 子查询执行向量相似度搜索，product 级别聚合。
 
-        每条 semantic 子查询独立计算与 product_review.embedding 的余弦相似度
-        （1 - <=>），综合得分为各子查询得分的 SUM。结果按 sku_id 分组。
-
-        使用 jsonb_agg 聚合 product_review 内容，作为 hit_metadata 的一部分返回，
-        避免后续 _get_skus 的二次 DB 查询。
+        使用子查询 + ROW_NUMBER 限制每个 product 最多 max_chunks_per_product 行，
+        外层按 product_id GROUP BY 并聚合 SKU 列表和 matched_texts。
 
         参数：
             sem_subs: semantic 策略的子查询列表。
@@ -347,52 +324,27 @@ class Retriever:
             top_k: 返回的最大结果数。
 
         返回值：
-            (按综合得分降序排列的 SKUHit 列表, hit_metadata dict)
+            (按综合得分降序排列的 ProductHit 列表, hit_metadata dict)
         """
         if not sem_subs:
             return [], {}
 
-        # 为每条 semantic 子查询生成 embedding
         vectors = []
         for sub in sem_subs:
             vec = await self.emb.embed(sub.text)
             vectors.append(str(vec))
 
-        # 构建 source 加权 + sum 得分表达式
         weight_expr, w_params = self._build_weight_expr(settings.search.source_weights)
         score_parts = [f"(1 - (pr.embedding <=> :vec_{i}))" for i in range(len(vectors))]
-        score_expr = " + ".join(score_parts)
-        score_expr_full = f"SUM({weight_expr} * ({score_expr})) AS score"
+        score_expr = f"{weight_expr} * ({' + '.join(score_parts)})"
 
-        # 扩展 SELECT：product 信息 + SKU 信息 + jsonb_agg 聚合 product_review
-        extra_cols = (
-            ", p.title, p.brand, p.category, p.sub_category, p.base_price"
-            ", s.properties, s.price, s.stock"
-            ", jsonb_agg(jsonb_build_object("
-            "'content', pr.content, "
-            "'source', pr.source, "
-            "'metadata', pr.metadata"
-            ")) AS matched_texts_json"
-        )
-        sql_str = self._build_base_query(filters, score_expr_full, extra_cols)
-
-        # 添加 GROUP BY —— 需包含所有非聚合列
-        group_by_extra = (
-            "p.title, p.brand, p.category, p.sub_category, p.base_price, "
-            "s.properties, s.price, s.stock"
-        )
-        if "WHERE" in sql_str:
-            parts = sql_str.split("WHERE", 1)
-            sql_str = f"{parts[0]}WHERE {parts[1]} GROUP BY s.sku_id, p.product_id, {group_by_extra}"
-        else:
-            sql_str = f"{sql_str} GROUP BY s.sku_id, p.product_id, {group_by_extra}"
-
-        sql_str += " ORDER BY score DESC LIMIT :limit"
+        inner_sql = self._build_base_query(filters, score_expr)
+        sql_str = self._build_grouped_query(inner_sql)
 
         params = {f"vec_{i}": v for i, v in enumerate(vectors)}
         params["limit"] = top_k
         params.update(filters._all_params())
-        params.update(w_params)  # 合并 source 权重参数
+        params.update(w_params)
 
         sql = text(sql_str)
         logger.debug("semantic_search SQL", sql=sql_str, params={k: str(v)[:80] for k, v in params.items()})
@@ -401,45 +353,36 @@ class Retriever:
 
         logger.debug("semantic_search 结果",
                      row_count=len(rows),
-                     top_rows=[{"sku_id": r.sku_id,
+                     top_rows=[{"product_id": r.product_id,
                                 "score": round(float(r.score), 4),
                                 "content": (r.matched_texts_json or [{}])[0].get("content", "")[:100]}
                                for r in rows[:3]])
 
-        # 构建 SKUHit 列表 + hit_metadata（asyncpg 自动将 JSONB 反序列化为 Python list）
-        hits: list[SKUHit] = []
+        hits: list[ProductHit] = []
         hit_metadata: dict[str, dict] = {}
         for r in rows:
-            sku_id = r.sku_id
-            hits.append(SKUHit(sku_id=sku_id, product_id=r.product_id, score=float(r.score)))
-            matched_texts = r.matched_texts_json or []
-            hit_metadata[sku_id] = {
-                "product_id": r.product_id,
+            pid = r.product_id
+            hits.append(ProductHit(product_id=pid, score=float(r.score)))
+            hit_metadata[pid] = {
+                "product_id": pid,
                 "title": r.title,
                 "brand": r.brand,
                 "category": r.category,
                 "sub_category": r.sub_category,
                 "base_price": float(r.base_price) if r.base_price else None,
-                "sku_id": sku_id,
-                "properties": r.properties,
-                "price": float(r.price),
-                "stock": r.stock,
-                "matched_texts": matched_texts,
+                "skus": r.skus_json or [],
+                "matched_texts": r.matched_texts_json or [],
             }
 
         return hits, hit_metadata
 
     async def _keyword_search(
         self, kw_subs: list[SubQuery], filters: Filters, top_k: int
-    ) -> tuple[list[SKUHit], dict[str, dict]]:
-        """对每个 keyword 子查询执行全文搜索，合并结果并去重。
+    ) -> tuple[list[ProductHit], dict[str, dict]]:
+        """对每个 keyword 子查询执行全文搜索，product 级别聚合。
 
-        每个 keyword SubQuery 尝试 tsvector 全文搜索（优先 chinese 配置，
-        其次 simple），无结果时降级为 ILIKE。所有 keyword 子查询的结果
-        按 sku_id 去重（保留最高分）。
-
-        不再使用 @@ 硬过滤：ts_rank 对不匹配行返回 0 分，
-        ORDER BY + LIMIT 保证排序质量，同时避免因关键词不匹配导致的空结果。
+        使用子查询 + ROW_NUMBER 限制每个 product 最多 max_chunks_per_product 行，
+        外层按 product_id GROUP BY。各子查询结果按 product_id 去重（保留最高分）。
 
         参数：
             kw_subs: keyword 策略的子查询列表。
@@ -447,33 +390,22 @@ class Retriever:
             top_k: 返回的最大结果数。
 
         返回值：
-            (按 score 降序排列的 SKUHit 列表, hit_metadata dict)
+            (按 score 降序排列的 ProductHit 列表, hit_metadata dict)
         """
         all_rows: list[dict] = []
 
-        # 构建 source 权重表达式（semantic 和 keyword 共用）
         weight_expr, w_params = self._build_weight_expr(settings.search.source_weights)
-
-        # 扩展 SELECT：product_review 内容 + product 信息 + SKU 信息
-        extra_cols = (
-            ", pr.content, pr.source, pr.metadata"
-            ", p.title, p.brand, p.category, p.sub_category, p.base_price"
-            ", s.properties, s.price, s.stock"
-        )
 
         for sub in kw_subs:
             rows = []
-            # 尝试 tsvector 全文搜索（不再用 @@ 硬过滤）
             for tsv_config in ("chinese", "simple"):
                 try:
-                    base_sql = self._build_base_query(
-                        filters,
-                        f"{weight_expr} * ts_rank(pr.content_tsv, plainto_tsquery(:tsv_config, :kw)) AS score",
-                        extra_cols=extra_cols,
-                    )
-                    sql = text(base_sql + " ORDER BY score DESC LIMIT :limit")
+                    score_expr = f"{weight_expr} * ts_rank(pr.content_tsv, plainto_tsquery(:tsv_config, :kw))"
+                    inner_sql = self._build_base_query(filters, score_expr)
+                    sql_str = self._build_grouped_query(inner_sql)
+                    sql = text(sql_str)
                     kw_params = {"tsv_config": tsv_config, "kw": sub.text.strip(), "limit": top_k, **filters._all_params(), **w_params}
-                    logger.debug("keyword_search SQL (tsvector)", config=tsv_config, sql=base_sql, params={k: str(v)[:80] for k, v in kw_params.items()})
+                    logger.debug("keyword_search SQL (tsvector)", config=tsv_config, sql=sql_str, params={k: str(v)[:80] for k, v in kw_params.items()})
                     result = await self.db.execute(sql, kw_params)
                     rows = result.fetchall()
                     if rows:
@@ -482,20 +414,19 @@ class Retriever:
                     await self.db.rollback()
                     continue
 
-            # 降级：ILIKE（同时搜索产品字段和评价内容）
             if not rows:
-                base_sql = self._build_base_query(
-                    filters, f"{weight_expr} * 0.3 AS score", extra_cols=extra_cols
-                )
+                score_expr = f"{weight_expr} * 0.3"
+                inner_sql = self._build_base_query(filters, score_expr)
                 where_extra = (
                     "pr.content ILIKE :pat OR p.brand ILIKE :pat "
                     "OR p.category ILIKE :pat OR p.title ILIKE :pat"
                 )
-                if "WHERE" in base_sql:
-                    sql_str = base_sql + " AND (" + where_extra + ") LIMIT :limit"
+                if "WHERE" in inner_sql:
+                    inner_sql = inner_sql + " AND (" + where_extra + ")"
                 else:
-                    sql_str = base_sql + " WHERE " + where_extra + " LIMIT :limit"
+                    inner_sql = inner_sql + " WHERE " + where_extra
 
+                sql_str = self._build_grouped_query(inner_sql)
                 sql = text(sql_str)
                 ilike_params = {"pat": f"%{sub.text}%", "limit": top_k, **filters._all_params(), **w_params}
                 logger.debug("keyword_search SQL (ILIKE fallback)", sql=sql_str, params={k: str(v)[:80] for k, v in ilike_params.items()})
@@ -506,84 +437,52 @@ class Retriever:
                 logger.debug("keyword_search 结果",
                              sub_text=sub.text[:80],
                              row_count=len(rows),
-                             top_rows=[{"sku_id": r.sku_id, "score": round(float(r.score), 4), "content": r.content[:100]}
+                             top_rows=[{"product_id": r.product_id, "score": round(float(r.score), 4)}
                                         for r in rows[:3]])
 
             for r in rows:
                 all_rows.append({
-                    "sku_id": r.sku_id,
                     "product_id": r.product_id,
                     "score": float(r.score),
-                    "content": r.content,
-                    "source": r.source,
-                    "metadata": r.metadata,
                     "title": r.title,
                     "brand": r.brand,
                     "category": r.category,
                     "sub_category": r.sub_category,
                     "base_price": float(r.base_price) if r.base_price else None,
-                    "properties": r.properties,
-                    "price": float(r.price),
-                    "stock": r.stock,
+                    "skus": r.skus_json or [],
+                    "matched_texts": r.matched_texts_json or [],
                 })
 
-        # 按 sku_id 去重（保留最高分），同时构建 hit_metadata
-        deduped: dict[str, SKUHit] = {}
+        # 按 product_id 去重（保留最高分）
+        deduped: dict[str, ProductHit] = {}
         hit_metadata: dict[str, dict] = {}
         for row in all_rows:
-            sid = row["sku_id"]
-            # 保留最高分 SKUHit
-            if sid not in deduped or row["score"] > deduped[sid].score:
-                deduped[sid] = SKUHit(
-                    sku_id=sid,
-                    product_id=row["product_id"],
-                    score=row["score"],
-                )
-            # 初始化或更新 hit_metadata（product 信息相同，追加 matched_texts）
-            if sid not in hit_metadata:
-                hit_metadata[sid] = {
-                    "product_id": row["product_id"],
+            pid = row["product_id"]
+            if pid not in deduped or row["score"] > deduped[pid].score:
+                deduped[pid] = ProductHit(product_id=pid, score=row["score"])
+            if pid not in hit_metadata:
+                hit_metadata[pid] = {
+                    "product_id": pid,
                     "title": row["title"],
                     "brand": row["brand"],
                     "category": row["category"],
                     "sub_category": row["sub_category"],
                     "base_price": row["base_price"],
-                    "sku_id": sid,
-                    "properties": row["properties"],
-                    "price": row["price"],
-                    "stock": row["stock"],
+                    "skus": list(row["skus"]),
                     "matched_texts": [],
                 }
-            # 追加 matched_text（按 content 去重）
-            existing_contents = {t["content"] for t in hit_metadata[sid]["matched_texts"]}
-            if row.get("content") and row["content"] not in existing_contents:
-                hit_metadata[sid]["matched_texts"].append({
-                    "content": row["content"],
-                    "source": row["source"],
-                    "metadata": row["metadata"],
-                })
+            # 追加 matched_texts（按 content 去重）
+            existing_contents = {t["content"] for t in hit_metadata[pid]["matched_texts"]}
+            for mt in row.get("matched_texts", []):
+                if mt.get("content") and mt["content"] not in existing_contents:
+                    hit_metadata[pid]["matched_texts"].append(mt)
+                    existing_contents.add(mt["content"])
 
         ranked = sorted(deduped.values(), key=lambda h: h.score, reverse=True)
         return ranked[:top_k], hit_metadata
 
     async def _structured_filter(self, sub: SubQuery, top_k: int) -> list[dict]:
-        """
-        对产品或 SKU 字段执行结构化（精确/模糊）过滤。
-
-        支持的操作符：in、not_in、lt、gt、contains、not_contains。
-        对 brand/category/sub_category 字段路由到 'product' 表，
-        对 price/stock 字段路由到 'sku' 表。仅返回活跃产品。
-
-        参数：
-            sub (SubQuery)：包含字段、操作符、值和可选的
-                            expanded_values 的子查询。
-            top_k (int)：最大结果数。
-
-        返回值：
-            list[dict]：包含 product_id、source（"basic_info" 或 "sku"）
-                        和固定分数 1.0 的结果。
-        """
-        # 根据字段名确定目标表
+        """对产品或 SKU 字段执行结构化过滤。"""
         if sub.field in ("brand", "category", "sub_category"):
             table = "product"
         elif sub.field in ("price", "stock"):
@@ -591,12 +490,10 @@ class Retriever:
         else:
             return []
 
-        # 解析值：优先使用 expanded_values，其次使用单个值
         values = sub.expanded_values if sub.expanded_values else (
             [sub.value] if sub.value is not None else []
         )
 
-        # 根据操作符构建 WHERE 子句和参数
         if sub.operator in ("in", "not_in") and values:
             placeholders = ", ".join([f":v{i}" for i in range(len(values))])
             col = f"p.{sub.field}" if table == "product" else f"s.{sub.field}"
@@ -624,7 +521,6 @@ class Retriever:
         else:
             return []
 
-        # 按表构建并执行相应的查询
         if table == "product":
             sql = text(f"""
                 SELECT DISTINCT p.product_id, 'basic_info' AS source, 1.0 AS score
@@ -651,13 +547,7 @@ class Retriever:
 
 # ---------------------------------------------------------------------------
 # 加权 RRF (Reciprocal Rank Fusion) 合并器
-# ---------------------------------------------------------------------------
-# 将 keyword 和 semantic 两路已排名的 SKUHit 列表通过加权 RRF 公式
-# 融合为单一排序结果。
-#
-# 加权 RRF 公式: RRF(sku) = sw * Σ 1/(k + sem_rank_i) + kw * Σ 1/(k + kw_rank_i)
-# 其中 k=60, rank 从 1 开始, sw/kw 为语义/关键词权重。
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 
 
 class Merger:
@@ -667,7 +557,7 @@ class Merger:
         rrf_k: RRF 平滑参数（默认 60）。
         semantic_weight: 语义检索权重（默认 0.7）。
         keyword_weight: 关键词检索权重（默认 0.3）。
-        final_limit: 融合后返回的最大 SKU 数量（默认 25）。
+        final_limit: 融合后返回的最大 product 数量（默认 25）。
     """
 
     def __init__(
@@ -684,9 +574,9 @@ class Merger:
 
     def merge(
         self,
-        keyword_ranked: list[SKUHit],
-        semantic_ranked: list[SKUHit],
-    ) -> list[SKUHit]:
+        keyword_ranked: list[ProductHit],
+        semantic_ranked: list[ProductHit],
+    ) -> list[ProductHit]:
         """通过加权 RRF 融合两路排名结果。
 
         参数:
@@ -694,30 +584,29 @@ class Merger:
             semantic_ranked: 语义检索的排名结果（按分数降序）。
 
         返回值:
-            按加权 RRF 得分降序排列的 SKUHit 列表，最多 final_limit 条。
+            按加权 RRF 得分降序排列的 ProductHit 列表，最多 final_limit 条。
         """
         rrf_scores: dict[str, float] = {}
-        sku_map: dict[str, SKUHit] = {}
+        product_map: dict[str, ProductHit] = {}
 
         for rank, hit in enumerate(keyword_ranked, start=1):
             rrf = self.keyword_weight / (self.rrf_k + rank)
-            rrf_scores[hit.sku_id] = rrf_scores.get(hit.sku_id, 0.0) + rrf
-            if hit.sku_id not in sku_map:
-                sku_map[hit.sku_id] = hit
+            rrf_scores[hit.product_id] = rrf_scores.get(hit.product_id, 0.0) + rrf
+            if hit.product_id not in product_map:
+                product_map[hit.product_id] = hit
 
         for rank, hit in enumerate(semantic_ranked, start=1):
             rrf = self.semantic_weight / (self.rrf_k + rank)
-            rrf_scores[hit.sku_id] = rrf_scores.get(hit.sku_id, 0.0) + rrf
-            if hit.sku_id not in sku_map:
-                sku_map[hit.sku_id] = hit
+            rrf_scores[hit.product_id] = rrf_scores.get(hit.product_id, 0.0) + rrf
+            if hit.product_id not in product_map:
+                product_map[hit.product_id] = hit
 
         ranked_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
 
         return [
-            SKUHit(
-                sku_id=sku_map[sid].sku_id,
-                product_id=sku_map[sid].product_id,
-                score=rrf_scores[sid],
+            ProductHit(
+                product_id=product_map[pid].product_id,
+                score=rrf_scores[pid],
             )
-            for sid in ranked_ids[:self.final_limit]
+            for pid in ranked_ids[:self.final_limit]
         ]

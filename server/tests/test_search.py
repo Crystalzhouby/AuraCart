@@ -9,8 +9,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient, ASGITransport
 from app.main import app
-from app.services.sku_utils_service import _truncate_texts, _get_skus
-from app.services.retriever_service import SKUHit
+from app.services.sku_utils_service import _truncate_texts, _get_products
+from app.services.retriever_service import ProductHit
 
 
 @pytest.mark.asyncio
@@ -113,7 +113,7 @@ class TestTruncateTexts:
 
 
 # ======================================================================
-# _get_skus 单元测试（mock DB）
+# _get_products 单元测试（mock DB）
 # ======================================================================
 
 
@@ -128,7 +128,7 @@ class _MockRow:
 def _make_mock_db(rows: list[dict]) -> AsyncMock:
     """构造一个返回指定行的 mock AsyncSession。
 
-    _get_skus 中 await db.execute(...) 返回的 Result 对象
+    _get_products 中 await db.execute(...) 返回的 Result 对象
     会被直接 for 迭代，因此 mock 返回 list[_MockRow] 即可。
     """
     mock_db = AsyncMock()
@@ -136,14 +136,14 @@ def _make_mock_db(rows: list[dict]) -> AsyncMock:
     return mock_db
 
 
-class TestGetSkus:
-    """测试 _get_skus 的 SQL 扩展与聚合行为。"""
+class TestGetProducts:
+    """测试 _get_products 的 SQL 扩展与聚合行为。"""
 
     @pytest.mark.asyncio
-    async def test_empty_skuhits(self):
+    async def test_empty_hits(self):
         """空列表直接返回空列表。"""
         db = _make_mock_db([])
-        result = await _get_skus(db, [])
+        result = await _get_products(db, [])
         assert result == []
 
     @pytest.mark.asyncio
@@ -155,14 +155,14 @@ class TestGetSkus:
              "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
              "content": None, "source": None, "extra_data": None},
         ])
-        skuhits = [SKUHit(sku_id="SKU1", product_id="P1", score=0.9)]
-        result = await _get_skus(db, skuhits)
+        hits = [ProductHit(product_id="P1", score=0.9)]
+        result = await _get_products(db, hits)
         assert len(result) == 1
         assert result[0]["matched_texts"] == []
 
     @pytest.mark.asyncio
     async def test_with_reviews_aggregated(self):
-        """同一 SKU 的多条 product_review 聚合到 matched_texts。"""
+        """同一 product 的多条 product_review 聚合到 matched_texts。"""
         db = _make_mock_db([
             {"product_id": "P1", "title": "测试商品", "brand": "品牌A",
              "category": "美妆", "sub_category": "防晒", "base_price": 100.0,
@@ -177,8 +177,8 @@ class TestGetSkus:
              "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
              "content": "Q:适合干皮吗 A:适合", "source": "faq", "extra_data": None},
         ])
-        skuhits = [SKUHit(sku_id="SKU1", product_id="P1", score=0.9)]
-        result = await _get_skus(db, skuhits)
+        hits = [ProductHit(product_id="P1", score=0.9)]
+        result = await _get_products(db, hits)
         assert len(result) == 1
         assert len(result[0]["matched_texts"]) == 3
 
@@ -195,19 +195,19 @@ class TestGetSkus:
              "sku_id": "SKU1", "properties": None, "price": 99.0, "stock": 10,
              "content": "评价A", "source": "user_review", "extra_data": None},
         ])
-        # RRF 排 SKU2 第一，SKU1 第二
-        skuhits = [
-            SKUHit(sku_id="SKU2", product_id="P2", score=0.95),
-            SKUHit(sku_id="SKU1", product_id="P1", score=0.90),
+        # RRF 排 P2 第一，P1 第二
+        hits = [
+            ProductHit(product_id="P2", score=0.95),
+            ProductHit(product_id="P1", score=0.90),
         ]
-        result = await _get_skus(db, skuhits)
-        assert result[0]["sku_id"] == "SKU2"
-        assert result[1]["sku_id"] == "SKU1"
+        result = await _get_products(db, hits)
+        assert result[0]["product_id"] == "P2"
+        assert result[1]["product_id"] == "P1"
 
     @pytest.mark.asyncio
-    async def test_sku_id_not_in_db(self):
-        """DB 中不存在的 sku_id 被跳过。"""
+    async def test_product_id_not_in_db(self):
+        """DB 中不存在的 product_id 被跳过。"""
         db = _make_mock_db([])
-        skuhits = [SKUHit(sku_id="NONEXIST", product_id="PX", score=0.5)]
-        result = await _get_skus(db, skuhits)
+        hits = [ProductHit(product_id="NONEXIST", score=0.5)]
+        result = await _get_products(db, hits)
         assert result == []

@@ -2,9 +2,9 @@
 Product Retrieval 节点。
 
 流水线：
-1. 欢迎语（LLM，基于 requirements 生成）
+1. 欢迎语（由 router 节点生成，从 state 读取）
 2. 按品类分组检索（requirements 已按品类分组）
-3. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-15）并行
+3. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-25）并行
 4. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
 5. bge-reranker 精排（top-5）+ fallback
 6. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + chat_reply 推荐理由）
@@ -27,19 +27,11 @@ from app.agent.prompts.show_prompt import (
 
 logger = structlog.get_logger("agent.retrieval")
 
-# source → 中文标签映射，用于构建推荐理由上下文的匹配文本
 SOURCE_LABEL = {"user_review": "[用户评价]", "marketing": "[官方描述]", "faq": "[FAQ]"}
 
 
 def _intent_to_sub_queries(intent: dict) -> list[SubQuery]:
-    """将新格式意图转换为 SubQuery 对象列表，兼容现有 Retriever 接口。
-
-    参数:
-        intent: {category, sub_category, text, min_price, max_price, order_num, brand}
-
-    返回值:
-        [SubQuery(text=..., strategy="semantic"), SubQuery(strategy="structured_filter"), ...]
-    """
+    """将新格式意图转换为 SubQuery 对象列表，兼容现有 Retriever 接口。"""
     subs = []
     cat = intent.get("category")
     sub = intent.get("sub_category")
@@ -49,16 +41,13 @@ def _intent_to_sub_queries(intent: dict) -> list[SubQuery]:
     order_n = intent.get("order_num", 1)
     brands = intent.get("brand")
 
-    # 关键词查询（精确商品/品类名匹配）
     if text:
         subs.append(SubQuery(text=text, strategy="keyword",
                              category=cat, sub_category=sub))
-    # 语义查询（主观评价/体验意图）
     if text:
         subs.append(SubQuery(text=text, strategy="semantic",
                              category=cat, sub_category=sub))
 
-    # 结构化条件
     if cat:
         subs.append(SubQuery(text="", strategy="structured_filter",
                              field="category", operator="eq",
@@ -88,45 +77,16 @@ def _intent_to_sub_queries(intent: dict) -> list[SubQuery]:
     return subs
 
 
-def _build_product_context(skus: list[dict]) -> str:
-    """按 product_id 分组构建商品上下文字符串，用于 LLM 生成推荐理由。
+def _build_product_context(products: list[dict]) -> str:
+    """按 product 列表构建商品上下文字符串，用于 LLM 生成推荐理由。
 
-    将扁平 SKU 列表按 product_id 归组，每组渲染为一个商品条目：
-    商品概要行（标题/品牌/品类/基础价格），后跟组内每条 SKU 的详情行，
-    最后追加匹配文本（FAQ / 用户评价 / 官方描述）。组间以空行分隔。
-
-    参数:
-        skus: 扁平 SKU 字典列表，与 retrieval_results 格式一致。
-
-    返回值:
-        适合注入 LLM 提示词的多行字符串，作为商品上下文。
+    每个 product 字典已包含 skus 列表和 matched_texts，直接遍历构建。
     """
-    if not skus:
+    if not products:
         return ""
 
-    # 按 product_id 分组，保持首次出现顺序
-    grouped: dict[str, dict] = {}
-    order: list[str] = []
-    for item in skus:
-        pid = item["product_id"]
-        if pid not in grouped:
-            grouped[pid] = {
-                "title": item["title"],
-                "brand": item.get("brand"),
-                "category": item.get("category"),
-                "base_price": item.get("base_price"),
-                "skus": [],
-            }
-            order.append(pid)
-        grouped[pid]["skus"].append({
-            "sku_id": item["sku_id"],
-            "properties": item.get("properties"),
-            "price": item["price"],
-        })
-
     lines = []
-    for i, pid in enumerate(order, 1):
-        p = grouped[pid]
+    for i, p in enumerate(products, 1):
         lines.append(f"{i}. {p['title']}")
         if p.get("brand"):
             lines.append(f"   品牌: {p['brand']}")
@@ -135,7 +95,7 @@ def _build_product_context(skus: list[dict]) -> str:
         if p.get("base_price"):
             lines.append(f"   基础价格: ¥{p['base_price']}")
 
-        for sku in p["skus"]:
+        for sku in p.get("skus", []):
             props_parts = []
             if sku.get("properties"):
                 props_parts = [
@@ -149,10 +109,9 @@ def _build_product_context(skus: list[dict]) -> str:
 
         lines.append("")
 
-    # ---- 追加匹配文本（用户评价/官方描述/FAQ） ----
     matched_lines: list[str] = []
-    for item in skus:
-        for mt in item.get("matched_texts", []):
+    for p in products:
+        for mt in p.get("matched_texts", []):
             label = SOURCE_LABEL.get(mt.get("source", ""), "[其他]")
             matched_lines.append(f"{label} {mt.get('content', '')}")
 
@@ -170,29 +129,17 @@ async def _category_task(
     emb_service,
     reranker=None,
 ) -> dict:
-    """单个品类的检索任务：SQL 条件 → 双路检索 → RRF → reranker。
-
-    参数:
-        intent: 单品类意图 {category, sub_category, text, min_price, max_price, order_num, brand}
-        async_session_factory: async_session 工厂函数。
-        emb_service: EmbeddingService 实例。
-        reranker: RerankerService 实例（可选）。
-
-    返回值:
-        {category, sub_category, skus, product_ids, error}
-    """
+    """单个品类的检索任务：SQL 条件 → 双路检索 → RRF → reranker。"""
     category = intent.get("category") or ""
     sub_category = intent.get("sub_category") or ""
     text = intent.get("text", "")
 
     try:
-        # 将意图转换为 SubQuery 列表（兼容现有 Retriever 接口）
         subs = _intent_to_sub_queries(intent)
 
         async with async_session_factory() as db:
             logger.info(f"品类 [{category}/{sub_category}] 开始检索", text=text[:80])
 
-            # 双路检索（Retriever 内部并行执行 semantic + keyword）
             retriever = Retriever(db=db, emb=emb_service)
             retrieve_result = await retriever.retrieve(
                 subs, top_k=max(settings.search.semantic_top_k,
@@ -202,7 +149,6 @@ async def _category_task(
             sem_results = retrieve_result["semantic"]
             merged_meta = retrieve_result.get("hit_metadata", {})
 
-            # 3. 加权 RRF 融合
             merger = Merger(
                 rrf_k=settings.search.rrf_k,
                 semantic_weight=settings.search.rrf_semantic_weight,
@@ -215,21 +161,19 @@ async def _category_task(
             )
 
             logger.info(f"品类 [{category}/{sub_category}] RRF 融合完成",
-                        sku_count=len(rrf_ranked))
+                        product_count=len(rrf_ranked))
 
             if not rrf_ranked:
                 return {
                     "category": category, "sub_category": sub_category,
-                    "skus": [], "product_ids": [],
+                    "products": [], "product_ids": [],
                     "error": None,
                 }
 
-            # 4. bge-reranker 精排
             if reranker and len(rrf_ranked) > settings.search.rerank_top_k:
-                # 构建 documents 文本列表
                 documents = []
                 for hit in rrf_ranked:
-                    meta = merged_meta.get(hit.sku_id, {})
+                    meta = merged_meta.get(hit.product_id, {})
                     title = meta.get("title", "")
                     matched = meta.get("matched_texts", [])
                     first_text = matched[0].get("content", "") if matched else ""
@@ -241,7 +185,6 @@ async def _category_task(
                 )
 
                 if rerank_results:
-                    # 用 rerank index 映射回 SKU
                     final_hits = []
                     for rr in rerank_results:
                         idx = rr.get("index", 0)
@@ -253,38 +196,35 @@ async def _category_task(
                     logger.info(f"品类 [{category}/{sub_category}] reranker 完成",
                                 result_count=len(rrf_ranked))
                 else:
-                    # fallback: RRF top-5
                     rrf_ranked = rrf_ranked[:settings.search.rerank_top_k]
             else:
                 rrf_ranked = rrf_ranked[:settings.search.rerank_top_k]
 
-            # 5. Review 截断 + 组装 SKU 数据
-            skus = []
+            products = []
             for hit in rrf_ranked:
-                data = merged_meta.get(hit.sku_id)
+                data = merged_meta.get(hit.product_id)
                 if data is None:
                     continue
                 raw_texts = data.get("matched_texts", [])
-                # Review 截断
                 truncated = _truncate_texts(
                     raw_texts,
-                    settings.search.max_reviews_per_product,
-                    settings.search.max_match_chars_per_sku,
+                    settings.search.max_match_texts_per_product,
+                    settings.search.max_match_chars_per_product,
                 )
                 data["matched_texts"] = truncated
-                skus.append(data)
+                products.append(data)
 
             logger.info(f"品类 [{category}/{sub_category}] 检索完成",
-                        final_sku_count=len(skus))
+                        final_product_count=len(products))
 
             return {
                 "category": category,
                 "sub_category": sub_category,
-                "skus": skus,
+                "products": products,
                 "product_ids": [
-                    {"product_id": s["product_id"], "sku_id": s["sku_id"],
+                    {"product_id": p["product_id"],
                      "category": category, "sub_category": sub_category}
-                    for s in skus
+                    for p in products
                 ],
                 "error": None,
             }
@@ -294,7 +234,7 @@ async def _category_task(
                      error=str(e), traceback=traceback.format_exc())
         return {
             "category": category, "sub_category": sub_category,
-            "skus": [], "product_ids": [],
+            "products": [], "product_ids": [],
             "error": str(e),
         }
 
@@ -307,19 +247,7 @@ async def _generate_category_intro(
     scenario_description: str,
     llm,
 ) -> str:
-    """生成品类介绍过渡语。
-
-    参数:
-        category: 品类名。
-        sub_category: 子品类名。
-        index: 当前品类序号（1-based，按有效品类编号）。
-        total: 有效品类总数。
-        scenario_description: 场景描述。
-        llm: LLMService 实例。
-
-    返回值:
-        str: 品类介绍语，失败时返回空字符串。
-    """
+    """生成品类介绍过渡语。"""
     if not llm:
         return ""
     try:
@@ -342,33 +270,21 @@ async def _generate_category_intro(
 
 
 async def _generate_product_reason(
-    sku: dict,
+    product: dict,
     user_intent: str,
-    category_skus: list[dict],
+    category_products: list[dict],
     llm,
     session_memory: list[dict] | None = None,
 ) -> str:
-    """为单个商品生成推荐理由。注入同品类全部商品概览和用户历史关注。
-
-    参数:
-        sku: 单个 SKU 字典。
-        user_intent: 用户原始查询或需求文本。
-        category_skus: 同品类下全部 SKU 列表（用于构建横向对比概览）。
-        llm: LLMService 实例。
-        session_memory: 会话记忆（可选），用于提取该品类历史查询。
-
-    返回值:
-        str: 推荐理由文本，失败时返回空字符串。
-    """
+    """为单个商品生成推荐理由。"""
     if not llm:
         return ""
     try:
-        # 提取该品类历史查询
         user_history = ""
         if session_memory:
             from app.agent.memory import get_queries_by_category
-            cat = sku.get("category", "")
-            sub = sku.get("sub_category", "")
+            cat = product.get("category", "")
+            sub = product.get("sub_category", "")
             queries = get_queries_by_category(session_memory, cat, sub)
             if queries:
                 user_history = (
@@ -376,15 +292,15 @@ async def _generate_product_reason(
                     + "\n".join(f"- {q['query']}" for q in queries)
                 )
 
-        product_detail = _build_product_context([sku])
+        product_detail = _build_product_context([product])
         category_overview = (
-            _build_product_context(category_skus)
-            if len(category_skus) > 1
+            _build_product_context(category_products)
+            if len(category_products) > 1
             else product_detail
         )
         prompt = PRODUCT_REASON_SYSTEM.format(
             user_intent=user_intent or "推荐合适的商品",
-            total_in_category=len(category_skus),
+            total_in_category=len(category_products),
             category_overview=category_overview,
             product_detail=product_detail,
             max_chars=settings.search.reasoning_max_chars,
@@ -397,7 +313,7 @@ async def _generate_product_reason(
         text = await llm.chat(messages, temperature=0.3)
         return text.strip() if text else ""
     except Exception as e:
-        logger.warning("商品推荐理由生成失败", sku=sku.get("sku_id"), error=str(e))
+        logger.warning("商品推荐理由生成失败", product=product.get("product_id"), error=str(e))
         return ""
 
 
@@ -407,17 +323,7 @@ async def _generate_ending(
     llm,
     session_memory: list[dict] | None = None,
 ) -> str:
-    """生成结束语。汇总推荐结果，引导用户下一步互动。
-
-    参数:
-        category_results: _category_task 的返回列表。
-        requirements: 意图列表。
-        llm: LLMService 实例。
-        session_memory: 会话记忆（可选），用于注入跨品类对话历史。
-
-    返回值:
-        str: 结束语文本，失败时返回空字符串。
-    """
+    """生成结束语。"""
     if not llm:
         return ""
     try:
@@ -429,7 +335,7 @@ async def _generate_ending(
                 sub = r.get("sub_category", "")
                 if cat and sub:
                     categories.append(f"{cat}/{sub}")
-                total_products += len(r.get("skus", []))
+                total_products += len(r.get("products", []))
 
         categories_summary = "、".join(categories) if categories else "无"
         scenario = ""
@@ -438,7 +344,6 @@ async def _generate_ending(
                 scenario = req["text"]
                 break
 
-        # 提取跨品类对话历史
         recent_text = "(无历史记录)"
         if session_memory:
             from app.agent.memory import get_recent_queries
@@ -477,17 +382,6 @@ async def retrieval_node(
     """Product Retrieval 节点函数。
 
     流水线：欢迎语 → 并行检索 → 品类介绍(多品类) → 逐商品推荐 → 结束语 + done。
-
-    参数:
-        state: AgentState 字典。
-        llm: LLMService 实例，用于生成欢迎语/品类介绍/推荐理由/结束语。
-        emb_service: EmbeddingService 实例。
-        async_session_factory: async_session 工厂函数。
-        reranker: RerankerService 实例（可选）。
-        _sse_queue: SSE 事件队列（可选）。
-
-    返回值:
-        dict: {"retrieval_results", "failed_categories", "session_memory"}
     """
     user_query = state.get("user_query", "")
     requirements = state.get("requirements", [])
@@ -501,12 +395,12 @@ async def retrieval_node(
     logger.info("Retrieval 节点开始", user_query=user_query,
                 requirement_count=len(requirements))
 
-    # 1. 欢迎语（由 router 节点生成，从 state 读取）
+    # 1. 欢迎语
     welcome_text = state.get("welcome_text", "")
     if queue and welcome_text:
         await queue.put({"event": "welcome", "data": welcome_text})
 
-    # 2. 并行检索（多品类 + asyncio.Semaphore 限流）
+    # 2. 并行检索
     semaphore = asyncio.Semaphore(settings.search.max_category_concurrency)
 
     async def _bounded_task(intent):
@@ -518,7 +412,6 @@ async def retrieval_node(
     tasks = [_bounded_task(req) for req in requirements]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # 异常处理
     safe_results = []
     for i, r in enumerate(results):
         if isinstance(r, Exception):
@@ -526,7 +419,7 @@ async def retrieval_node(
             safe_results.append({
                 "category": req.get("category", ""),
                 "sub_category": req.get("sub_category", ""),
-                "skus": [], "product_ids": [],
+                "products": [], "product_ids": [],
                 "error": str(r),
             })
         else:
@@ -546,12 +439,12 @@ async def retrieval_node(
             })
             continue
 
-        skus = r.get("skus", [])
-        retrieval_results.extend(skus)
+        products = r.get("products", [])
+        retrieval_results.extend(products)
         category = r.get("category", "")
         sub_category = r.get("sub_category", "")
 
-        # 3a. 品类介绍语（仅多品类）
+        # 3a. 品类介绍语
         if total_valid > 1:
             intro = await _generate_category_intro(
                 category, sub_category, idx + 1, total_valid,
@@ -561,23 +454,20 @@ async def retrieval_node(
                 await queue.put({"event": "chat_reply", "data": intro})
 
         # 3b. 逐商品推荐
-        if skus:
-            # 并行生成推荐理由
+        if products:
             reason_tasks = [
-                _generate_product_reason(sku, user_query, skus, llm,
+                _generate_product_reason(p, user_query, products, llm,
                                          session_memory=state.get("session_memory"))
-                for sku in skus
+                for p in products
             ]
             reasons = await asyncio.gather(*reason_tasks, return_exceptions=True)
 
-            # 串行 SSE 发送（保证前端展示顺序）
-            for i, sku in enumerate(skus):
+            for i, p in enumerate(products):
                 if queue:
                     await queue.put({
                         "event": "products",
                         "data": {
-                            "product_id": sku["product_id"],
-                            "sku_id": sku["sku_id"],
+                            "product_id": p["product_id"],
                             "category": category,
                             "sub_category": sub_category,
                         },
@@ -589,14 +479,11 @@ async def retrieval_node(
                     if reason:
                         await queue.put({"event": "chat_reply", "data": reason})
 
-    # 4. 结束语 + done
+    # 4. 结束语（done 事件由 _agent_event_stream 在所有节点完成后统一发送）
     ending_text = await _generate_ending(safe_results, requirements, llm,
                                          session_memory=state.get("session_memory"))
-    if queue:
-        await queue.put({
-            "event": "done",
-            "data": {"text": ending_text or ""},
-        })
+    if queue and ending_text:
+        await queue.put({"event": "chat_reply", "data": ending_text})
 
     # 5. Memory 更新
     new_memory = state.get("session_memory", [])
@@ -613,7 +500,7 @@ async def retrieval_node(
         )
 
     logger.info("Retrieval 节点完成",
-                total_skus=len(retrieval_results),
+                total_products=len(retrieval_results),
                 failed_categories=len(failed_categories))
 
     return {

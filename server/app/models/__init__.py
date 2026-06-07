@@ -32,6 +32,7 @@ from app.models.user_review import UserReview  # noqa: E402, F401
 from app.models.product_review import ProductReview  # noqa: E402, F401
 from app.models.category_lookup import CategoryLookup  # noqa: E402, F401
 from app.models.conversation import Conversation  # noqa: E402, F401
+from app.models.chat_message import ChatMessage  # noqa: E402, F401
 
 # ---------------------------------------------------------------------------
 # 显式控制 ``from app.models import *`` 时暴露的内容。
@@ -45,4 +46,5 @@ __all__ = [
     "ProductReview",
     "CategoryLookup",
     "Conversation",
+    "ChatMessage",
 ]
