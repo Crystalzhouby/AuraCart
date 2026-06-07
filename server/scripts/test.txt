@@ -14,16 +14,13 @@ q=%E6%8E%A8%E8%8D%90%E4%B8%80%E6%AC%BE%E4%B8%8D%E5%90%AB%E9%85%92%E7%B2%BE%E7%9A
 多轮对话：
 
 帮我推荐跑鞋
-curl -N "http://localhost:8000/api/search?
-q=%E5%B8%AE%E6%88%91%E6%8E%A8%E8%8D%90%E8%B7%91%E9%9E%8B"
+curl -N "http://localhost:8000/api/search/e7b37fc5-95ce-4cea-bf89-cbadc0d8c222?q=%E5%B8%AE%E6%88%91%E6%8E%A8%E8%8D%90%E8%B7%91%E9%9E%8B"
 
 要轻量的
-curl -N "http://localhost:8000/api/search?
-q=%E8%A6%81%E8%BD%BB%E9%87%8F%E7%9A%84"
+curl -N "http://localhost:8000/api/search/e7b37fc5-95ce-4cea-bf89-cbadc0d8c222?q=%E8%A6%81%E8%BD%BB%E9%87%8F%E7%9A%84"
 
 预算 500 以内
-curl -N "http://localhost:8000/api/search?
-q=%E9%A2%84%E7%AE%97+500+%E4%BB%A5%E5%86%85"
+curl -N "http://localhost:8000/api/search/e7b37fc5-95ce-4cea-bf89-cbadc0d8c222?q=%E9%A2%84%E7%AE%97+500+%E4%BB%A5%E5%86%85"
 
 场景化推荐：
 去三亚旅行

@@ -114,9 +114,6 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
     if len(options) > 3:
         options = options[:3]
 
-    # SSE 发送 next_options 事件
-    queue = state.get("_sse_queue")
-    if queue and options:
-        await queue.put({"event": "next_options", "data": options})
-
+    # next_options 由 _agent_event_stream 的 finally 块统一从 final_state 读取并发送，
+    # 避免队列排空和 finally 块双重发送。
     return {"next_options": options}
