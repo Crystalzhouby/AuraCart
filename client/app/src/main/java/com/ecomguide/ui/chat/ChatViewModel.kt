@@ -69,6 +69,12 @@ class ChatViewModel : ViewModel() {
     var conversationId: String? = null
         private set
 
+    /** 会话创建中的防抖标记，避免重复并发创建。 */
+    private var isCreatingConversation = false
+
+    /** 会话创建完成后待发送的最新一条用户消息。 */
+    private var pendingMessageAfterConversationReady: String? = null
+
     /** 当前活跃 SSE 请求，用于 reset 或页面销毁时取消。 */
     private var activeCall: Call? = null
 
@@ -126,7 +132,8 @@ class ChatViewModel : ViewModel() {
         var currentProductGroupKey: String? = null,
         var activeStreamChannel: ChatStreamEvent.StreamText.Channel? = null,
         var activeStreamBlockIndex: Int = -1,
-        var streamCompleted: Boolean = false
+        var streamCompleted: Boolean = false,
+        var deferredEndingText: String = ""
     )
 
     // ─── 对外入口：会话与发送 ────────────────────────────────────────────────────
@@ -137,11 +144,19 @@ class ChatViewModel : ViewModel() {
      * 建议在页面初始化时调用一次。成功后会把 conversationId 写入当前 ViewModel。
      */
     fun createConversation() {
+        if (conversationId != null || isCreatingConversation) return
+        isCreatingConversation = true
+
         client.createConversation(
             onSuccess = { cid ->
-                conversationId = cid
+                mainHandler.post {
+                    conversationId = cid
+                    isCreatingConversation = false
+                    flushPendingMessageAfterConversationReady()
+                }
             },
             onError = { msg ->
+                mainHandler.post { isCreatingConversation = false }
                 // createConversation 回调来自 OkHttp 子线程，需用 postValue
                 _error.postValue("创建会话失败: $msg")
             }
@@ -157,8 +172,25 @@ class ChatViewModel : ViewModel() {
      * 3) 始终走后端 SSE
      */
     fun sendMessage(text: String) {
-        if (!prepareForUserRequest(text)) return
-        searchFromBackend(text)
+        val normalized = text.trim()
+        if (normalized.isBlank()) return
+
+        if (conversationId == null) {
+            pendingMessageAfterConversationReady = normalized
+            createConversation()
+            return
+        }
+
+        if (!prepareForUserRequest(normalized)) return
+        searchFromBackend(normalized)
+    }
+
+    /** 会话初始化完成后，自动补发用户在等待期间输入的消息。 */
+    private fun flushPendingMessageAfterConversationReady() {
+        val pending = pendingMessageAfterConversationReady?.trim()
+        pendingMessageAfterConversationReady = null
+        if (pending.isNullOrBlank()) return
+        sendMessage(pending)
     }
 
     // ─── 后端 SSE：事件编排 ─────────────────────────────────────────────────────
@@ -279,7 +311,7 @@ class ChatViewModel : ViewModel() {
         ensureAiMsg(renderState)
     }
 
-    /** 收到 done 事件：只收尾流状态，不再集中补插商品卡。 */
+    /** 收到 done 事件：统一在商品/场景卡片渲染后再落结束语。 */
     private fun handleDoneEvent(
         event: ChatStreamEvent.Done,
         userText: String,
@@ -290,11 +322,14 @@ class ChatViewModel : ViewModel() {
         // 无论本轮是否产出文本，都要先移除 typing，避免一直显示输入动画。
         ensureTypingRemoved(renderState)
 
-        if (!event.text.isNullOrBlank()) {
-            val index = ensureAiMsg(renderState)
-            val doneText = formatSegmentText(event.text)
-            if (doneText.isNotBlank() && !isLastTextBlock(index, doneText)) {
-                appendSegmentToAiMsg(index, doneText)
+        val doneText = formatSegmentText(event.text.orEmpty())
+        if (doneText.isNotBlank()) {
+            // 记录 done 文本，统一在卡片渲染后追加，避免 subcat=1 时出现“结束语在前”。
+            val existing = formatSegmentText(renderState.deferredEndingText)
+            renderState.deferredEndingText = when {
+                existing.isBlank() -> doneText
+                existing == doneText -> renderState.deferredEndingText
+                else -> "${renderState.deferredEndingText}\n$doneText"
             }
         }
 
@@ -570,6 +605,12 @@ class ChatViewModel : ViewModel() {
         event: ChatStreamEvent.StreamText,
         renderState: StreamRenderState
     ) {
+        if (event.channel == ChatStreamEvent.StreamText.Channel.ENDING) {
+            // 结束语统一延后到卡片渲染后展示，避免出现“先结束语后商品”。
+            handleDeferredEndingStreamEvent(event, renderState)
+            return
+        }
+
         when (event.phase) {
             ChatStreamEvent.StreamText.Phase.START -> {
                 if (event.channel == ChatStreamEvent.StreamText.Channel.CATEGORY_INTRO) {
@@ -607,6 +648,22 @@ class ChatViewModel : ViewModel() {
                 renderState.activeStreamChannel = null
                 renderState.activeStreamBlockIndex = -1
             }
+        }
+    }
+
+    /** 结束语流式增量先缓存，done 后在卡片之后统一追加。 */
+    private fun handleDeferredEndingStreamEvent(
+        event: ChatStreamEvent.StreamText,
+        renderState: StreamRenderState
+    ) {
+        when (event.phase) {
+            ChatStreamEvent.StreamText.Phase.START -> Unit
+            ChatStreamEvent.StreamText.Phase.DELTA -> {
+                if (event.text.isNotEmpty()) {
+                    renderState.deferredEndingText += event.text
+                }
+            }
+            ChatStreamEvent.StreamText.Phase.END -> Unit
         }
     }
 
@@ -757,29 +814,47 @@ class ChatViewModel : ViewModel() {
      */
     private fun applyCardRenderModeBySubCategory(renderState: StreamRenderState) {
         val aiMsgIndex = renderState.aiMsgIndex
-        if (aiMsgIndex < 0) return
-
         val pairs = productReasonPairs.toList()
-        if (pairs.isEmpty()) return
+        if (pairs.isEmpty()) {
+            appendDeferredEndingIfNeeded(renderState)
+            return
+        }
 
         scope.launch {
             try {
                 val resolved = withContext(Dispatchers.IO) {
                     resolveRecommendations(pairs)
                 }
-                if (resolved.isEmpty()) return@launch
+                if (resolved.isEmpty()) {
+                    appendDeferredEndingIfNeeded(renderState)
+                    return@launch
+                }
 
                 val grouped = resolved.groupBy { rec -> toGroupKey(rec.category, rec.subCategory) }
                 if (shouldRenderAsScenario(grouped)) {
                     emitRemainingScenarioCards(renderState, grouped)
-                } else {
+                } else if (aiMsgIndex >= 0) {
                     emitSingleGroupHorizontalProducts(aiMsgIndex, grouped)
                 }
                 productReasonPairs.clear()
+                appendDeferredEndingIfNeeded(renderState)
             } catch (e: Exception) {
                 _error.value = "切换卡片展示模式失败: ${e.message}"
+                appendDeferredEndingIfNeeded(renderState)
             }
         }
+    }
+
+    /** done 后把缓存的结束语追加到当前 AI 气泡末尾。 */
+    private fun appendDeferredEndingIfNeeded(renderState: StreamRenderState) {
+        val endingText = formatSegmentText(renderState.deferredEndingText)
+        if (endingText.isBlank()) return
+
+        val aiMsgIndex = ensureAiMsg(renderState)
+        if (!isLastTextBlock(aiMsgIndex, endingText)) {
+            appendSegmentToAiMsg(aiMsgIndex, endingText)
+        }
+        renderState.deferredEndingText = ""
     }
 
     /** done 后一次性补齐全部场景入口卡片，避免异步并发导致顺序错乱。 */
@@ -1448,7 +1523,8 @@ class ChatViewModel : ViewModel() {
         if (_isStreaming.value == true) return false
 
         if (conversationId == null) {
-            _error.value = "会话未初始化，请稍后重试"
+            pendingMessageAfterConversationReady = text
+            createConversation()
             return false
         }
 
@@ -1500,6 +1576,8 @@ class ChatViewModel : ViewModel() {
         activeCall = null
 
         conversationId = null
+        isCreatingConversation = false
+        pendingMessageAfterConversationReady = null
         history.clear()
         productReasonPairs.clear()
         productPairQueue.clear()
@@ -1508,6 +1586,8 @@ class ChatViewModel : ViewModel() {
         _messages.value = mutableListOf()
         _isStreaming.value = false
         showWelcome.value = true
+
+        createConversation()
     }
 
     override fun onCleared() {
