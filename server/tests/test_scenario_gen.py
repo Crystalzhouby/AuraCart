@@ -34,7 +34,7 @@ async def test_scenario_gen_basic():
     mock_llm = _make_mock_llm(returns=json.dumps({
         "scenario_description": "去三亚度假准备方案",
         "requirements": [
-            {"category": "面部护肤", "sub_category": "防晒霜",
+            {"category": "美妆护肤", "sub_category": "防晒",
              "text": "高倍数防晒", "min_price": 0, "max_price": 4294967295,
              "order_num": 1, "brand": None},
             {"category": "服饰", "sub_category": "墨镜",
@@ -49,14 +49,14 @@ async def test_scenario_gen_basic():
         
         "session_memory": [],
     }
-    result = await scenario_gen_node(state, llm=mock_llm, category_list="面部护肤|防晒霜\n服饰|墨镜")
+    result = await scenario_gen_node(state, llm=mock_llm, category_list="美妆护肤|防晒\n服饰|墨镜")
 
     assert "scenario_description" in result
     assert "requirements" in result
     reqs = result["requirements"]
     assert isinstance(reqs, list)
     assert len(reqs) == 2
-    assert reqs[0]["category"] == "面部护肤"
+    assert reqs[0]["category"] == "美妆护肤"
 
 
 @pytest.mark.asyncio
@@ -70,7 +70,7 @@ async def test_scenario_gen_fallback_on_llm_error():
         
         "session_memory": [],
     }
-    result = await scenario_gen_node(state, llm=mock_llm, category_list="面部护肤|防晒霜")
+    result = await scenario_gen_node(state, llm=mock_llm, category_list="美妆护肤|防晒")
 
     assert "requirements" in result
     assert result["requirements"] == []
@@ -82,35 +82,35 @@ async def test_scenario_gen_fallback_on_llm_error():
 
 
 def test_cross_validate_exact_match():
-    lookup = {("面部护肤", "防晒霜"), ("服饰", "墨镜")}
-    result = _cross_validate_categories("面部护肤", "防晒霜", lookup)
-    assert result == ("面部护肤", "防晒霜")
+    lookup = {("美妆护肤", "防晒"), ("服饰", "墨镜")}
+    result = _cross_validate_categories("美妆护肤", "防晒", lookup)
+    assert result == ("美妆护肤", "防晒")
 
 
 def test_cross_validate_case_insensitive_match():
-    lookup = {("面部护肤", "防晒霜"), ("服饰", "墨镜")}
-    result = _cross_validate_categories("面部护肤", "防晒霜 ", lookup)
-    assert result == ("面部护肤", "防晒霜")
+    lookup = {("美妆护肤", "防晒"), ("服饰", "墨镜")}
+    result = _cross_validate_categories("美妆护肤", "防晒 ", lookup)
+    assert result == ("美妆护肤", "防晒")
 
-    result2 = _cross_validate_categories(" 面部护肤", "防晒霜", lookup)
-    assert result2 == ("面部护肤", "防晒霜")
+    result2 = _cross_validate_categories(" 美妆护肤", "防晒", lookup)
+    assert result2 == ("美妆护肤", "防晒")
 
 
 def test_cross_validate_no_match_returns_none():
-    lookup = {("面部护肤", "防晒霜")}
+    lookup = {("美妆护肤", "防晒")}
     result = _cross_validate_categories("不存在的品类", "虚构子类", lookup)
     assert result == (None, None)
 
 
 def test_cross_validate_none_input():
-    lookup = {("面部护肤", "防晒霜")}
+    lookup = {("美妆护肤", "防晒")}
     result = _cross_validate_categories(None, None, lookup)
     assert result == (None, None)
 
 
 def test_cross_validate_partial_match_category_only():
-    lookup = {("面部护肤", "防晒霜")}
-    result = _cross_validate_categories("面部护肤", "不存在子类", lookup)
+    lookup = {("美妆护肤", "防晒")}
+    result = _cross_validate_categories("美妆护肤", "不存在子类", lookup)
     assert result == (None, None)
 
 
@@ -120,7 +120,7 @@ async def test_scenario_gen_cross_validates_llm_output():
     mock_llm = _make_mock_llm(returns=json.dumps({
         "scenario_description": "去三亚度假准备方案",
         "requirements": [
-            {"category": "面部护肤", "sub_category": " 防晒霜 ",
+            {"category": "美妆护肤", "sub_category": " 防晒 ",
              "text": "高倍数防晒", "min_price": 0, "max_price": 4294967295,
              "order_num": 1, "brand": None},
         ]
@@ -135,10 +135,10 @@ async def test_scenario_gen_cross_validates_llm_output():
 
     result = await scenario_gen_node(
         state, llm=mock_llm,
-        category_list="面部护肤|防晒霜\n服饰|墨镜\n面部护肤|洗面奶"
+        category_list="美妆护肤|防晒\n服饰|墨镜\n服饰运动|帽子"
     )
 
     reqs = result["requirements"]
     assert len(reqs) == 1
-    assert reqs[0]["category"] == "面部护肤"
-    assert reqs[0]["sub_category"] == "防晒霜"  # 空格被修正
+    assert reqs[0]["category"] == "美妆护肤"
+    assert reqs[0]["sub_category"] == "防晒"  # 空格被修正

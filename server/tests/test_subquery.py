@@ -19,13 +19,13 @@ def test_subquery_default_category_fields_none():
 def test_subquery_with_category_fields():
     """构造 SubQuery 时传入 category/sub_category，应正确存储。"""
     sq = SubQuery(
-        text="防晒霜",
+        text="防晒",
         strategy="keyword",
-        category="面部护肤",
-        sub_category="防晒霜",
+        category="美妆护肤",
+        sub_category="防晒",
     )
-    assert sq.category == "面部护肤"
-    assert sq.sub_category == "防晒霜"
+    assert sq.category == "美妆护肤"
+    assert sq.sub_category == "防晒"
 
 
 def test_subquery_with_category_only():

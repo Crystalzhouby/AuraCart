@@ -24,6 +24,4 @@ curl -N "http://localhost:8000/api/search/e7b37fc5-95ce-4cea-bf89-cbadc0d8c222?q
 
 场景化推荐：
 去三亚旅行
-curl -N "http://localhost:8000/api/search?
-q=%E4%B8%8B%E5%91%A8%E5%8E%BB%E4%B8%89%E4%BA%9A%E5%BA%A6%E5%81%87%EF%BC%8C%E5%B8%AE%E6%88%91%E6%90%AD%E9%85%8D%E4%B8%80%E5%A5%97%E4%BB%8E%E9%98%B2%E6%99%92%E5%88%B0%E7%A9%BF%E6%90%AD%E7%9A%84%E6%96%B9%E6%A1%88"
-
+curl -N "http://localhost:8000/api/search/e7b37fc5-95ce-4cea-bf89-cbadc0d8c222?q=%E4%B8%8B%E5%91%A8%E5%8E%BB%E4%B8%89%E4%BA%9A%E5%BA%A6%E5%81%87%EF%BC%8C%E5%B8%AE%E6%88%91%E6%90%AD%E9%85%8D%E4%B8%80%E5%A5%97%E4%BB%8E%E9%98%B2%E6%99%92%E5%88%B0%E7%A9%BF%E6%90%AD%E7%9A%84%E6%96%B9%E6%A1%88"

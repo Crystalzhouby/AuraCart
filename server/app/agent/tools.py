@@ -62,8 +62,8 @@ COLUMN_DESCRIPTIONS: dict[str, dict[str, str]] = {
         "product_id": "商品唯一业务标识",
         "title": "商品名称/标题",
         "brand": "品牌名称",
-        "category": "品类大类（如「面部护肤」「服饰运动」）",
-        "sub_category": "品类细类（如「防晒霜」「跑步鞋」）",
+        "category": "品类大类（如「美妆护肤」「服饰运动」）",
+        "sub_category": "品类细类（如「防晒」「跑步鞋」）",
         "base_price": "商品基础参考价格",
         "image_path": "商品主图片路径",
         "is_active": "是否上架（TRUE=在售）",
@@ -186,7 +186,7 @@ async def query_field_values(
     """查询指定表某个字段的去重取值列表，支持多字段联合过滤。
 
     例: query_field_values(db, "product", "brand",
-          {"category": "面部护肤", "sub_category": "防晒霜"})
+          {"category": "美妆护肤", "sub_category": "防晒"})
     返回: ["安热沙", "资生堂", ...]
 
     参数:

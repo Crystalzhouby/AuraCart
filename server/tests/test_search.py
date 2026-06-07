@@ -22,7 +22,7 @@ async def test_search_sse_route_exists():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         try:
-            resp = await client.get("/api/search/test-cid?q=防晒霜&stream=true")
+            resp = await client.get("/api/search/test-cid?q=防晒&stream=true")
             assert resp.status_code in (200, 404, 500, 503)
         except Exception:
             pass
@@ -37,7 +37,7 @@ async def test_search_nonstream_route_exists():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         try:
-            resp = await client.get("/api/search/test-cid?q=防晒霜&stream=false")
+            resp = await client.get("/api/search/test-cid?q=防晒&stream=false")
             assert resp.status_code in (200, 404, 500, 503)
         except Exception:
             pass

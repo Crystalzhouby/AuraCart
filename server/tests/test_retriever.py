@@ -12,8 +12,8 @@ from app.services.retriever_service import Retriever, SubQuery
 
 def test_subquery_no_negation_field():
     """验证 SubQuery 已移除 negation 字段，不再接受 negation 参数。"""
-    sq = SubQuery(text="防晒霜", strategy="semantic")
-    assert sq.text == "防晒霜"
+    sq = SubQuery(text="防晒", strategy="semantic")
+    assert sq.text == "防晒"
     assert sq.strategy == "semantic"
     # 传入 negation 应抛出 TypeError
     with pytest.raises(TypeError):
@@ -109,14 +109,14 @@ async def test_retrieve_semantic(mock_db, mock_emb):
     mock_result.fetchall.return_value = [mock_row]
     mock_db.execute.return_value = mock_result
 
-    subs = [SubQuery(text="防晒霜", strategy="semantic")]
+    subs = [SubQuery(text="防晒", strategy="semantic")]
     hits, meta = await retriever._semantic_search(subs, Filters(conditions=[]), top_k=20)
 
     assert len(hits) == 1
     assert hits[0].product_id == "PROD001"
     assert hits[0].score == 0.85
     assert "PROD001" in meta
-    mock_emb.embed.assert_called_once_with("防晒霜")
+    mock_emb.embed.assert_called_once_with("防晒")
 
 
 @pytest.mark.asyncio
@@ -333,7 +333,7 @@ def test_extract_filters_empty_subs(retriever_without_db):
 def test_extract_filters_only_non_structured(retriever_without_db):
     """验证仅有 keyword/semantic 子查询时不产生 FilterClause。"""
     subs = [
-        SubQuery(text="防晒霜", strategy="keyword"),
+        SubQuery(text="防晒", strategy="keyword"),
         SubQuery(text="保湿效果好", strategy="semantic"),
     ]
     result = retriever_without_db._extract_filters(subs)
@@ -421,7 +421,7 @@ def test_extract_filters_contains(retriever_without_db):
 def test_extract_filters_mixed(retriever_without_db):
     """验证同时有 structured_filter 和非 filter 子查询时仅提取 filter。"""
     subs = [
-        SubQuery(text="防晒霜", strategy="keyword"),
+        SubQuery(text="防晒", strategy="keyword"),
         SubQuery(
             text="", strategy="structured_filter",
             field="price", operator="lt", value=200,

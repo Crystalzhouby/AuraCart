@@ -17,7 +17,7 @@ logger = structlog.get_logger("agent.scenario_gen")
 def _parse_category_list(category_list: str) -> set[tuple[str, str]]:
     """将 category_list 字符串解析为 (category, sub_category) 集合。
 
-    格式: "面部护肤|防晒霜\\n服饰|墨镜\\n..."
+    格式: "美妆护肤|防晒\\n服饰|墨镜\\n..."
     """
     result = set()
     if not category_list:
@@ -38,13 +38,18 @@ def _cross_validate_categories(
     sub_category: str | None,
     lookup: set[tuple[str, str]],
 ) -> tuple[str | None, str | None]:
-    """对 LLM 输出的 category/sub_category 做交叉校验。"""
+    """对 LLM 输出的 category/sub_category 做交叉校验，仅支持精确匹配。
+
+    1. 精确匹配：直接查找或 strip 后查找
+    2. 仍未匹配 → 返回 (None, None)
+    """
     if not category or not sub_category:
         return None, None
 
     cat_stripped = category.strip()
     sub_stripped = sub_category.strip()
 
+    # 1. 精确匹配
     if (cat_stripped, sub_stripped) in lookup:
         return cat_stripped, sub_stripped
 
@@ -142,6 +147,15 @@ async def scenario_gen_node(
     history_context = _build_scenario_history_context(
         rewritten_query, category_list, session_memory
     )
+
+    # 内部加载 category_list（与 extraction_node 模式一致）
+    if not category_list and db_session_factory:
+        try:
+            from app.services.category_lookup_service import fetch_category_context
+            async with db_session_factory() as session:
+                category_list, _ = await fetch_category_context(session)
+        except Exception as e:
+            logger.warning("scenario_gen 品类加载失败", error=str(e))
 
     # ---- 查询全部品类品牌映射表 ----
     brand_map_text = "(品牌数据暂不可用)"

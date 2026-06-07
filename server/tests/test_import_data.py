@@ -24,7 +24,7 @@ def test_chunk_product():
     """
     product_data = {
         "product_id": "SKU001",
-        "title": "安耐晒小金瓶防晒霜",
+        "title": "安耐晒小金瓶防晒",
         "brand": "安耐晒",
         "category": "美妆护肤",
         "sub_category": "防晒",

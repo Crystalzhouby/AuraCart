@@ -55,7 +55,7 @@ def test_health(client: httpx.Client) -> int:
 
 def test_search_stream(client: httpx.Client) -> int:
     """SSE 全链路检索 — GET /api/search?q=...&stream=true"""
-    print("\n[2/3] SSE 全链路检索  GET /api/search?q=推荐一款200元以下的防晒霜&stream=true")
+    print("\n[2/3] SSE 全链路检索  GET /api/search?q=推荐一款200元以下的防晒&stream=true")
     errors = 0
     events: dict[str, list[str]] = {}
 
@@ -63,7 +63,7 @@ def test_search_stream(client: httpx.Client) -> int:
         with client.stream(
             "GET",
             "/api/search",
-            params={"q": "推荐一款200元以下的防晒霜", "stream": True},
+            params={"q": "推荐一款200元以下的防晒", "stream": True},
             timeout=35.0,
         ) as resp:
             errors += check(resp.status_code == 200, f"HTTP {resp.status_code}")

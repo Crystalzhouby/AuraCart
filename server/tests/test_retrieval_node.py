@@ -20,8 +20,8 @@ from app.services.retriever_service import SubQuery
 def test_intent_to_sub_queries_basic():
     """基本意图应生成 keyword + semantic + structured_filter SubQuery。"""
     intent = {
-        "category": "面部护肤",
-        "sub_category": "防晒霜",
+        "category": "美妆护肤",
+        "sub_category": "防晒",
         "text": "高倍数防晒 不粘腻",
         "min_price": 0,
         "max_price": 200,
@@ -86,7 +86,7 @@ def test_intent_to_sub_queries_with_price_bounds():
 def test_intent_to_sub_queries_empty_text():
     """text 为空时不应生成 semantic SubQuery。"""
     intent = {
-        "category": "面部护肤",
+        "category": "美妆护肤",
         "sub_category": "面霜",
         "text": "",
         "min_price": 0,

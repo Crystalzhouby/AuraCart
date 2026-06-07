@@ -50,16 +50,16 @@ class TestGetQueriesByCategory:
 
     def test_exact_match(self):
         memory = [
-            {"category": "面部护肤", "sub_category": "防晒霜",
+            {"category": "美妆护肤", "sub_category": "防晒",
              "queries": [{"query": "防晒", "timestamp": "2026-01-01T00:00:00"}]},
         ]
-        result = get_queries_by_category(memory, "面部护肤", "防晒霜")
+        result = get_queries_by_category(memory, "美妆护肤", "防晒")
         assert len(result) == 1
         assert result[0]["query"] == "防晒"
 
     def test_no_match(self):
         memory = [
-            {"category": "面部护肤", "sub_category": "防晒霜",
+            {"category": "美妆护肤", "sub_category": "防晒",
              "queries": [{"query": "防晒", "timestamp": "2026-01-01T00:00:00"}]},
         ]
         result = get_queries_by_category(memory, "服饰运动", "跑步鞋")
@@ -74,12 +74,12 @@ class TestAppendQuery:
 
     def test_adds_to_existing_group(self):
         memory = [
-            {"category": "面部护肤", "sub_category": "防晒霜",
+            {"category": "美妆护肤", "sub_category": "防晒",
              "queries": [{"query": "防晒", "timestamp": "2026-01-01T00:00:00"}]},
         ]
         result = append_query(
             memory, "轻薄的",
-            [{"category": "面部护肤", "sub_category": "防晒霜"}],
+            [{"category": "美妆护肤", "sub_category": "防晒"}],
             "2026-06-01T00:00:00",
         )
         assert len(result) == 1

@@ -7,8 +7,8 @@ Product Retrieval 节点。
 3. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-25）并行
 4. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
 5. bge-reranker 精排（top-5）+ fallback
-6. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + chat_reply 推荐理由）
-7. 结束语（LLM）+ done 事件
+6. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + product_reason 推荐理由）
+7. 结束语（LLM）+ ending 事件
 8. Memory 更新（原始查询按品类追加到 session_memory）
 """
 import asyncio
@@ -322,6 +322,7 @@ async def _generate_ending(
     requirements: list[dict],
     llm,
     session_memory: list[dict] | None = None,
+    user_query: str = "",
 ) -> str:
     """生成结束语。"""
     if not llm:
@@ -359,6 +360,7 @@ async def _generate_ending(
             product_count=total_products,
             scenario_description=scenario or "无",
             recent_queries=recent_text,
+            rewritten_query=user_query or "无",
         )
         messages = [
             {"role": "system", "content": prompt},
@@ -451,13 +453,12 @@ async def retrieval_node(
                 scenario_description, llm,
             )
             if queue and intro:
-                await queue.put({"event": "chat_reply", "data": intro})
+                await queue.put({"event": "category_intro", "data": intro})
 
         # 3b. 逐商品推荐
         if products:
             reason_tasks = [
-                _generate_product_reason(p, user_query, products, llm,
-                                         session_memory=state.get("session_memory"))
+                _generate_product_reason(p, user_query, products, llm, session_memory=state.get("session_memory"))
                 for p in products
             ]
             reasons = await asyncio.gather(*reason_tasks, return_exceptions=True)
@@ -468,8 +469,8 @@ async def retrieval_node(
                         "event": "products",
                         "data": {
                             "product_id": p["product_id"],
-                            "category": category,
-                            "sub_category": sub_category,
+                            "category": p.get("category") or category,
+                            "sub_category": p.get("sub_category") or sub_category,
                         },
                     })
                     reason = reasons[i] if (
@@ -477,13 +478,12 @@ async def retrieval_node(
                         and isinstance(reasons[i], str)
                     ) else ""
                     if reason:
-                        await queue.put({"event": "chat_reply", "data": reason})
+                        await queue.put({"event": "product_reason", "data": reason})
 
-    # 4. 结束语（done 事件由 _agent_event_stream 在所有节点完成后统一发送）
-    ending_text = await _generate_ending(safe_results, requirements, llm,
-                                         session_memory=state.get("session_memory"))
+    # 4. 结束语
+    ending_text = await _generate_ending(safe_results, requirements, llm, session_memory=state.get("session_memory"), user_query=state.get("rewritten_query") or state.get("user_query", ""))
     if queue and ending_text:
-        await queue.put({"event": "chat_reply", "data": ending_text})
+        await queue.put({"event": "ending", "data": ending_text})
 
     # 5. Memory 更新
     new_memory = state.get("session_memory", [])

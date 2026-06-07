@@ -27,7 +27,7 @@ async def fetch_category_context(db: AsyncSession) -> tuple[str, set[tuple[str, 
     返回值:
         (formatted_str, valid_pairs_set):
         - formatted_str: 按 category 分组的品类清单，每行一个 category。
-          例: "- 面部护肤：防晒霜、洗面奶、面霜"
+          例: "- 美妆护肤：防晒、洗面奶、面霜"
           异常或空表返回 ""。
         - valid_pairs_set: set[tuple[str, str]]，后校验用。
     """

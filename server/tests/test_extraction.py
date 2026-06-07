@@ -69,18 +69,18 @@ def test_build_context_with_history():
 def test_build_context_multiple_categories():
     """多品类时每品类有独立的历史+当前拼接段。"""
     memory = [
-        {"category": "面部护肤", "sub_category": "防晒霜",
+        {"category": "美妆护肤", "sub_category": "防晒",
          "queries": [{"query": "夏天到了", "timestamp": "2026-06-01"}]},
     ]
     context = _build_context_with_memory(
-        "推荐不粘腻的防晒霜和舒服的跑鞋",
+        "推荐不粘腻的防晒和舒服的跑鞋",
         [
-            {"category": "面部护肤", "sub_category": "防晒霜", "brand": None},
+            {"category": "美妆护肤", "sub_category": "防晒", "brand": None},
             {"category": "服饰运动", "sub_category": "跑步鞋", "brand": None},
         ],
         memory,
     )
-    assert "防晒霜" in context
+    assert "防晒" in context
     assert "跑步鞋" in context
     assert "夏天到了" in context
 

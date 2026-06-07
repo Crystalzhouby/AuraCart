@@ -47,9 +47,9 @@ def test_category_lookup_unique_constraint():
 
 def test_category_lookup_creation():
     """验证 CategoryLookup 实例可创建。"""
-    cl = CategoryLookup(category="面部护肤", sub_category="防晒霜")
-    assert cl.category == "面部护肤"
-    assert cl.sub_category == "防晒霜"
+    cl = CategoryLookup(category="美妆护肤", sub_category="防晒")
+    assert cl.category == "美妆护肤"
+    assert cl.sub_category == "防晒"
 
 
 def test_category_lookup_repr():

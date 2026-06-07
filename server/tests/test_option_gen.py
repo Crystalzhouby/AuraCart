@@ -83,7 +83,7 @@ async def test_option_gen_injects_failed_categories_into_prompt():
     async def _capture_chat(messages, **kwargs):
         system_content = messages[0]["content"] if messages else ""
         captured_system_content.append(system_content)
-        return json.dumps({"next_options": ["需要推荐其他面部护肤品吗？"]})
+        return json.dumps({"next_options": ["需要推荐其他美妆护肤品吗？"]})
 
     mock_llm.chat = _capture_chat
 
@@ -92,7 +92,7 @@ async def test_option_gen_injects_failed_categories_into_prompt():
         "retrieval_results": [],
         
         "scenario_description": None,
-        "failed_categories": ["防晒霜", "墨镜"],  # 检索失败的品类
+        "failed_categories": ["防晒", "墨镜"],  # 检索失败的品类
     }
     await option_gen_node(state, llm=mock_llm)
 
@@ -101,7 +101,7 @@ async def test_option_gen_injects_failed_categories_into_prompt():
     prompt = captured_system_content[0]
 
     # 应该包含格式化的失败品类列表
-    assert "防晒霜" in prompt
+    assert "防晒" in prompt
     assert "墨镜" in prompt
     # 不应是 retrieval_results 中的（已设为空），应来自 failed_categories 注入
 

@@ -115,7 +115,7 @@ async def _extract_categories_and_brands(
         db_session_factory: async_session 工厂函数。
 
     返回值:
-        [{"category": "面部护肤", "sub_category": "防晒霜", "brand": ["安热沙"]}, ...]
+        [{"category": "美妆护肤", "sub_category": "防晒", "brand": ["安热沙"]}, ...]
     """
     # 加载品类上下文用于提示词注入
     category_list = ""
@@ -150,7 +150,7 @@ async def _extract_categories_and_brands(
         sub = item.get("sub_category")
         brands = item.get("brand", [])
 
-        # 品类校验
+        # 品类校验（精确匹配）
         if valid_categories and cat and sub:
             if (cat, sub) not in valid_categories:
                 logger.debug("Step1 品类不合法，置 null", category=cat, sub_category=sub)
