@@ -56,19 +56,29 @@ class ProductDetailActivity : AppCompatActivity() {
     }
 
     private fun renderProduct(p: ApiProduct) {
-        // Image：优先本地 API（data_api.py），失败时 fallback 到 picsum
-        val primaryUrl = resolveImageUrl(p.imageUrl)
-        val fallbackUrl = p.img
-        val loadUrl = primaryUrl ?: fallbackUrl
+        // Image：优先商品字段，其次 /api/products/image/{id}，最后 fallback 图
+        val primaryUrl = RetrofitClient.resolveImageUrl(p.resolvedImageUrl)
+        val endpointUrl = RetrofitClient.productImageUrl(p.resolvedId)
+        val fallbackUrl = RetrofitClient.resolveImageUrl(p.img)
+        val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
         if (loadUrl != null) {
             val req = Glide.with(this)
-            if (primaryUrl != null && fallbackUrl != null) {
-                req.load(primaryUrl).error(req.load(fallbackUrl))
-                    .centerCrop().placeholder(android.R.color.darker_gray)
+            when {
+                primaryUrl != null -> req.load(primaryUrl)
+                    .error(req.load(endpointUrl ?: fallbackUrl))
+                    .centerCrop()
+                    .placeholder(android.R.color.darker_gray)
                     .into(b.ivDetailImage)
-            } else {
-                req.load(loadUrl).centerCrop()
-                    .placeholder(android.R.color.darker_gray).into(b.ivDetailImage)
+
+                endpointUrl != null -> req.load(endpointUrl)
+                    .error(req.load(fallbackUrl))
+                    .centerCrop()
+                    .placeholder(android.R.color.darker_gray)
+                    .into(b.ivDetailImage)
+
+                else -> req.load(loadUrl).centerCrop()
+                    .placeholder(android.R.color.darker_gray)
+                    .into(b.ivDetailImage)
             }
         }
 
@@ -195,13 +205,13 @@ class ProductDetailActivity : AppCompatActivity() {
             runCatching {
                 RetrofitClient.api.getProduct(productId)
             }.onSuccess { full ->
-                product = full
-                full.ragKnowledge?.let { renderRagKnowledge(it) }
-                renderSkus(full.skus)
-                b.tvDetailPrice.text = "¥${formatPrice(full.resolvedPrice)}"
-                b.tvDetailTitle.text = full.resolvedTitle
-                b.tvIntro.text = full.ragKnowledge?.marketingDescription ?: full.description
-                renderBasicInfo(full)
+                val merged = full.copy(
+                    imageUrl = full.imageUrl ?: product?.imageUrl,
+                    imagePath = full.imagePath ?: product?.imagePath,
+                    img = full.img ?: product?.img
+                )
+                product = merged
+                renderProduct(merged)
             }
         }
     }
@@ -211,12 +221,6 @@ class ProductDetailActivity : AppCompatActivity() {
         val skuLabel = p.skus.getOrNull(selectedSkuIndex)?.label ?: ""
         CartRepository.add(p, skuLabel)
         Toast.makeText(this, getString(R.string.toast_added_cart), Toast.LENGTH_SHORT).show()
-    }
-
-    private fun resolveImageUrl(url: String?): String? {
-        if (url == null) return null
-        return if (url.startsWith("http")) url
-        else "${RetrofitClient.BASE_URL.trimEnd('/')}$url"
     }
 
     private fun formatPrice(price: Double): String =

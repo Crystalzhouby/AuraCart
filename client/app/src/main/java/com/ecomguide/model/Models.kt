@@ -35,6 +35,7 @@ data class ApiProduct(
     val stock: Int = 0,
     val description: String = "",
     @SerializedName("image_url") val imageUrl: String? = null,
+    @SerializedName("image_path") val imagePath: String? = null,
     val img: String? = null,
     val tags: List<String> = emptyList(),
     val reason: String = "",
@@ -44,7 +45,7 @@ data class ApiProduct(
     val resolvedId: String get() = productId ?: id ?: ""
     val resolvedTitle: String get() = title ?: name ?: ""
     val resolvedPrice: Double get() = basePrice ?: price ?: 0.0
-    val resolvedImageUrl: String? get() = imageUrl ?: img
+    val resolvedImageUrl: String? get() = imageUrl ?: imagePath ?: img
 }
 
 @Parcelize
@@ -143,18 +144,26 @@ data class ScenarioCard(
 
 sealed class MessageItem {
     data class UserMsg(val text: String) : MessageItem()
+
+    /** 单个 AI 回复段：一段推荐文案 +（可选）对应商品卡片 */
+    data class AiReplyBlock(
+        val text: String,
+        val product: ApiProduct? = null
+    )
+
     /**
-     * AI 文本消息 — 支持内嵌商品卡片（紧跟在推荐理由后展示）
+     * AI 文本消息（单气泡）— 支持分段文本与“段内商品卡片”绑定展示。
      *
-     * @param text           AI 回复文本（欢迎语 + 推荐理由流式拼接 + 结束语）
+     * @param text           AI 回复全文（段落拼接，主要用于兼容旧渲染逻辑）
      * @param isStreaming    是否仍在接收 SSE 流
-     * @param inlineProducts 内嵌商品卡片列表，每个商品紧跟在其推荐理由之后展示。
-     *                       数据由 batch API (/api/products/batch) 异步获取后填入。
+     * @param inlineProducts 兼容字段：历史逻辑使用的内嵌商品列表
+     * @param blocks         新逻辑：按段组织的文案与对应商品，支持“每段文案下方卡片”
      */
     data class AiMsg(
         val text: String,
         val isStreaming: Boolean = false,
-        val inlineProducts: List<ApiProduct> = emptyList()
+        val inlineProducts: List<ApiProduct> = emptyList(),
+        val blocks: List<AiReplyBlock> = emptyList()
     ) : MessageItem()
     object Typing : MessageItem()
     data class ProductCards(val products: List<ApiProduct>) : MessageItem()

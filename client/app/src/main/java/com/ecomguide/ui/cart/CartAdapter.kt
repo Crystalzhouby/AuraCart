@@ -44,9 +44,7 @@ class CartAdapter(
             b.tvCartPrice.text = "¥${formatPrice(item.price)}"
             b.tvQty.text = item.qty.toString()
 
-            val primaryUrl = item.imageUrl?.let {
-                if (it.startsWith("http")) it else "${RetrofitClient.BASE_URL.trimEnd('/')}$it"
-            }
+            val primaryUrl = RetrofitClient.resolveImageUrl(item.imageUrl)
             val fallbackUrl = "https://picsum.photos/seed/${item.productId}/400/400"
             val req = Glide.with(b.root.context)
             if (primaryUrl != null) {

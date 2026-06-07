@@ -190,19 +190,33 @@ class ChatStreamClient(
             }
             "next_options" -> {
                 try {
-                    val json = JSONObject(data)
                     val opts = mutableListOf<String>()
-                    val arr = json.optJSONArray("options") ?: json.optJSONArray("")
-                    for (i in 0 until arr.length()) opts.add(arr.getString(i))
-                    onEvent(ChatStreamEvent.NextOptions(opts))
+                    val trimmed = data.trim()
+                    if (trimmed.startsWith("[")) {
+                        val arr = org.json.JSONArray(trimmed)
+                        for (i in 0 until arr.length()) {
+                            opts.add(arr.optString(i))
+                        }
+                    } else {
+                        val json = JSONObject(trimmed)
+                        val arr = json.optJSONArray("options")
+                        if (arr != null) {
+                            for (i in 0 until arr.length()) {
+                                opts.add(arr.optString(i))
+                            }
+                        }
+                    }
+                    onEvent(ChatStreamEvent.NextOptions(opts.filter { it.isNotBlank() }))
                 } catch (_: Exception) {
                     // 忽略
                 }
             }
             "error" -> {
                 val msg = try {
-                    JSONObject(data).optString("detail")
-                        ?: JSONObject(data).optString("message")
+                    val json = JSONObject(data)
+                    json.optString("detail").ifBlank {
+                        json.optString("message")
+                    }
                 } catch (_: Exception) { data }
                 onEvent(ChatStreamEvent.Error(msg.ifBlank { data }))
             }

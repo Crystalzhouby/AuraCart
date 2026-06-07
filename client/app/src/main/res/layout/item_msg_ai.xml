@@ -1,45 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  AI 消息气泡 — 支持内嵌商品卡片
-
-  布局结构：
-    [头像] [气泡 (垂直)
-             ├─ tvText: AI 回复文本
-             └─ rvInlineProducts: 内嵌商品卡片列表（紧跟推荐理由后展示）
-           ]
+  AI 消息气泡 — 使用块级 RecyclerView 渲染，支持文本与商品卡片交错展示
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="horizontal" android:gravity="start"
-    android:paddingStart="14dp" android:paddingEnd="48dp"
-    android:paddingTop="4dp" android:paddingBottom="4dp">
-    <ImageView android:id="@+id/ivAvatar"
-        android:layout_width="32dp" android:layout_height="32dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="start"
+    android:paddingStart="14dp"
+    android:paddingEnd="48dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <ImageView
+        android:id="@+id/ivAvatar"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="8dp"
         android:src="@drawable/guide_face"
         android:background="@drawable/bg_avatar"
         android:scaleType="centerCrop"
-        android:clipToOutline="true"
-        android:layout_marginEnd="8dp" android:layout_marginTop="2dp"/>
-    <!-- 气泡容器：文字 + 内嵌商品卡片 -->
+        android:clipToOutline="true" />
+
     <LinearLayout
-        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="@drawable/bg_ai_bubble"
-        android:paddingStart="14dp" android:paddingEnd="14dp"
-        android:paddingTop="10dp" android:paddingBottom="10dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
         android:elevation="2dp">
-        <!-- AI 回复文本 -->
-        <TextView android:id="@+id/tvText"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textColor="@color/colorTextPrimary" android:textSize="14sp"
-            android:lineSpacingMultiplier="1.55"/>
-        <!-- 内嵌商品卡片列表（横向卡片纵向排列） -->
+
         <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvInlineProducts"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:id="@+id/rvBlocks"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:nestedScrollingEnabled="false"
-            android:overScrollMode="never"
-            android:visibility="gone"/>
+            android:overScrollMode="never" />
     </LinearLayout>
 </LinearLayout>

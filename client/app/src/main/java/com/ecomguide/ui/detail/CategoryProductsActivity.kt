@@ -148,19 +148,26 @@ class CategoryProductsActivity : AppCompatActivity() {
                 tvRating.text = if (avgRating != null) "⭐ ${"%.1f".format(avgRating)}" else ""
 
                 // Image
-                val primaryUrl = resolveImageUrl(product.imageUrl)
-                val fallbackUrl = product.img
-                val loadUrl = primaryUrl ?: fallbackUrl
+                val primaryUrl = com.ecomguide.network.RetrofitClient.resolveImageUrl(product.resolvedImageUrl)
+                val endpointUrl = com.ecomguide.network.RetrofitClient.productImageUrl(product.resolvedId)
+                val fallbackUrl = com.ecomguide.network.RetrofitClient.resolveImageUrl(product.img)
+                val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
                 if (loadUrl != null) {
                     val req = Glide.with(itemView.context)
-                    if (primaryUrl != null && fallbackUrl != null) {
-                        req.load(primaryUrl)
+                    when {
+                        primaryUrl != null -> req.load(primaryUrl)
+                            .error(req.load(endpointUrl ?: fallbackUrl))
+                            .centerCrop()
+                            .placeholder(android.R.color.darker_gray)
+                            .into(ivProduct)
+
+                        endpointUrl != null -> req.load(endpointUrl)
                             .error(req.load(fallbackUrl))
                             .centerCrop()
                             .placeholder(android.R.color.darker_gray)
                             .into(ivProduct)
-                    } else {
-                        req.load(loadUrl).centerCrop()
+
+                        else -> req.load(loadUrl).centerCrop()
                             .placeholder(android.R.color.darker_gray)
                             .into(ivProduct)
                     }
@@ -176,11 +183,6 @@ class CategoryProductsActivity : AppCompatActivity() {
                 if (price == price.toLong().toDouble()) "¥${price.toLong()}"
                 else "¥${"%.2f".format(price)}"
 
-            private fun resolveImageUrl(url: String?): String? {
-                if (url == null) return null
-                return if (url.startsWith("http")) url
-                else "${com.ecomguide.network.RetrofitClient.BASE_URL.trimEnd('/')}$url"
-            }
         }
     }
 }
