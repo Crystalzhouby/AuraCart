@@ -12,7 +12,6 @@ class AgentState(TypedDict):
 
     字段:
         user_query: 当前轮用户原始输入。
-        rewritten_query: Router 改写后的用户查询。
         welcome_text: Router 生成的欢迎词文本（retrieval 节点发送 SSE 用）。
         session_memory: 会话记忆 — 按 (category,sub_category) 分组的原始查询列表。
             格式: [{category, sub_category, queries: [{query, timestamp}]}]
@@ -28,7 +27,6 @@ class AgentState(TypedDict):
     """
 
     user_query: str
-    rewritten_query: str
     welcome_text: str
     session_memory: list[dict]
     intent: str

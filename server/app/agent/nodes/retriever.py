@@ -8,8 +8,7 @@ Product Retrieval 节点。
 4. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
 5. bge-reranker 精排（top-5）+ fallback
 6. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + product_reason 推荐理由）
-7. 结束语（LLM）+ ending 事件
-8. Memory 更新（原始查询按品类追加到 session_memory）
+7. Memory 更新（原始查询按品类追加到 session_memory）
 """
 import asyncio
 import traceback
@@ -22,7 +21,7 @@ from app.services.sku_utils_service import _truncate_texts
 from app.agent.memory import append_query
 from app.agent.prompts.show_prompt import (
     CATEGORY_INTRO_SYSTEM,
-    PRODUCT_REASON_SYSTEM, ENDING_SYSTEM,
+    PRODUCT_REASON_SYSTEM,
 )
 
 logger = structlog.get_logger("agent.retrieval")
@@ -317,62 +316,6 @@ async def _generate_product_reason(
         return ""
 
 
-async def _generate_ending(
-    category_results: list[dict],
-    requirements: list[dict],
-    llm,
-    session_memory: list[dict] | None = None,
-    user_query: str = "",
-) -> str:
-    """生成结束语。"""
-    if not llm:
-        return ""
-    try:
-        categories = []
-        total_products = 0
-        for r in category_results:
-            if not r.get("error"):
-                cat = r.get("category", "")
-                sub = r.get("sub_category", "")
-                if cat and sub:
-                    categories.append(f"{cat}/{sub}")
-                total_products += len(r.get("products", []))
-
-        categories_summary = "、".join(categories) if categories else "无"
-        scenario = ""
-        for req in requirements:
-            if req.get("text"):
-                scenario = req["text"]
-                break
-
-        recent_text = "(无历史记录)"
-        if session_memory:
-            from app.agent.memory import get_recent_queries
-            from app.config import settings as _settings
-            n_rounds = _settings.search.memory_recent_rounds
-            recent = get_recent_queries(session_memory, n_rounds)
-            if recent:
-                sorted_q = sorted(recent, key=lambda x: x["timestamp"])
-                recent_text = "\n".join(f"- {q['query']}" for q in sorted_q)
-
-        prompt = ENDING_SYSTEM.format(
-            categories_summary=categories_summary,
-            product_count=total_products,
-            scenario_description=scenario or "无",
-            recent_queries=recent_text,
-            rewritten_query=user_query or "无",
-        )
-        messages = [
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": "请生成结束语"},
-        ]
-        text = await llm.chat(messages, temperature=0.3)
-        return text.strip() if text else ""
-    except Exception as e:
-        logger.warning("结束语生成失败", error=str(e))
-        return ""
-
-
 async def retrieval_node(
     state: dict,
     llm=None,
@@ -383,7 +326,7 @@ async def retrieval_node(
 ) -> dict:
     """Product Retrieval 节点函数。
 
-    流水线：欢迎语 → 并行检索 → 品类介绍(多品类) → 逐商品推荐 → 结束语 + done。
+    流水线：欢迎语 → 并行检索 → 品类介绍(多品类) → 逐商品推荐 → Memory 更新。
     """
     user_query = state.get("user_query", "")
     requirements = state.get("requirements", [])
@@ -480,12 +423,7 @@ async def retrieval_node(
                     if reason:
                         await queue.put({"event": "product_reason", "data": reason})
 
-    # 4. 结束语
-    ending_text = await _generate_ending(safe_results, requirements, llm, session_memory=state.get("session_memory"), user_query=state.get("rewritten_query") or state.get("user_query", ""))
-    if queue and ending_text:
-        await queue.put({"event": "ending", "data": ending_text})
-
-    # 5. Memory 更新
+    # 4. Memory 更新
     new_memory = state.get("session_memory", [])
     if requirements and user_query:
         categories_list = [

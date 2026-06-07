@@ -210,7 +210,6 @@ async def _agent_event_stream(
     # 构建初始状态
     initial_state: AgentState = {
         "user_query": user_query,
-        "rewritten_query": "",
         "welcome_text": "",
         "session_memory": initial_session_memory,
         "intent": "explicit",

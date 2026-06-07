@@ -21,7 +21,7 @@ async def test_router_explicit():
     result = await router_node(state, llm=mock_llm)
 
     assert result["intent"] == "explicit"
-    assert "rewritten_query" in result
+    assert "welcome_text" in result
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_router_scenario():
     result = await router_node(state, llm=mock_llm)
 
     assert result["intent"] == "scenario"
-    assert "rewritten_query" in result
+    assert "welcome_text" in result
 
 
 @pytest.mark.asyncio
@@ -53,8 +53,8 @@ async def test_router_chat():
     result = await router_node(state, llm=mock_llm)
 
     assert result["intent"] == "chat"
-    # chat 路径不触发改写，rewritten_query 应为原查询
-    assert result["rewritten_query"] == "讲个笑话"
+    # chat 路径不生成欢迎语
+    assert result["welcome_text"] == ""
 
 
 @pytest.mark.asyncio

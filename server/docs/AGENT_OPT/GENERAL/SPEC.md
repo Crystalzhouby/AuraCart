@@ -29,7 +29,6 @@ START → Router → ChitChat / Extraction / ScenarioGen → Retrieval → Optio
 | 通道 | 内容 | 说明 |
 |------|------|------|
 | **State** | `intent`: `"chat"` \| `"explicit"` \| `"scenario"` | 驱动条件边路由 |
-| **State** | `rewritten_query`: `str` | 改写后的查询，chat 时为原始 user_query |
 | **State** | `welcome_text`: `str` | explicit/scenario 时的欢迎语；chat 时为空串 |
 
 > Router 不直接发送 SSE 事件。`welcome_text` 由 Retrieval 节点读取后通过 queue 以 `welcome` 事件发送。
@@ -89,7 +88,7 @@ START → Router → ChitChat / Extraction / ScenarioGen → Retrieval → Optio
 
 处理场景化需求路径（`intent == "scenario"`）。
 
-1. 从 `rewritten_query` 出发，从 **category_lookup 表**读取可用品类列表，确定场景所需品类
+1. 从 `user_query` 出发，从 **category_lookup 表**读取可用品类列表，确定场景所需品类
 2. 按品类从 `session_memory` 检索历史查询，与当前查询拼接
 3. LLM 按品类分组输出意图信息
 
@@ -327,7 +326,7 @@ CREATE TABLE category_lookup (
 
 | Agent | 失败/超时行为 |
 |-------|--------------|
-| Intent Router | 默认 `intent="explicit"`，`rewritten_query=user_query`，`welcome_text=""` |
+| Intent Router | 默认 `intent="explicit"`，`welcome_text=""` |
 | Intent Extraction | Step 1 LLM 失败 → 品类/品牌为 null；Step 3 LLM 失败 → 回退为 `[{text: user_query, category: null, ...}]` |
 | Scenario Gen | 视为误判，回退到 Intent Extraction 做 explicit 分解 |
 | Product Retrieval | 单品类检索失败 → 品类任务内 try/except，返回 `error` 字段，`failed_categories` 汇总记录，其他品类继续；Reranker API 失败 → fallback 到 RRF top-5；全部失败 → 用原始 `user_query` 做语义检索兜底 |
@@ -469,11 +468,11 @@ graph TD
 
 | Agent | 输入（从 State 读取） | 输出（写入 State） | SSE 事件（通过 queue） | 下游消费者 |
 |-------|---------------------|-------------------|---------------------|-----------|
-| **Intent Router** | `user_query`, `session_memory` | `intent`, `rewritten_query`, `welcome_text` | — | 条件边 → Chit-Chat 或 Extraction 或 Scenario Gen |
-| **Intent Extraction** | `rewritten_query`, `session_memory`（按品类读），DB Tools | `requirements` | — | Product Retrieval |
-| **Scenario Gen** | `rewritten_query`, `session_memory`, `category_list`（category_lookup 表） | `scenario_description`, `requirements` | — | Product Retrieval（scenario_description → Option Gen 也读） |
-| **Product Retrieval** | `requirements`, `user_query`, `welcome_text`, `session_memory` | `retrieval_results`, `failed_categories`, `session_memory`（追加后） | `welcome`, `category_intro`, `product_reason`, `ending`, `products` | Option Gen（State）；前端（SSE） |
-| **Option Gen** | `requirements`, `retrieval_results`, `scenario_description`, `failed_categories` | `next_options` | —（由消费循环 finally 块发送） | 消费循环 finally 块 → SSE |
+| **Intent Router** | `user_query`, `session_memory` | `intent`, `welcome_text` | — | 条件边 → Chit-Chat 或 Extraction 或 Scenario Gen |
+| **Intent Extraction** | `user_query`, `session_memory`（按品类读），DB Tools | `requirements` | — | Product Retrieval |
+| **Scenario Gen** | `user_query`, `session_memory`, `category_list`（category_lookup 表） | `scenario_description`, `requirements` | — | Product Retrieval（scenario_description → Option Gen 也读） |
+| **Product Retrieval** | `requirements`, `user_query`, `welcome_text`, `session_memory` | `retrieval_results`, `failed_categories`, `session_memory`（追加后） | `welcome`, `category_intro`, `product_reason`, `products` | Option Gen（State）；前端（SSE） |
+| **Option Gen** | `user_query`, `requirements`, `retrieval_results`, `scenario_description`, `failed_categories`, `session_memory` | `next_options` | `ending` | 前端（SSE）；消费循环 finally 块 → `next_options` SSE |
 | **Chit-Chat** | `user_query` | `chat_reply` | `chat_reply`, `done`（直接在节点内发送） | END |
 
 ## 3.1 Intent Router（意图路由与查询改写 + 欢迎语）
@@ -489,7 +488,6 @@ graph TD
 
 ```
 - intent: "chat" | "explicit" | "scenario"
-- rewritten_query: str         # 改写后的查询（chat 时为原始 user_query）
 - welcome_text: str            # 欢迎语（explicit/scenario 时生成，chat 时为空串）
 ```
 
@@ -503,19 +501,14 @@ graph TD
 - explicit：用户明确提出了具体商品需求
 - scenario：用户描述了一个使用场景而非具体商品
 
-## 任务二：查询改写（仅 explicit/scenario）
-1. 若当前查询缺少主体，从历史中提取主体补全
-2. 完整查询不做改写，直接透传
-3. 冲突时以时间靠后的为准
-
-## 任务三：欢迎语生成（仅 explicit/scenario）
+## 任务二：欢迎语生成（仅 explicit/scenario）
 单品类时突出品类特点，多品类时突出场景感。简洁友好。
 
 历史对话（最近 N 轮）：
 {recent_queries}
 
 ## 输出格式
-{"intent": "explicit", "rewritten_query": "...", "welcome_text": "帮你挑了几款..."}
+{"intent": "explicit", "welcome_text": "帮你挑了几款..."}
 
 用户提问：{user_query}
 ```
@@ -525,7 +518,7 @@ graph TD
 ### 输入规约
 
 ```
-- rewritten_query: str         # Router 改写后的查询
+- user_query: str             # 用户原始查询
 - session_memory: list         # 按 (category,sub_category) 分组的历史原始查询
 - DB Tools: list_tables / list_fields / query_field_values
 ```
@@ -631,8 +624,8 @@ SSE 事件（通过 queue，由消费循环转发）:
 
 ━━━ ① Intent Router ━━━
   Input:  user_query, session_memory=[]
-  Logic:  LLM 分类 → explicit; 首轮无历史 → 透传; 生成欢迎语
-  Output: intent="explicit", rewritten_query="200 元以下的蓝牙耳机有哪些？",
+  Logic:  LLM 分类 → explicit; 生成欢迎语
+  Output: intent="explicit",
           welcome_text="帮你挑了几款口碑好、性价比高的蓝牙耳机～"
 
 ━━━ ② Intent Extraction ━━━
@@ -672,7 +665,7 @@ SSE 事件（通过 queue，由消费循环转发）:
 
 ```text
 ━━━ ① Intent Router ━━━
-  Output: intent="explicit", rewritten_query="帮我推荐跑鞋"（首轮完整，透传），welcome_text="..."
+  Output: intent="explicit", welcome_text="..."
 
 ━━━ ② Intent Extraction ━━━
   Step 1: LLM → [{category: "运动户外", sub_category: "跑鞋", brand: null}]
@@ -695,12 +688,12 @@ SSE 事件（通过 queue，由消费循环转发）:
 ```text
 ━━━ ① Intent Router ━━━
   Input:  历史 = [{query: "帮我推荐跑鞋", ...}]
-  Logic:  缺少主体 → LLM 改写 → rewritten_query="要轻量的跑鞋"
-  Output: intent="explicit", rewritten_query="要轻量的跑鞋", welcome_text="..."
+  Logic:  欢迎语基于 user_query + 历史生成
+  Output: intent="explicit", welcome_text="..."
 
 ━━━ ② Intent Extraction ━━━
   Step 2: get_queries_by_category("运动户外", "跑鞋") → ["帮我推荐跑鞋"]
-          context = "#1 帮我推荐跑鞋\n当前: 要轻量的跑鞋"
+          context = "#1 帮我推荐跑鞋\n当前: 要轻量的"
   Step 3: LLM → [{category:"运动户外", sub_category:"跑鞋", text:"轻量化设计 舒适缓震", ...}]
 
 ━━━ ③ Product Retrieval ━━━
@@ -724,10 +717,10 @@ SSE 事件（通过 queue，由消费循环转发）:
 
 ```text
 ━━━ ① Intent Router ━━━
-  Output: intent="scenario", rewritten_query="..."（透传），welcome_text="海边度假装备得备齐！..."
+  Output: intent="scenario", welcome_text="海边度假装备得备齐！..."
 
 ━━━ ② Scenario Gen ━━━
-  Input:  rewritten_query, category_list（category_lookup 表动态注入）
+  Input:  user_query, category_list（category_lookup 表动态注入）
   Logic:  场景分析 → 热带海岛 → 高倍防晒、防水防汗、速干透气
           选取品类: 防晒霜/墨镜/沙滩裤/遮阳帽/凉鞋（≤6 个）
   Output: scenario_description="下周去三亚度假...", requirements = [5 品类]
@@ -757,7 +750,7 @@ SSE 事件（通过 queue，由消费循环转发）:
 用户: "今天天气怎么样？"
 
 ━━━ ① Intent Router ━━━
-  Output: intent="chat", rewritten_query="今天天气怎么样？", welcome_text=""
+  Output: intent="chat", welcome_text=""
 
 ━━━ ② Chit-Chat ━━━
   SSE (via queue):

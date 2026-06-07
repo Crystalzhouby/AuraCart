@@ -13,8 +13,8 @@ def test_agent_state_default_values():
     """验证 AgentState 各字段的默认值。"""
     state = AgentState(
         user_query="测试查询",
-        rewritten_query="",
-        session_memory=[],
+
+session_memory=[],
         intent="",
         requirements=[],
         retrieval_results=[],
@@ -24,7 +24,6 @@ def test_agent_state_default_values():
         scenario_description=None,
     )
     assert state["user_query"] == "测试查询"
-    assert state["rewritten_query"] == ""
     assert state["session_memory"] == []
     assert state["intent"] == ""
     assert state["requirements"] == []
@@ -39,8 +38,8 @@ def test_agent_state_sse_queue_injection():
     """验证 _sse_queue 可通过属性注入到 AgentState 实例中。"""
     state = AgentState(
         user_query="test",
-        rewritten_query="",
-        session_memory=[],
+
+session_memory=[],
         intent="",
         requirements=[],
         retrieval_results=[],
@@ -58,8 +57,8 @@ def test_agent_state_sse_queue_in_annotations():
     """_sse_queue 必须在 AgentState 的 __annotations__ 中，确保 LangGraph 节点间传递时保留该字段。"""
     state = AgentState(
         user_query="test",
-        rewritten_query="",
-        session_memory=[],
+
+session_memory=[],
         intent="",
         requirements=[],
         retrieval_results=[],
@@ -78,8 +77,8 @@ async def test_sse_queue_put_get():
     """验证通过 _sse_queue 可进行异步读写。"""
     state = AgentState(
         user_query="test",
-        rewritten_query="",
-        session_memory=[],
+
+session_memory=[],
         intent="",
         requirements=[],
         retrieval_results=[],

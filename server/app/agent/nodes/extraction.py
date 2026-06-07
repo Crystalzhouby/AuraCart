@@ -61,17 +61,17 @@ def _parse_json_array(raw: str) -> list:
 
 
 def _build_context_with_memory(
-    rewritten_query: str,
+    user_query: str,
     categories: list[dict],
     session_memory: list[dict],
 ) -> str:
     """Step 2: 按品类从 session_memory 检索历史查询，与当前查询拼接。
 
-    每个品类的历史查询按时间升序编号，末尾追加当前改写查询。
+    每个品类的历史查询按时间升序编号，末尾追加当前查询。
     所有品类拼接为一个文本块供 Step 3 一次性处理。
 
     参数:
-        rewritten_query: Router 改写后的查询。
+        user_query: 用户查询。
         categories: Step 1 输出的品类列表 [{category, sub_category, ...}]。
         session_memory: session_memory 列表。
 
@@ -96,21 +96,21 @@ def _build_context_with_memory(
                 lines.append(f"  #{j} [{hq.get('timestamp', '')}] {hq.get('query', '')}")
         else:
             lines.append("历史查询：(无)")
-        lines.append(f"当前查询: {rewritten_query}")
+        lines.append(f"当前查询: {user_query}")
         parts.append("\n".join(lines))
 
-    return "\n\n".join(parts) if parts else rewritten_query
+    return "\n\n".join(parts) if parts else user_query
 
 
 async def _extract_categories_and_brands(
-    rewritten_query: str,
+    user_query: str,
     llm: LLMService,
     db_session_factory,
 ) -> list[dict]:
     """Step 1: LLM 提取品类/品牌 + Tool 校验合法性。
 
     参数:
-        rewritten_query: Router 改写后的查询。
+        user_query: 用户查询。
         llm: LLMService 实例。
         db_session_factory: async_session 工厂函数。
 
@@ -130,7 +130,7 @@ async def _extract_categories_and_brands(
     prompt = EXTRACTION_STEP1_SYSTEM.replace("{category_list}", category_list)
     messages = [
         {"role": "system", "content": prompt},
-        {"role": "user", "content": rewritten_query},
+        {"role": "user", "content": user_query},
     ]
 
     try:
@@ -242,12 +242,12 @@ async def extraction_node(
     返回值:
         dict: {"requirements": [新格式]}，写入 AgentState。
     """
-    rewritten_query = state.get("rewritten_query", state.get("user_query", ""))
+    user_query = state.get("user_query", "")
     session_memory = state.get("session_memory", [])
 
     # ---- Step 1: 提取品类/品牌 ----
     categories = await _extract_categories_and_brands(
-        rewritten_query, llm, db_session_factory
+        user_query, llm, db_session_factory
     )
 
     if not categories:
@@ -256,7 +256,7 @@ async def extraction_node(
         categories = [{"category": None, "sub_category": None, "brand": None}]
 
     # ---- Step 2: 检索历史并拼接 ----
-    context = _build_context_with_memory(rewritten_query, categories, session_memory)
+    context = _build_context_with_memory(user_query, categories, session_memory)
 
     # ---- 查询品牌列表并注入 Step3 context ----
     brand_reference = ""
@@ -288,7 +288,7 @@ async def extraction_node(
         requirements = [{
             "category": None,
             "sub_category": None,
-            "text": rewritten_query,
+            "text": user_query,
             "min_price": 0,
             "max_price": 4294967295,
             "order_num": 1,

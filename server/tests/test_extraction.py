@@ -122,7 +122,6 @@ async def test_extraction_new_format_output():
 
     state = {
         "user_query": "200元以下的蓝牙耳机",
-        "rewritten_query": "200元以下的蓝牙耳机",
         "session_memory": [],
         
     }
@@ -153,7 +152,6 @@ async def test_extraction_fallback_on_llm_error():
 
     state = {
         "user_query": "蓝牙耳机",
-        "rewritten_query": "蓝牙耳机",
         "session_memory": [],
         
     }
@@ -170,8 +168,8 @@ async def test_extraction_fallback_on_llm_error():
 
 
 @pytest.mark.asyncio
-async def test_extraction_uses_rewritten_query():
-    """Extraction 应使用 rewritten_query 而非 user_query。"""
+async def test_extraction_uses_user_query():
+    """Extraction 应使用 user_query 进行品类提取。"""
     mock_llm = AsyncMock()
 
     step1_json_b = json.dumps([{"category": "服饰运动", "sub_category": "跑步鞋", "brand": None}])
@@ -193,10 +191,9 @@ async def test_extraction_uses_rewritten_query():
     mock_session.execute.return_value.fetchall.return_value = []
 
     state = {
-        "user_query": "要轻量的",           # 不完整查询
-        "rewritten_query": "要轻量的跑鞋",   # 改写后
+        "user_query": "要轻量的跑鞋",
         "session_memory": [],
-        
+
     }
 
     with patch("app.services.category_lookup_service.fetch_category_context",
@@ -207,6 +204,5 @@ async def test_extraction_uses_rewritten_query():
         )
 
     assert "requirements" in result
-    # 验证 result 包含正确的数据
     reqs = result["requirements"]
     assert len(reqs) >= 1

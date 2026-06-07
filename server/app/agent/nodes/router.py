@@ -1,17 +1,16 @@
 """
 Intent Router 节点 — 工作流第一个节点。
 
-单次三分类 + 查询改写：
+单次三分类 + 欢迎语生成：
 1. 意图分类: chat（闲聊）/ explicit（明确商品需求）/ scenario（场景化推荐）
-2. 若为 explicit 或 scenario，利用 session_memory 中最近 N 轮历史改写当前查询，
-   补充商品主体。完整查询不做改写（透传）。
+2. 若为 explicit 或 scenario，生成欢迎语（基于 user_query + 对话历史）。
 """
 import json
 import re
 import structlog
 from app.config import settings
 from app.agent.prompts.router_prompt import ROUTER_SYSTEM
-from app.agent.prompts.rewrite_prompt import REWRITE_SYSTEM
+
 from app.agent.prompts.show_prompt import WELCOME_SYSTEM
 from app.agent.memory import get_recent_queries
 from app.services.llm_service import LLMService
@@ -79,16 +78,14 @@ def _format_recent_queries(recent_queries: list[dict]) -> str:
 
 async def _generate_welcome(
     user_query: str,
-    rewritten_query: str,
     recent_queries: list[dict],
     scenario_description: str,
     llm,
 ) -> str:
-    """在 router 节点生成欢迎词。基于当前查询+改写结果+对话历史。
+    """在 router 节点生成欢迎词。基于当前查询+对话历史。
 
     参数:
-        user_query: 原始用户查询。
-        rewritten_query: 改写后的查询。
+        user_query: 用户查询。
         recent_queries: 最近 N 轮历史原始查询。
         scenario_description: 场景描述（当前阶段始终为空，由下游 scenario_gen 产出）。
         llm: LLMService 实例。
@@ -102,7 +99,6 @@ async def _generate_welcome(
         history_text = _format_recent_queries(recent_queries)
         prompt = WELCOME_SYSTEM.format(
             user_query=user_query,
-            rewritten_query=rewritten_query,
             recent_queries=history_text,
             scenario_description=scenario_description or "无",
         )
@@ -117,63 +113,19 @@ async def _generate_welcome(
         return ""
 
 
-async def _rewrite_query(
-    user_query: str,
-    recent_queries: list[dict],
-    llm: LLMService,
-) -> str:
-    """利用历史对话改写当前查询，补充商品主体。
-
-    若当前查询已完整，LLM 根据提示词指示直接返回原查询（透传）。
-
-    参数:
-        user_query: 当前用户原始查询。
-        recent_queries: 最近 N 轮历史原始查询。
-        llm: LLMService 实例。
-
-    返回值:
-        str: 改写后的查询（或原查询）。
-    """
-    history_text = _format_recent_queries(recent_queries)
-    prompt = (REWRITE_SYSTEM
-              .replace("{recent_queries}", history_text)
-              .replace("{user_query}", user_query))
-
-    messages = [
-        {"role": "system", "content": prompt},
-        {"role": "user", "content": user_query},
-    ]
-
-    try:
-        raw_response = await llm.chat(messages, temperature=0.1)
-        rewritten = raw_response.strip()
-        # 去除可能的 markdown 代码围栏或引号
-        if rewritten.startswith("```"):
-            lines = rewritten.split("\n")
-            rewritten = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-        rewritten = rewritten.strip().strip('"').strip("'")
-        logger.info("Router 查询改写完成",
-                    original=user_query[:80],
-                    rewritten=rewritten[:80])
-        return rewritten if rewritten else user_query
-    except Exception as e:
-        logger.warning("Router 查询改写失败，透传原查询", error=str(e))
-        return user_query
-
-
 async def router_node(state: dict, llm: LLMService) -> dict:
-    """Intent Router + 查询改写节点函数。
+    """Intent Router 节点函数。
 
     流程:
     1. LLM 三分类: chat / explicit / scenario
-    2. 若为 explicit 或 scenario: 从 session_memory 取最近 N 轮 → LLM 改写查询
+    2. 若为 explicit 或 scenario: 生成欢迎语
 
     参数:
         state: AgentState 字典。
         llm: LLMService 实例。
 
     返回值:
-        dict: {"intent", "rewritten_query"}，写入 AgentState。
+        dict: {"intent", "welcome_text"}，写入 AgentState。
     """
     user_query = state.get("user_query", "")
     session_memory = state.get("session_memory", [])
@@ -195,22 +147,15 @@ async def router_node(state: dict, llm: LLMService) -> dict:
 
     intent = parsed.get("intent", "explicit")
 
-    # ---- Step 2: 查询改写（explicit / scenario 路径） ----
+    # ---- Step 2: 生成欢迎词（explicit / scenario 路径） ----
+    welcome_text = ""
+    recent_queries = []
     if intent in ("explicit", "scenario"):
         n_rounds = settings.search.memory_recent_rounds
         recent_queries = get_recent_queries(session_memory, n_rounds)
-        rewritten_query = await _rewrite_query(user_query, recent_queries, llm)
-    else:
-        rewritten_query = user_query
-        recent_queries = []
-
-    # ---- Step 3: 生成欢迎词（explicit / scenario 路径） ----
-    welcome_text = ""
-    if intent in ("explicit", "scenario"):
         scenario_desc = state.get("scenario_description") or ""
         welcome_text = await _generate_welcome(
             user_query=user_query,
-            rewritten_query=rewritten_query,
             recent_queries=recent_queries,
             scenario_description=scenario_desc,
             llm=llm,
@@ -218,6 +163,5 @@ async def router_node(state: dict, llm: LLMService) -> dict:
 
     return {
         "intent": intent,
-        "rewritten_query": rewritten_query,
         "welcome_text": welcome_text,
     }

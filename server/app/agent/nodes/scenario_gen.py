@@ -1,7 +1,7 @@
 """
 Scenario Gen 节点 — 场景化需求路径。
 
-从 rewritten_query 出发，结合可用品类列表和历史查询，
+从 user_query 出发，结合可用品类列表和历史查询，
 LLM 端到端输出场景描述 + 新格式的品类分组意图列表。
 """
 import json
@@ -17,19 +17,45 @@ logger = structlog.get_logger("agent.scenario_gen")
 def _parse_category_list(category_list: str) -> set[tuple[str, str]]:
     """将 category_list 字符串解析为 (category, sub_category) 集合。
 
-    格式: "美妆护肤|防晒\\n服饰|墨镜\\n..."
+    支持两种格式:
+    1. "美妆护肤|防晒\\n服饰|墨镜\\n..."（旧 pipe 格式）
+    2. "- 美妆护肤：防晒、面膜\\n- 服饰：墨镜\\n..."（fetch_category_context 格式）
     """
     result = set()
     if not category_list:
         return result
     for line in category_list.strip().split("\n"):
         line = line.strip()
+        if not line:
+            continue
+
+        # 格式 1: pipe 分隔
         if "|" in line:
             parts = line.split("|", 1)
             cat = parts[0].strip()
             sub = parts[1].strip() if len(parts) > 1 else ""
             if cat and sub:
                 result.add((cat, sub))
+            continue
+
+        # 格式 2: "- 美妆护肤：防晒、面膜"（markdown 列表 + 中文冒号/逗号）
+        stripped = line
+        if stripped.startswith("- ") or stripped.startswith("* "):
+            stripped = stripped[2:]
+        if "：" in stripped:
+            parts = stripped.split("：", 1)
+        elif ":" in stripped:
+            parts = stripped.split(":", 1)
+        else:
+            continue
+
+        cat = parts[0].strip()
+        subs_text = parts[1].strip()
+        for sub in subs_text.replace(",", "、").split("、"):
+            sub = sub.strip()
+            if sub:
+                result.add((cat, sub))
+
     return result
 
 
@@ -62,7 +88,7 @@ def _cross_validate_categories(
 
 
 def _build_scenario_history_context(
-    rewritten_query: str,
+    user_query: str,
     category_list: str,
     session_memory: list[dict],
 ) -> str:
@@ -71,7 +97,7 @@ def _build_scenario_history_context(
     先从品类列表中提取相关品类，再检索其历史查询，格式化为文本。
 
     参数:
-        rewritten_query: Router 改写后的查询。
+        user_query: 用户查询。
         category_list: 可用品类列表字符串。
         session_memory: session_memory 列表。
 
@@ -140,12 +166,12 @@ async def scenario_gen_node(
     返回值:
         dict: {"scenario_description": str, "requirements": [新格式]}
     """
-    rewritten_query = state.get("rewritten_query", state.get("user_query", ""))
+    user_query = state.get("user_query", "")
     session_memory = state.get("session_memory", [])
 
     # 构建历史查询上下文
     history_context = _build_scenario_history_context(
-        rewritten_query, category_list, session_memory
+        user_query, category_list, session_memory
     )
 
     # 内部加载 category_list（与 extraction_node 模式一致）
@@ -179,7 +205,7 @@ async def scenario_gen_node(
               .replace("{category_list}", category_list)
               .replace("{history_context}", history_context)
               .replace("{brand_map}", brand_map_text)
-              .replace("{user_query}", rewritten_query))
+              .replace("{user_query}", user_query))
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": "请根据场景描述生成品类需求拆解"},
@@ -192,13 +218,13 @@ async def scenario_gen_node(
         if data is None:
             raise ValueError("无法从 LLM 响应中提取 JSON")
 
-        scenario_description = data.get("scenario_description", rewritten_query)
+        scenario_description = data.get("scenario_description", user_query)
         requirements = data.get("requirements", [])
 
     except Exception as e:
         logger.warning("Scenario Gen LLM 调用失败", error=str(e))
         return {
-            "scenario_description": rewritten_query,
+            "scenario_description": user_query,
             "requirements": [],
         }
 
