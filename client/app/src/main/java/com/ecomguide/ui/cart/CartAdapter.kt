@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.ecomguide.databinding.ItemCartBinding
 import com.ecomguide.model.CartItem
+import com.ecomguide.model.toPriceNumberText
 import com.ecomguide.network.RetrofitClient
 
 /**
@@ -41,7 +42,7 @@ class CartAdapter(
         fun bind(item: CartItem) {
             b.tvCartName.text = item.title
             b.tvCartSku.text = item.skuLabel
-            b.tvCartPrice.text = "¥${formatPrice(item.price)}"
+            b.tvCartPrice.text = "¥${item.price.toPriceNumberText()}"
             b.tvQty.text = item.qty.toString()
 
             val primaryUrl = RetrofitClient.resolveImageUrl(item.imageUrl)
@@ -70,7 +71,4 @@ class CartAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) = holder.bind(getItem(position))
 
-    private fun formatPrice(price: Double): String =
-        if (price == price.toLong().toDouble()) price.toLong().toString()
-        else "%.2f".format(price)
 }

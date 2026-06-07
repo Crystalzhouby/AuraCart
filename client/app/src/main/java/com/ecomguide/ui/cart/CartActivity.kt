@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.ecomguide.databinding.ActivityCartBinding
 import com.ecomguide.model.ApiProduct
 import com.ecomguide.model.CartItem
+import com.ecomguide.model.toPriceText
 import com.ecomguide.network.RetrofitClient
 import com.ecomguide.repository.CartRepository
 import com.ecomguide.ui.detail.ProductDetailActivity
@@ -54,7 +55,7 @@ class CartActivity : AppCompatActivity() {
             if (!isEmpty) {
                 val total = CartRepository.total()
                 val count = CartRepository.count()
-                b.tvTotal.text = "¥${formatPrice(total)}"
+                b.tvTotal.text = total.toPriceText()
                 b.btnCheckout.text = "结算($count)"
             }
         }
@@ -84,7 +85,4 @@ class CartActivity : AppCompatActivity() {
         })
     }
 
-    private fun formatPrice(price: Double): String =
-        if (price == price.toLong().toDouble()) price.toLong().toString()
-        else "%.2f".format(price)
 }

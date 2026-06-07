@@ -1,8 +1,34 @@
 package com.ecomguide.model
 
+import android.content.Intent
+import android.os.Build
 import android.os.Parcelable
 import com.google.gson.annotations.SerializedName
 import kotlinx.parcelize.Parcelize
+
+// ─── Shared model helpers ──────────────────────────────────────────────────────
+
+fun Double.toPriceNumberText(): String =
+    if (this == this.toLong().toDouble()) this.toLong().toString()
+    else "%.2f".format(this)
+
+fun Double.toPriceText(): String = "¥${toPriceNumberText()}"
+
+fun RagKnowledge.averageRating(): Float? {
+    if (userReviews.isEmpty()) return null
+    return userReviews.sumOf { it.rating }.toFloat() / userReviews.size
+}
+
+fun ApiProduct.averageRating(): Float? = ragKnowledge?.averageRating()
+
+inline fun <reified T : Parcelable> Intent.parcelableExtraCompat(key: String): T? {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        getParcelableExtra(key, T::class.java)
+    } else {
+        @Suppress("DEPRECATION")
+        getParcelableExtra(key)
+    }
+}
 
 // ─── Network models ────────────────────────────────────────────────────────────
 

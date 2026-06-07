@@ -8,6 +8,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.ecomguide.databinding.ItemProductCardBinding
 import com.ecomguide.model.ApiProduct
+import com.ecomguide.model.averageRating
+import com.ecomguide.model.toPriceText
 import com.ecomguide.network.RetrofitClient
 
 class ProductCardAdapter(
@@ -25,44 +27,25 @@ class ProductCardAdapter(
     inner class VH(val b: ItemProductCardBinding) : RecyclerView.ViewHolder(b.root) {
         fun bind(product: ApiProduct, isFirst: Boolean) {
             b.tvName.text = product.resolvedTitle
-            b.tvPrice.text = "¥${product.resolvedPrice.let {
-                if (it == it.toLong().toDouble()) it.toLong().toString() else String.format("%.2f", it)
-            }}"
+            b.tvPrice.text = product.resolvedPrice.toPriceText()
 
             // Hot badge for first card
             b.tvHotLabel.visibility = if (isFirst) android.view.View.VISIBLE else android.view.View.GONE
 
             // Rating (computed from reviews if available)
-            val avgRating = product.ragKnowledge?.userReviews?.let { reviews ->
-                if (reviews.isEmpty()) null
-                else reviews.sumOf { it.rating }.toFloat() / reviews.size
-            }
+            val avgRating = product.averageRating()
             b.tvRating.text = if (avgRating != null) "⭐ ${"%.1f".format(avgRating)}" else ""
 
-            // Image：优先商品字段，其次 /api/products/image/{id} 兜底，最后 fallback 图
-            val primaryUrl = RetrofitClient.resolveImageUrl(product.resolvedImageUrl)
-            val endpointUrl = RetrofitClient.productImageUrl(product.resolvedId)
-            val fallbackUrl = RetrofitClient.resolveImageUrl(product.img)
-            val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
+            // 图片加载使用共享策略，避免在多个商品卡里重复拼 URL 规则。
+            val imageSource = RetrofitClient.resolveProductImageSource(product)
+            val loadUrl = imageSource.displayUrl
             if (loadUrl != null) {
-                val req = Glide.with(b.root.context)
-                when {
-                    primaryUrl != null -> req.load(primaryUrl)
-                        .error(req.load(endpointUrl ?: fallbackUrl))
-                        .centerCrop()
-                        .placeholder(android.R.color.darker_gray)
-                        .into(b.ivProduct)
-
-                    endpointUrl != null -> req.load(endpointUrl)
-                        .error(req.load(fallbackUrl))
-                        .centerCrop()
-                        .placeholder(android.R.color.darker_gray)
-                        .into(b.ivProduct)
-
-                    else -> req.load(loadUrl).centerCrop()
-                        .placeholder(android.R.color.darker_gray)
-                        .into(b.ivProduct)
-                }
+                Glide.with(b.root.context)
+                    .load(loadUrl)
+                    .error(Glide.with(b.root.context).load(imageSource.errorUrl))
+                    .centerCrop()
+                    .placeholder(android.R.color.darker_gray)
+                    .into(b.ivProduct)
             } else {
                 b.ivProduct.setImageResource(android.R.color.darker_gray)
             }

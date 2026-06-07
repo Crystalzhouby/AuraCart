@@ -6,7 +6,6 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.ecomguide.databinding.ActivityChatHistoryBinding
 import com.ecomguide.databinding.ItemHistoryBinding
@@ -21,14 +20,14 @@ class ChatHistoryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityChatHistoryBinding.inflate(layoutInflater)
-        setContentView(b.root)
-
-        b.btnBack.setOnClickListener { finish() }
-
-        b.rvHistory.apply {
-            layoutManager = LinearLayoutManager(this@ChatHistoryActivity)
+        bindCommonSidebarList(
+            binding = b,
+            recyclerView = b.rvHistory,
             adapter = HistoryAdapter(histories)
-        }
+        )
+
+        // 统一返回行为：侧边栏二级页点击左上角直接关闭。
+        b.btnBack.setOnClickListener { finish() }
     }
 
     inner class HistoryAdapter(private val items: List<SidebarMockData.SidebarHistory>) :

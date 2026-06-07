@@ -13,6 +13,9 @@ import com.ecomguide.model.FaqItem
 import com.ecomguide.model.RagKnowledge
 import com.ecomguide.model.SkuOption
 import com.ecomguide.model.UserReview
+import com.ecomguide.model.averageRating
+import com.ecomguide.model.parcelableExtraCompat
+import com.ecomguide.model.toPriceText
 import com.ecomguide.network.RetrofitClient
 import com.ecomguide.ui.cart.CartActivity
 import com.ecomguide.ui.detail.HalfScreenProductDetailActivity
@@ -34,10 +37,11 @@ class ProductDetailActivity : AppCompatActivity() {
         b = ActivityProductDetailBinding.inflate(layoutInflater)
         setContentView(b.root)
 
-        product = intent.getParcelableExtra(EXTRA_PRODUCT)
+        product = intent.parcelableExtraCompat(EXTRA_PRODUCT)
         product?.let { renderProduct(it) } ?: finish()
 
-        b.btnBack.setOnClickListener { onBackPressed() }
+        // 使用 onBackPressedDispatcher 替代已废弃 onBackPressed()。
+        b.btnBack.setOnClickListener { onBackPressedDispatcher.onBackPressed() }
         b.btnDetailCart.setOnClickListener {
             startActivity(android.content.Intent(this, CartActivity::class.java))
         }
@@ -56,34 +60,22 @@ class ProductDetailActivity : AppCompatActivity() {
     }
 
     private fun renderProduct(p: ApiProduct) {
-        // Image：优先商品字段，其次 /api/products/image/{id}，最后 fallback 图
-        val primaryUrl = RetrofitClient.resolveImageUrl(p.resolvedImageUrl)
-        val endpointUrl = RetrofitClient.productImageUrl(p.resolvedId)
-        val fallbackUrl = RetrofitClient.resolveImageUrl(p.img)
-        val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
+        // 商品图统一走 RetrofitClient 的优先级策略，避免各页面重复拼接。
+        val imageSource = RetrofitClient.resolveProductImageSource(p)
+        val loadUrl = imageSource.displayUrl
         if (loadUrl != null) {
-            val req = Glide.with(this)
-            when {
-                primaryUrl != null -> req.load(primaryUrl)
-                    .error(req.load(endpointUrl ?: fallbackUrl))
-                    .centerCrop()
-                    .placeholder(android.R.color.darker_gray)
-                    .into(b.ivDetailImage)
-
-                endpointUrl != null -> req.load(endpointUrl)
-                    .error(req.load(fallbackUrl))
-                    .centerCrop()
-                    .placeholder(android.R.color.darker_gray)
-                    .into(b.ivDetailImage)
-
-                else -> req.load(loadUrl).centerCrop()
-                    .placeholder(android.R.color.darker_gray)
-                    .into(b.ivDetailImage)
-            }
+            Glide.with(this)
+                .load(loadUrl)
+                .error(Glide.with(this).load(imageSource.errorUrl))
+                .centerCrop()
+                .placeholder(android.R.color.darker_gray)
+                .into(b.ivDetailImage)
+        } else {
+            b.ivDetailImage.setImageResource(android.R.color.darker_gray)
         }
 
         // Price
-        b.tvDetailPrice.text = "¥${formatPrice(p.resolvedPrice)}"
+        b.tvDetailPrice.text = p.resolvedPrice.toPriceText()
 
         // Title
         b.tvDetailTitle.text = p.resolvedTitle
@@ -94,8 +86,7 @@ class ProductDetailActivity : AppCompatActivity() {
 
         // Rating from reviews
         val rk = p.ragKnowledge
-        val reviews = rk?.userReviews ?: emptyList()
-        val avg = if (reviews.isNotEmpty()) reviews.sumOf { it.rating }.toFloat() / reviews.size else null
+        val avg = p.averageRating()
         b.tvDetailRating.text = if (avg != null) "⭐ ${"%.1f".format(avg)}" else ""
 
         // SKUs
@@ -115,7 +106,7 @@ class ProductDetailActivity : AppCompatActivity() {
         b.cgSkus.removeAllViews()
         skus.forEachIndexed { i, sku ->
             val chip = Chip(this).apply {
-                text = sku.label.ifBlank { "¥${formatPrice(sku.price)}" }
+                text = sku.label.ifBlank { sku.price.toPriceText() }
                 isCheckable = true
                 isChecked = i == selectedSkuIndex
                 setOnCheckedChangeListener { _, checked -> if (checked) selectedSkuIndex = i }
@@ -152,7 +143,7 @@ class ProductDetailActivity : AppCompatActivity() {
         if (rk.userReviews.isNotEmpty()) {
             b.cardReviews.visibility = View.VISIBLE
             b.llReviews.removeAllViews()
-            val avg = rk.userReviews.sumOf { it.rating }.toFloat() / rk.userReviews.size
+            val avg = rk.averageRating() ?: return
             b.tvAvgRating.text = "%.1f".format(avg)
             b.tvReviewCount.text = getString(R.string.reviews_count, rk.userReviews.size)
             // Star bar
@@ -232,8 +223,5 @@ class ProductDetailActivity : AppCompatActivity() {
         }
     }
 
-    private fun formatPrice(price: Double): String =
-        if (price == price.toLong().toDouble()) price.toLong().toString()
-        else "%.2f".format(price)
 }
 

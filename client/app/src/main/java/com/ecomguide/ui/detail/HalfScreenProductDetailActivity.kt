@@ -1,7 +1,6 @@
 package com.ecomguide.ui.detail
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -12,6 +11,8 @@ import com.ecomguide.R
 import com.ecomguide.databinding.ActivityProductDetailHalfBinding
 import com.ecomguide.model.ApiProduct
 import com.ecomguide.model.SkuOption
+import com.ecomguide.model.parcelableExtraCompat
+import com.ecomguide.model.toPriceText
 import com.ecomguide.network.RetrofitClient
 import com.ecomguide.repository.CartRepository
 import com.google.android.material.chip.Chip
@@ -53,13 +54,7 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
         b = ActivityProductDetailHalfBinding.inflate(layoutInflater)
         setContentView(b.root)
 
-        @Suppress("DEPRECATION")
-        product = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(EXTRA_PRODUCT, ApiProduct::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra(EXTRA_PRODUCT)
-        }
+        product = intent.parcelableExtraCompat(EXTRA_PRODUCT)
 
         if (product == null) { finish(); return }
 
@@ -85,15 +80,13 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
     private fun bindData() {
         if (product == null) return
 
-        // 大图
-        val primaryUrl = RetrofitClient.resolveImageUrl(product!!.resolvedImageUrl)
-        val endpointUrl = RetrofitClient.productImageUrl(product!!.resolvedId)
-        val fallbackUrl = RetrofitClient.resolveImageUrl(product!!.img)
-        val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
+        // 大图统一使用共享加载策略，减少页面内重复拼接 URL 逻辑。
+        val imageSource = RetrofitClient.resolveProductImageSource(product!!)
+        val loadUrl = imageSource.displayUrl
         if (loadUrl != null) {
             Glide.with(this)
                 .load(loadUrl)
-                .error(Glide.with(this).load(endpointUrl ?: fallbackUrl))
+                .error(Glide.with(this).load(imageSource.errorUrl))
                 .centerCrop()
                 .placeholder(android.R.color.darker_gray)
                 .into(b.ivProductImage)
@@ -102,7 +95,7 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
         }
 
         // 价格
-        b.tvPrice.text = formatPrice(product!!.resolvedPrice)
+        b.tvPrice.text = product!!.resolvedPrice.toPriceText()
 
         // 介绍
         b.tvDescription.text = product!!.ragKnowledge?.marketingDescription
@@ -121,7 +114,7 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
         b.cgSkus.removeAllViews()
         skus.forEachIndexed { i, sku ->
             val chip = Chip(this).apply {
-                text = sku.label.ifBlank { "¥${formatPrice(sku.price)}" }
+                text = sku.label.ifBlank { sku.price.toPriceText() }
                 isCheckable = true
                 isChecked = i == selectedSkuIndex
                 setEnsureMinTouchTargetSize(false)
@@ -132,7 +125,7 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
                 shapeAppearanceModel = shapeAppearanceModel.withCornerSize(10f)
                 setOnClickListener {
                     selectedSkuIndex = i
-                    b.tvPrice.text = formatPrice(sku.price)
+                    b.tvPrice.text = sku.price.toPriceText()
                     updateStockStatus()
                     renderSkus(skus)
                 }
@@ -152,7 +145,7 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
                 if (response.skus.isNotEmpty()) {
                     skuOptions = response.skus
                     selectedSkuIndex = 0
-                    b.tvPrice.text = formatPrice(skuOptions.first().price)
+                    b.tvPrice.text = skuOptions.first().price.toPriceText()
                     renderSkus(skuOptions)
                     updateStockStatus()
                 }
@@ -215,9 +208,4 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
         b.tvStockStatus.visibility = if (b.tvStockStatus.text.isBlank()) View.GONE else View.VISIBLE
     }
 
-    // ─── 工具方法 ──────────────────────────────────────────────────────────────
-
-    private fun formatPrice(price: Double): String =
-        if (price == price.toLong().toDouble()) "¥${price.toLong()}"
-        else "¥${"%.2f".format(price)}"
 }

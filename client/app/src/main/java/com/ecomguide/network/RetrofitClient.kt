@@ -1,5 +1,6 @@
 package com.ecomguide.network
 
+import com.ecomguide.model.ApiProduct
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -39,6 +40,39 @@ object RetrofitClient {
         val id = productId?.trim().orEmpty()
         if (id.isBlank()) return null
         return "${BASE_URL.trimEnd('/')}/api/products/image/$id"
+    }
+
+    /**
+     * 商品图加载方案：
+     * - displayUrl: 首选展示地址（字段图 -> 接口图 -> fallback 图）
+     * - errorUrl: 加载失败后的兜底地址（接口图 -> fallback 图）
+     */
+    data class ProductImageSource(
+        val displayUrl: String?,
+        val errorUrl: String?
+    )
+
+    fun resolveProductImageSource(product: ApiProduct): ProductImageSource {
+        val primaryUrl = resolveImageUrl(product.resolvedImageUrl)
+        val endpointUrl = productImageUrl(product.resolvedId)
+        val fallbackUrl = resolveImageUrl(product.img)
+
+        return when {
+            primaryUrl != null -> ProductImageSource(
+                displayUrl = primaryUrl,
+                errorUrl = endpointUrl ?: fallbackUrl
+            )
+
+            endpointUrl != null -> ProductImageSource(
+                displayUrl = endpointUrl,
+                errorUrl = fallbackUrl
+            )
+
+            else -> ProductImageSource(
+                displayUrl = fallbackUrl,
+                errorUrl = null
+            )
+        }
     }
 
     val instance: Retrofit by lazy {

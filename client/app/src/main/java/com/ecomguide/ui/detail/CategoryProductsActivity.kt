@@ -2,7 +2,6 @@ package com.ecomguide.ui.detail
 
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -16,6 +15,8 @@ import com.ecomguide.R
 import com.ecomguide.databinding.ActivityCategoryProductsBinding
 import com.ecomguide.model.ApiProduct
 import com.ecomguide.model.ScenarioCard
+import com.ecomguide.model.parcelableExtraCompat
+import com.ecomguide.model.toPriceText
 /**
  * 品类商品落地页 — 场景推荐卡片点击后跳转的商品列表页（参考图2）
  *
@@ -48,13 +49,8 @@ class CategoryProductsActivity : AppCompatActivity() {
         b = ActivityCategoryProductsBinding.inflate(layoutInflater)
         setContentView(b.root)
 
-        @Suppress("DEPRECATION")
-        scenarioCard = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(EXTRA_SCENARIO_CARD, ScenarioCard::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra(EXTRA_SCENARIO_CARD)
-        } ?: run { finish(); return }
+        scenarioCard = intent.parcelableExtraCompat(EXTRA_SCENARIO_CARD)
+            ?: run { finish(); return }
 
         setupToolbar()
         setupProductGrid()
@@ -63,9 +59,10 @@ class CategoryProductsActivity : AppCompatActivity() {
     // ─── Toolbar ──────────────────────────────────────────────────────────────
 
     private fun setupToolbar() {
-        b.tvCategoryTitle.text = scenarioCard.scenarioName
-        b.tvCategoryReason.text = scenarioCard.reason
-        b.tvCategoryReason.visibility = if (scenarioCard.reason.isBlank()) View.GONE else View.VISIBLE
+        // 场景入口落地页统一标题文案。
+        b.tvCategoryTitle.text = "品类商品"
+        // 推荐语仅展示在商品卡片内，不在列表外额外展示。
+        b.tvCategoryReason.visibility = View.GONE
         b.btnBack.setOnClickListener { finish() }
     }
 
@@ -125,49 +122,26 @@ class CategoryProductsActivity : AppCompatActivity() {
 
             fun bind(product: ApiProduct) {
                 tvName.text = product.resolvedTitle
-                tvPrice.text = formatPrice(product.resolvedPrice)
+                tvPrice.text = product.resolvedPrice.toPriceText()
 
-                // 优先在落地页展示每个商品推荐理由；没有理由时再显示评分。
-                if (product.reason.isNotBlank()) {
-                    tvRating.text = product.reason
-                    tvRating.maxLines = 2
-                } else {
-                    tvRating.maxLines = 1
-                    val avgRating = product.ragKnowledge?.userReviews?.let { reviews ->
-                        if (reviews.isEmpty()) null
-                        else reviews.sumOf { it.rating }.toFloat() / reviews.size
-                    }
-                    tvRating.text = if (avgRating != null) "⭐ ${"%.1f".format(avgRating)}" else ""
-                }
+                // 推荐语固定放在价格下、加入购物车按钮上。
+                tvRating.text = product.reason.trim()
+                tvRating.maxLines = 2
                 tvRating.visibility = if (tvRating.text.isNullOrBlank()) View.GONE else View.VISIBLE
 
                 // Hot badge：每个都隐藏（落地页不需要爆款角标）
                 tvHotLabel.visibility = View.GONE
 
-                // Image
-                val primaryUrl = com.ecomguide.network.RetrofitClient.resolveImageUrl(product.resolvedImageUrl)
-                val endpointUrl = com.ecomguide.network.RetrofitClient.productImageUrl(product.resolvedId)
-                val fallbackUrl = com.ecomguide.network.RetrofitClient.resolveImageUrl(product.img)
-                val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
+                // 图片加载统一走共享策略：优先商品字段，再接口图，再 fallback。
+                val imageSource = com.ecomguide.network.RetrofitClient.resolveProductImageSource(product)
+                val loadUrl = imageSource.displayUrl
                 if (loadUrl != null) {
-                    val req = Glide.with(itemView.context)
-                    when {
-                        primaryUrl != null -> req.load(primaryUrl)
-                            .error(req.load(endpointUrl ?: fallbackUrl))
-                            .centerCrop()
-                            .placeholder(android.R.color.darker_gray)
-                            .into(ivProduct)
-
-                        endpointUrl != null -> req.load(endpointUrl)
-                            .error(req.load(fallbackUrl))
-                            .centerCrop()
-                            .placeholder(android.R.color.darker_gray)
-                            .into(ivProduct)
-
-                        else -> req.load(loadUrl).centerCrop()
-                            .placeholder(android.R.color.darker_gray)
-                            .into(ivProduct)
-                    }
+                    Glide.with(itemView.context)
+                        .load(loadUrl)
+                        .error(Glide.with(itemView.context).load(imageSource.errorUrl))
+                        .centerCrop()
+                        .placeholder(android.R.color.darker_gray)
+                        .into(ivProduct)
                 } else {
                     ivProduct.setImageResource(android.R.color.darker_gray)
                 }
@@ -175,10 +149,6 @@ class CategoryProductsActivity : AppCompatActivity() {
                 itemView.setOnClickListener { onProductClick(product) }
                 btnAddCart.setOnClickListener { onAddToCart(product) }
             }
-
-            private fun formatPrice(price: Double): String =
-                if (price == price.toLong().toDouble()) "¥${price.toLong()}"
-                else "¥${"%.2f".format(price)}"
 
         }
     }

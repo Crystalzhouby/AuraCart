@@ -6,7 +6,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.ecomguide.R
@@ -23,14 +22,14 @@ class MyOrdersActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityMyOrdersBinding.inflate(layoutInflater)
-        setContentView(b.root)
-
-        b.btnBack.setOnClickListener { finish() }
-
-        b.rvOrders.apply {
-            layoutManager = LinearLayoutManager(this@MyOrdersActivity)
+        bindCommonSidebarList(
+            binding = b,
+            recyclerView = b.rvOrders,
             adapter = OrderAdapter(orders)
-        }
+        )
+
+        // 统一返回行为：侧边栏二级页点击左上角直接关闭。
+        b.btnBack.setOnClickListener { finish() }
     }
 
     inner class OrderAdapter(private val items: List<SidebarMockData.SidebarOrder>) :

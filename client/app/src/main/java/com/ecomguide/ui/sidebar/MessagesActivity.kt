@@ -8,9 +8,21 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.viewbinding.ViewBinding
 import com.ecomguide.databinding.ActivityMessagesBinding
 import com.ecomguide.databinding.ItemMessageBinding
 import com.ecomguide.repository.SidebarMockData
+
+/** 侧边栏二级页通用列表初始化：设置内容视图 + 线性列表 + 适配器。 */
+internal fun AppCompatActivity.bindCommonSidebarList(
+    binding: ViewBinding,
+    recyclerView: RecyclerView,
+    adapter: RecyclerView.Adapter<*>
+) {
+    setContentView(binding.root)
+    recyclerView.layoutManager = LinearLayoutManager(this)
+    recyclerView.adapter = adapter
+}
 
 class MessagesActivity : AppCompatActivity() {
 
@@ -28,14 +40,14 @@ class MessagesActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityMessagesBinding.inflate(layoutInflater)
-        setContentView(b.root)
-
-        b.btnBack.setOnClickListener { finish() }
-
-        b.rvMessages.apply {
-            layoutManager = LinearLayoutManager(this@MessagesActivity)
+        bindCommonSidebarList(
+            binding = b,
+            recyclerView = b.rvMessages,
             adapter = MsgAdapter(messages)
-        }
+        )
+
+        // 统一返回行为：侧边栏二级页点击左上角直接关闭。
+        b.btnBack.setOnClickListener { finish() }
     }
 
     inner class MsgAdapter(private val items: List<SidebarMockData.SidebarMessage>) :

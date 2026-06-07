@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -40,6 +41,7 @@ class MainActivity : AppCompatActivity() {
 
         setupDrawer()
         setupToolbarActions()
+        setupBackPressedHandling()
         observeCart()
     }
 
@@ -76,10 +78,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onBackPressed() {
-        if (b.drawerLayout.isDrawerOpen(GravityCompat.START))
-            b.drawerLayout.closeDrawer(GravityCompat.START)
-        else
-            super.onBackPressed()
+    private fun setupBackPressedHandling() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (b.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    b.drawerLayout.closeDrawer(GravityCompat.START)
+                    return
+                }
+                // 让系统继续分发返回事件，避免回调自身递归触发。
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+            }
+        })
     }
 }

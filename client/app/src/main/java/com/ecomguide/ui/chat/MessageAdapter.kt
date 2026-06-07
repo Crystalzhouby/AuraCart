@@ -28,6 +28,8 @@ import com.ecomguide.databinding.ItemScenarioMiniCardBinding
 import com.ecomguide.model.ApiProduct
 import com.ecomguide.model.MessageItem
 import com.ecomguide.model.ScenarioCard
+import com.ecomguide.model.averageRating
+import com.ecomguide.model.toPriceText
 import com.ecomguide.network.RetrofitClient
 import com.google.android.material.chip.Chip
 
@@ -153,7 +155,7 @@ class MessageAdapter(
         cartClick: (ApiProduct) -> Unit
     ) {
         binding.tvName.text = product.resolvedTitle
-        binding.tvPrice.text = formatPrice(product.resolvedPrice)
+        binding.tvPrice.text = product.resolvedPrice.toPriceText()
 
         bindProductRating(
             product = product,
@@ -171,9 +173,7 @@ class MessageAdapter(
 
     /** 统一评分渲染：有评分则显示，无评分则隐藏。 */
     private fun bindProductRating(product: ApiProduct, ratingView: TextView) {
-        val avgRating = product.ragKnowledge?.userReviews?.let { reviews ->
-            if (reviews.isEmpty()) null else reviews.sumOf { it.rating }.toFloat() / reviews.size
-        }
+        val avgRating = product.averageRating()
 
         if (avgRating == null) {
             ratingView.visibility = View.GONE
@@ -186,15 +186,12 @@ class MessageAdapter(
 
     /**
      * 统一图片加载策略：
-     * 1) 商品字段图
-     * 2) `/api/products/image/{id}` 接口图
-     * 3) fallback 图
+     * 通过 RetrofitClient.resolveProductImageSource() 复用全局规则，
+     * 避免不同页面出现 URL 优先级不一致。
      */
     private fun bindProductImage(imageView: ImageView, product: ApiProduct) {
-        val primaryUrl = RetrofitClient.resolveImageUrl(product.resolvedImageUrl)
-        val endpointUrl = RetrofitClient.productImageUrl(product.resolvedId)
-        val fallbackUrl = RetrofitClient.resolveImageUrl(product.img)
-        val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
+        val imageSource = RetrofitClient.resolveProductImageSource(product)
+        val loadUrl = imageSource.displayUrl
 
         if (loadUrl == null) {
             imageView.setImageResource(android.R.color.darker_gray)
@@ -203,16 +200,10 @@ class MessageAdapter(
 
         Glide.with(imageView.context)
             .load(loadUrl)
-            .error(Glide.with(imageView.context).load(endpointUrl ?: fallbackUrl))
+            .error(Glide.with(imageView.context).load(imageSource.errorUrl))
             .centerCrop()
             .placeholder(android.R.color.darker_gray)
             .into(imageView)
-    }
-
-    /** 统一价格文案格式。 */
-    private fun formatPrice(price: Double): String {
-        return if (price == price.toLong().toDouble()) "¥${price.toLong()}"
-        else "¥${"%.2f".format(price)}"
     }
 
     /**
@@ -493,7 +484,7 @@ class MessageAdapter(
             binding.tvScenarioName.setTypeface(binding.tvScenarioName.typeface, android.graphics.Typeface.BOLD)
             binding.tvSubtitle.visibility = View.GONE
             binding.tvProductTitle.visibility = View.GONE
-            binding.tvProductPrice.text = formatPrice(card.firstProductPrice)
+            binding.tvProductPrice.text = card.firstProductPrice.toPriceText()
             binding.tvProductCount.text = "${card.productCount}件类似商品"
 
             val thumbUrl = RetrofitClient.resolveImageUrl(card.firstProductImage)

@@ -243,7 +243,7 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    /** 收到 products 事件：立即插入占位卡，并异步回填详情。 */
+    /** 收到 products 事件：仅记录商品与分组信息，done 后统一按模式渲染。 */
     private fun handleProductEvent(
         event: ChatStreamEvent.ProductEvent,
         renderState: StreamRenderState
@@ -275,9 +275,8 @@ class ChatViewModel : ViewModel() {
             )
         )
 
-        val aiMsgIndex = ensureAiMsg(renderState)
-        appendProductPlaceholderBlock(aiMsgIndex, pending)
-        resolvePlaceholderProductAsync(aiMsgIndex, pending)
+        // 不在流式阶段先渲染商品卡，避免 subCategory>1 时出现“先商品后场景”的闪变。
+        ensureAiMsg(renderState)
     }
 
     /** 收到 done 事件：只收尾流状态，不再集中补插商品卡。 */
@@ -303,8 +302,9 @@ class ChatViewModel : ViewModel() {
         conversationId = event.conversationId ?: conversationId
 
         completeRequest(userText = userText, assistantText = null)
+        applyCardRenderModeBySubCategory(renderState)
 
-        // done 只做收尾：未配对理由的商品保留占位卡，等待异步详情回填。
+        // done 只做收尾：清空未配对的理由队列。
         productPairQueue.clear()
         renderState.currentProductGroupKey = null
     }
@@ -750,13 +750,17 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    /** done 后按模式输出推荐：多分组用场景卡片，单分组用横向商品卡片。 */
-    private fun emitRecommendationCardsByMode(renderState: StreamRenderState) {
-        val pairs = productReasonPairs.toList()
-        if (pairs.isEmpty()) return
-
+    /**
+     * done 后按 subCategory 个数切换展示模式。
+     * - subCategory = 1：统一输出横向商品卡片
+     * - subCategory > 1：统一输出场景入口卡片
+     */
+    private fun applyCardRenderModeBySubCategory(renderState: StreamRenderState) {
         val aiMsgIndex = renderState.aiMsgIndex
         if (aiMsgIndex < 0) return
+
+        val pairs = productReasonPairs.toList()
+        if (pairs.isEmpty()) return
 
         scope.launch {
             try {
@@ -766,16 +770,14 @@ class ChatViewModel : ViewModel() {
                 if (resolved.isEmpty()) return@launch
 
                 val grouped = resolved.groupBy { rec -> toGroupKey(rec.category, rec.subCategory) }
-
                 if (shouldRenderAsScenario(grouped)) {
                     emitRemainingScenarioCards(renderState, grouped)
                 } else {
                     emitSingleGroupHorizontalProducts(aiMsgIndex, grouped)
                 }
-
                 productReasonPairs.clear()
             } catch (e: Exception) {
-                _error.value = "获取推荐卡片失败: ${e.message}"
+                _error.value = "切换卡片展示模式失败: ${e.message}"
             }
         }
     }
@@ -817,10 +819,20 @@ class ChatViewModel : ViewModel() {
         appendProductsToAiMsg(aiMsgIndex, products)
     }
 
-    /** 判定规则：有效分组数 > 1 即场景化，否则按单品（横向商品卡）渲染。 */
+    /**
+     * 判定规则：按 subCategory 个数判断。
+     * - subCategory = 1：每个商品用横向商品卡片展示
+     * - subCategory > 1：使用场景入口卡片展示
+     */
     private fun shouldRenderAsScenario(grouped: Map<String, List<ResolvedRecommendation>>): Boolean {
-        val validGroupCount = grouped.values.count { items -> items.isNotEmpty() }
-        return validGroupCount > 1
+        val subCategoryCount = grouped.values
+            .flatten()
+            .map { recommendation -> recommendation.subCategory.trim() }
+            .filter { subCategory -> subCategory.isNotEmpty() }
+            .distinct()
+            .size
+
+        return subCategoryCount > 1
     }
 
     /** 追加单品推荐块到同一 Ai 气泡内：插在收尾文案前（若存在）。 */
