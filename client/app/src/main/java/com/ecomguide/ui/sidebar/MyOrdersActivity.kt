@@ -12,42 +12,13 @@ import com.bumptech.glide.Glide
 import com.ecomguide.R
 import com.ecomguide.databinding.ActivityMyOrdersBinding
 import com.ecomguide.databinding.ItemOrderBinding
+import com.ecomguide.repository.SidebarMockData
 
 class MyOrdersActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMyOrdersBinding
 
-    enum class OrderStatus { DELIVERED, SHIPPING, PROCESSING }
-
-    data class OrderItem(
-        val orderId: String,
-        val status: OrderStatus,
-        val imageUrls: List<String>,
-        val itemCount: Int,
-        val total: String,
-        val actionLabel: String
-    )
-
-    private val mockOrders = listOf(
-        OrderItem(
-            orderId = "#20240521001", status = OrderStatus.DELIVERED,
-            imageUrls = listOf(
-                "https://picsum.photos/seed/p_beauty_001/80/80",
-                "https://picsum.photos/seed/p_beauty_004/80/80"
-            ),
-            itemCount = 2, total = "¥1,610", actionLabel = "再次购买"
-        ),
-        OrderItem(
-            orderId = "#20240519002", status = OrderStatus.SHIPPING,
-            imageUrls = listOf("https://picsum.photos/seed/p_digital_007/80/80"),
-            itemCount = 1, total = "¥1,299", actionLabel = "查看物流"
-        ),
-        OrderItem(
-            orderId = "#20240515003", status = OrderStatus.PROCESSING,
-            imageUrls = listOf("https://picsum.photos/seed/p_clothes_007/80/80"),
-            itemCount = 1, total = "¥899", actionLabel = "催发货"
-        ),
-    )
+    private val orders = SidebarMockData.orders
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,22 +29,22 @@ class MyOrdersActivity : AppCompatActivity() {
 
         b.rvOrders.apply {
             layoutManager = LinearLayoutManager(this@MyOrdersActivity)
-            adapter = OrderAdapter(mockOrders)
+            adapter = OrderAdapter(orders)
         }
     }
 
-    inner class OrderAdapter(private val items: List<OrderItem>) :
+    inner class OrderAdapter(private val items: List<SidebarMockData.SidebarOrder>) :
         RecyclerView.Adapter<OrderAdapter.VH>() {
 
         inner class VH(val b: ItemOrderBinding) : RecyclerView.ViewHolder(b.root) {
-            fun bind(order: OrderItem) {
+            fun bind(order: SidebarMockData.SidebarOrder) {
                 b.tvOrderId.text = "订单号 ${order.orderId}"
 
                 // Status badge
                 val (label, textColor) = when (order.status) {
-                    OrderStatus.DELIVERED  -> Pair("✅ 已签收", 0xFF00A878.toInt())
-                    OrderStatus.SHIPPING   -> Pair("🚚 配送中", 0xFF6C5CE7.toInt())
-                    OrderStatus.PROCESSING -> Pair("⏳ 待发货", 0xFFB8860B.toInt())
+                    SidebarMockData.SidebarOrderStatus.DELIVERED -> Pair("✅ 已签收", 0xFF00A878.toInt())
+                    SidebarMockData.SidebarOrderStatus.SHIPPING -> Pair("🚚 配送中", 0xFF6C5CE7.toInt())
+                    SidebarMockData.SidebarOrderStatus.PROCESSING -> Pair("⏳ 待发货", 0xFFB8860B.toInt())
                 }
                 b.tvStatus.text = label
                 b.tvStatus.setTextColor(textColor)

@@ -20,7 +20,6 @@ import com.ecomguide.R
 import com.ecomguide.databinding.FragmentChatBinding
 import com.ecomguide.model.ApiProduct
 import com.ecomguide.model.ScenarioCard
-import com.ecomguide.repository.CartRepository
 import com.ecomguide.ui.detail.CategoryProductsActivity
 import com.ecomguide.ui.detail.HalfScreenProductDetailActivity
 import com.ecomguide.ui.detail.ProductDetailActivity
@@ -139,11 +138,8 @@ class ChatFragment : Fragment() {
         val llm = LinearLayoutManager(requireContext()).apply { stackFromEnd = true }
         messageAdapter = MessageAdapter(
             onProductClick = { product -> openDetail(product) },
-            onAddToCart    = { product ->
-                CartRepository.add(product)
-                Toast.makeText(requireContext(), "✅ 已加入购物车", Toast.LENGTH_SHORT).show()
-            },
-            onTagClick     = { tag -> sendMessage(tag) },
+            onAddToCart = { product -> openHalfScreenDetail(product) },
+            onTagClick = { tag -> sendMessage(tag) },
             onScenarioClick = { card -> openCategoryProducts(card) },
             onHorizontalProductClick = { product -> openHalfScreenDetail(product) }
         )

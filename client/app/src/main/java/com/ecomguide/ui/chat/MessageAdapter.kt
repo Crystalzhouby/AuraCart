@@ -2,11 +2,14 @@ package com.ecomguide.ui.chat
 
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
+import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
@@ -47,7 +50,6 @@ class MessageAdapter(
     private val onScenarioClick: (ScenarioCard) -> Unit = {},
     private val onHorizontalProductClick: (ApiProduct) -> Unit = {}
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-
     companion object {
         private const val TYPE_USER = 1
         private const val TYPE_AI = 2
@@ -62,8 +64,33 @@ class MessageAdapter(
 
     /** 列表整量更新入口。 */
     fun submitMessages(items: List<MessageItem>) {
-        messageItems = items
+        messageItems = normalizeTypingItems(items)
         notifyDataSetChanged()
+    }
+
+    /** 把独立 Typing 消息折叠到最近的 AI 气泡，保证动画在同一气泡内显示。 */
+    private fun normalizeTypingItems(items: List<MessageItem>): List<MessageItem> {
+        if (items.none { it is MessageItem.Typing }) return items
+
+        val normalized = mutableListOf<MessageItem>()
+        items.forEach { item ->
+            when (item) {
+                is MessageItem.Typing -> {
+                    val aiIndex = normalized.indexOfLast { it is MessageItem.AiMsg }
+                    if (aiIndex >= 0) {
+                        val ai = normalized[aiIndex] as MessageItem.AiMsg
+                        if (!ai.isStreaming) {
+                            normalized[aiIndex] = ai.copy(isStreaming = true)
+                        }
+                    } else {
+                        normalized.add(MessageItem.AiMsg(text = "", isStreaming = true))
+                    }
+                }
+
+                else -> normalized.add(item)
+            }
+        }
+        return normalized
     }
 
     override fun getItemCount(): Int = messageItems.size
@@ -200,17 +227,37 @@ class MessageAdapter(
             item.blocks.forEach { block ->
                 val text = block.text.trim()
                 if (text.isNotEmpty()) {
-                    renderBlocks.add(AiRenderBlock.Text(text))
+                    renderBlocks.add(
+                        AiRenderBlock.Text(
+                            text = text,
+                            placeholderToken = block.placeholderToken
+                        )
+                    )
                 }
-                block.product?.let { renderBlocks.add(AiRenderBlock.Product(it)) }
+                block.scenarioCard?.let { renderBlocks.add(AiRenderBlock.ScenarioEntry(it)) }
+                block.product?.let {
+                    renderBlocks.add(
+                        AiRenderBlock.Product(
+                            product = it,
+                            placeholderToken = block.placeholderToken
+                        )
+                    )
+                }
             }
 
+            if (item.isStreaming) {
+                renderBlocks.add(AiRenderBlock.Typing)
+            }
             if (renderBlocks.isNotEmpty()) return renderBlocks
         }
 
         val fallbackLines = item.text.lines().map { it.trim() }.filter { it.isNotEmpty() }
         fallbackLines.forEach { line -> renderBlocks.add(AiRenderBlock.Text(line)) }
         item.inlineProducts.forEach { product -> renderBlocks.add(AiRenderBlock.Product(product)) }
+
+        if (item.isStreaming) {
+            renderBlocks.add(AiRenderBlock.Typing)
+        }
 
         return renderBlocks
     }
@@ -404,28 +451,7 @@ class MessageAdapter(
         }
 
         private fun bindMiniCard(binding: ItemScenarioMiniCardBinding, card: ScenarioCard) {
-            binding.root.tag = card
-            binding.tvEmoji.text = card.emoji
-            binding.tvScenarioName.text = card.scenarioName
-            binding.tvSubtitle.text = card.subtitle
-            binding.tvSubtitle.visibility = if (card.subtitle.isBlank()) View.GONE else View.VISIBLE
-
-            binding.tvProductTitle.text = card.firstProductTitle
-            binding.tvProductPrice.text = formatPrice(card.firstProductPrice)
-            binding.tvProductCount.text = "${card.productCount}件商品在售"
-
-            val thumbUrl = RetrofitClient.resolveImageUrl(card.firstProductImage)
-            if (!thumbUrl.isNullOrBlank()) {
-                Glide.with(b.root.context)
-                    .load(thumbUrl)
-                    .centerCrop()
-                    .placeholder(android.R.color.darker_gray)
-                    .into(binding.ivProductThumb)
-            } else {
-                binding.ivProductThumb.setImageResource(android.R.color.darker_gray)
-            }
-
-            binding.root.setOnClickListener { onScenarioClick(card) }
+            ScenarioMiniCardBlockVH(binding.root, onScenarioClick).bind(card)
         }
     }
 
@@ -453,6 +479,38 @@ class MessageAdapter(
         }
     }
 
+    /** AI / ScenarioReply 共用的场景入口卡片 ViewHolder。 */
+    private inner class ScenarioMiniCardBlockVH(
+        itemView: View,
+        private val onScenarioClick: (ScenarioCard) -> Unit
+    ) : RecyclerView.ViewHolder(itemView) {
+        private val binding = ItemScenarioMiniCardBinding.bind(itemView)
+
+        fun bind(card: ScenarioCard) {
+            binding.root.tag = card
+            binding.tvEmoji.visibility = View.GONE
+            binding.tvScenarioName.text = card.firstProductTitle
+            binding.tvScenarioName.setTypeface(binding.tvScenarioName.typeface, android.graphics.Typeface.BOLD)
+            binding.tvSubtitle.visibility = View.GONE
+            binding.tvProductTitle.visibility = View.GONE
+            binding.tvProductPrice.text = formatPrice(card.firstProductPrice)
+            binding.tvProductCount.text = "${card.productCount}件类似商品"
+
+            val thumbUrl = RetrofitClient.resolveImageUrl(card.firstProductImage)
+            if (!thumbUrl.isNullOrBlank()) {
+                Glide.with(binding.root.context)
+                    .load(thumbUrl)
+                    .centerCrop()
+                    .placeholder(android.R.color.darker_gray)
+                    .into(binding.ivProductThumb)
+            } else {
+                binding.ivProductThumb.setImageResource(android.R.color.darker_gray)
+            }
+
+            binding.root.setOnClickListener { onScenarioClick(card) }
+        }
+    }
+
     /** AI 商品块 ViewHolder。 */
     private inner class AiProductBlockVH(
         itemView: View,
@@ -471,11 +529,43 @@ class MessageAdapter(
         }
     }
 
+    /** AI 气泡内的三点输入动画块。 */
+    private class AiTypingBlockVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val dots: List<View> = (itemView as LinearLayout).let { container ->
+            listOf(container.getChildAt(0), container.getChildAt(1), container.getChildAt(2))
+        }
+        private val animators = mutableListOf<ObjectAnimator>()
+
+        fun bind() {
+            if (animators.isNotEmpty()) return
+            dots.forEachIndexed { i, dot ->
+                val animator = ObjectAnimator.ofPropertyValuesHolder(
+                    dot,
+                    PropertyValuesHolder.ofFloat("translationY", 0f, -8f, 0f)
+                ).apply {
+                    duration = 600
+                    startDelay = (i * 150).toLong()
+                    repeatCount = ObjectAnimator.INFINITE
+                }
+                animator.start()
+                animators.add(animator)
+            }
+        }
+
+        fun stop() {
+            animators.forEach { it.cancel() }
+            animators.clear()
+            dots.forEach { it.translationY = 0f }
+        }
+    }
+
     // ─── AI 块级渲染子适配器 ─────────────────────────────────────────────────────
 
     private sealed class AiRenderBlock {
-        data class Text(val text: String) : AiRenderBlock()
-        data class Product(val product: ApiProduct) : AiRenderBlock()
+        data class Text(val text: String, val placeholderToken: String = "") : AiRenderBlock()
+        data class Product(val product: ApiProduct, val placeholderToken: String = "") : AiRenderBlock()
+        data class ScenarioEntry(val card: ScenarioCard) : AiRenderBlock()
+        data object Typing : AiRenderBlock()
     }
 
     /**
@@ -493,6 +583,8 @@ class MessageAdapter(
         // inner class 不能声明 companion object，改为实例常量。
         private val blockTextType = 1
         private val blockProductType = 2
+        private val blockScenarioType = 3
+        private val blockTypingType = 4
 
         private var blocks: List<AiRenderBlock> = emptyList()
 
@@ -507,6 +599,8 @@ class MessageAdapter(
             return when (blocks[position]) {
                 is AiRenderBlock.Text -> blockTextType
                 is AiRenderBlock.Product -> blockProductType
+                is AiRenderBlock.ScenarioEntry -> blockScenarioType
+                is AiRenderBlock.Typing -> blockTypingType
             }
         }
 
@@ -536,6 +630,46 @@ class MessageAdapter(
                     )
                 }
 
+                blockScenarioType -> {
+                    val view = LayoutInflater.from(parent.context)
+                        .inflate(R.layout.item_scenario_mini_card, parent, false)
+                    ScenarioMiniCardBlockVH(
+                        itemView = view,
+                        onScenarioClick = onScenarioClick
+                    )
+                }
+
+                blockTypingType -> {
+                    val context = parent.context
+                    val dotSize = dp(context, 6)
+                    val dotGap = dp(context, 4)
+                    val verticalPadding = dp(context, 2)
+
+                    val container = LinearLayout(context).apply {
+                        layoutParams = RecyclerView.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        )
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(0, verticalPadding, 0, verticalPadding)
+                    }
+
+                    repeat(3) { index ->
+                        val dot = View(context).apply {
+                            layoutParams = LinearLayout.LayoutParams(dotSize, dotSize).apply {
+                                if (index < 2) marginEnd = dotGap
+                            }
+                            background = GradientDrawable().apply {
+                                shape = GradientDrawable.OVAL
+                                setColor(ContextCompat.getColor(context, R.color.colorPrimary))
+                            }
+                        }
+                        container.addView(dot)
+                    }
+                    AiTypingBlockVH(container)
+                }
+
                 else -> throw IllegalArgumentException("Unknown block viewType=$viewType")
             }
         }
@@ -544,8 +678,17 @@ class MessageAdapter(
             when (val block = blocks[position]) {
                 is AiRenderBlock.Text -> (holder as AiTextBlockVH).bind(block.text)
                 is AiRenderBlock.Product -> (holder as AiProductBlockVH).bind(block.product)
+                is AiRenderBlock.ScenarioEntry -> (holder as ScenarioMiniCardBlockVH).bind(block.card)
+                is AiRenderBlock.Typing -> (holder as AiTypingBlockVH).bind()
             }
             applyBlockSpacing(holder.itemView, position)
+        }
+
+        override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+            if (holder is AiTypingBlockVH) {
+                holder.stop()
+            }
+            super.onViewRecycled(holder)
         }
 
         /** 根据前后块类型设置间距，控制阅读节奏。 */
@@ -558,28 +701,48 @@ class MessageAdapter(
 
             val prev = blocks.getOrNull(position - 1)
             val next = blocks.getOrNull(position + 1)
-            val isText = blocks.getOrNull(position) is AiRenderBlock.Text
+            val current = blocks.getOrNull(position)
+            val textBlock = current as? AiRenderBlock.Text
+            val isText = textBlock != null
+            val isTyping = current is AiRenderBlock.Typing
+
+            val prevProduct = prev as? AiRenderBlock.Product
+            val nextProduct = next as? AiRenderBlock.Product
+            val samePlaceholderAsPrev =
+                textBlock != null &&
+                    textBlock.placeholderToken.isNotBlank() &&
+                    textBlock.placeholderToken == prevProduct?.placeholderToken
+            val samePlaceholderAsNext =
+                textBlock != null &&
+                    textBlock.placeholderToken.isNotBlank() &&
+                    textBlock.placeholderToken == nextProduct?.placeholderToken
 
             val top = when {
                 position == 0 -> 0
+                samePlaceholderAsPrev -> dp(itemView, 2)
                 prev is AiRenderBlock.Product -> dp(itemView, 8)
                 else -> dp(itemView, 4)
             }
 
             val bottom = when {
                 position == blocks.lastIndex -> 0
+                isTyping -> 0
+                samePlaceholderAsNext -> dp(itemView, 2)
                 isText && next is AiRenderBlock.Text -> dp(itemView, 10)
                 isText && next is AiRenderBlock.Product -> dp(itemView, 6)
                 else -> dp(itemView, 8)
             }
-
             params.topMargin = top
             params.bottomMargin = bottom
             itemView.layoutParams = params
         }
 
         private fun dp(itemView: View, value: Int): Int {
-            return (value * itemView.resources.displayMetrics.density).toInt()
+            return dp(itemView.context, value)
+        }
+
+        private fun dp(context: android.content.Context, value: Int): Int {
+            return (value * context.resources.displayMetrics.density).toInt()
         }
 
     }

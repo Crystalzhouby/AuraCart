@@ -3,7 +3,6 @@ package com.ecomguide.ui.detail
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
@@ -15,7 +14,6 @@ import com.ecomguide.model.RagKnowledge
 import com.ecomguide.model.SkuOption
 import com.ecomguide.model.UserReview
 import com.ecomguide.network.RetrofitClient
-import com.ecomguide.repository.CartRepository
 import com.ecomguide.ui.cart.CartActivity
 import com.ecomguide.ui.detail.HalfScreenProductDetailActivity
 import com.google.android.material.chip.Chip
@@ -51,8 +49,10 @@ class ProductDetailActivity : AppCompatActivity() {
             product?.let { p -> HalfScreenProductDetailActivity.start(this, p) }
         }
 
-        // Fetch full product details (FAQ + reviews) from API
-        product?.let { fetchFullDetails(it.resolvedId) }
+        product?.let { p ->
+            fetchFullDetails(p.resolvedId)
+            fetchRagKnowledge(p.resolvedId)
+        }
     }
 
     private fun renderProduct(p: ApiProduct) {
@@ -208,7 +208,8 @@ class ProductDetailActivity : AppCompatActivity() {
                 val merged = full.copy(
                     imageUrl = full.imageUrl ?: product?.imageUrl,
                     imagePath = full.imagePath ?: product?.imagePath,
-                    img = full.img ?: product?.img
+                    img = full.img ?: product?.img,
+                    ragKnowledge = full.ragKnowledge ?: product?.ragKnowledge
                 )
                 product = merged
                 renderProduct(merged)
@@ -216,11 +217,19 @@ class ProductDetailActivity : AppCompatActivity() {
         }
     }
 
-    private fun addToCart() {
-        val p = product ?: return
-        val skuLabel = p.skus.getOrNull(selectedSkuIndex)?.label ?: ""
-        CartRepository.add(p, skuLabel)
-        Toast.makeText(this, getString(R.string.toast_added_cart), Toast.LENGTH_SHORT).show()
+    private fun fetchRagKnowledge(productId: String) {
+        if (productId.isBlank()) return
+        lifecycleScope.launch {
+            runCatching {
+                RetrofitClient.api.getProductReview(productId)
+            }.onSuccess { response ->
+                val rk = response.ragKnowledge ?: return@onSuccess
+                val current = product ?: return@onSuccess
+                val merged = current.copy(ragKnowledge = rk)
+                product = merged
+                renderProduct(merged)
+            }
+        }
     }
 
     private fun formatPrice(price: Double): String =

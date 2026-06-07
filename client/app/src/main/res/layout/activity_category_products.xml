@@ -41,6 +41,19 @@
         android:layout_height="1dp"
         android:background="@color/colorBorder"/>
 
+    <TextView
+        android:id="@+id/tvCategoryReason"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="6dp"
+        android:textColor="@color/colorTextSecondary"
+        android:textSize="13sp"
+        android:maxLines="3"
+        android:ellipsize="end"/>
+
     <!-- 商品列表（双列 Grid） -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvCategoryProducts"

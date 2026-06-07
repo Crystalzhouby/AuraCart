@@ -139,12 +139,16 @@ class ChatStreamClient(
             val line = source.readUtf8Line() ?: break
             when {
                 line.isBlank() -> {
-                    dispatch(eventName, dataLines.joinToString("\n"), onEvent)
+                    dispatch(
+                        eventName = eventName,
+                        data = dataLines.joinToString("\n"),
+                        onEvent = onEvent
+                    )
                     eventName = ""
                     dataLines.clear()
                 }
                 line.startsWith("event:") -> eventName = line.removePrefix("event:").trim()
-                line.startsWith("data:")  -> dataLines.add(line.removePrefix("data:").trim())
+                line.startsWith("data:") -> dataLines.add(line.removePrefix("data:").trim())
             }
         }
     }
@@ -152,42 +156,82 @@ class ChatStreamClient(
     /**
      * 根据事件名将数据分发为对应的 ChatStreamEvent 子类（v2 协议）。
      */
-    private fun dispatch(eventName: String, data: String, onEvent: (ChatStreamEvent) -> Unit) {
+    private fun dispatch(
+        eventName: String,
+        data: String,
+        onEvent: (ChatStreamEvent) -> Unit
+    ) {
         if (eventName.isBlank() || data.isBlank()) return
+
         when (eventName) {
-            "welcome" -> {
-                // data 是纯文本字符串
-                onEvent(ChatStreamEvent.Welcome(data.trim('"')))
-            }
+            "welcome" -> onEvent(ChatStreamEvent.Welcome(normalizeTextPayload(data)))
+
+            "welcome_chat_stream" -> emitStreamTextEvent(
+                channel = ChatStreamEvent.StreamText.Channel.WELCOME,
+                data = data,
+                onEvent = onEvent
+            )
+
             "products" -> {
                 // data 是单个商品 JSON 对象 {product_id, sku_id, category, sub_category}
                 try {
                     val json = JSONObject(data)
-                    onEvent(ChatStreamEvent.ProductEvent(
-                        productId = json.optString("product_id"),
-                        skuId = json.optString("sku_id"),
-                        category = json.optString("category"),
-                        subCategory = json.optString("sub_category")
-                    ))
+                    onEvent(
+                        ChatStreamEvent.ProductEvent(
+                            productId = json.optString("product_id"),
+                            skuId = json.optString("sku_id"),
+                            category = json.optString("category"),
+                            subCategory = json.optString("sub_category")
+                        )
+                    )
                 } catch (_: Exception) {
                     // 忽略格式错误的 products 事件
                 }
             }
-            "chat_reply" -> {
-                // data 是纯文本推荐理由
-                onEvent(ChatStreamEvent.ChatReply(data.trim('"')))
+
+            "chat_reply",
+            "category_intro",
+            "product_reason" -> {
+                onEvent(ChatStreamEvent.ChatReply(normalizeTextPayload(data)))
             }
+
+            "category_intro_stream" -> emitStreamTextEvent(
+                channel = ChatStreamEvent.StreamText.Channel.CATEGORY_INTRO,
+                data = data,
+                onEvent = onEvent
+            )
+
+            "ending_stream" -> emitStreamTextEvent(
+                channel = ChatStreamEvent.StreamText.Channel.ENDING,
+                data = data,
+                onEvent = onEvent
+            )
+
+            "ending" -> {
+                val text = normalizeTextPayload(data)
+                if (text.isNotBlank()) {
+                    onEvent(
+                        ChatStreamEvent.StreamText(
+                            channel = ChatStreamEvent.StreamText.Channel.ENDING,
+                            phase = ChatStreamEvent.StreamText.Phase.DELTA,
+                            text = text
+                        )
+                    )
+                }
+            }
+
             "done" -> {
                 try {
                     val json = JSONObject(data)
                     ChatStreamEvent.Done(
-                        text = if (json.has("text")) json.getString("text") else null,
-                        conversationId = if (json.has("conversation_id")) json.getString("conversation_id") else null
+                        text = if (json.has("text")) json.optString("text") else null,
+                        conversationId = if (json.has("conversation_id")) json.optString("conversation_id") else null
                     )
                 } catch (_: Exception) {
                     ChatStreamEvent.Done(text = null, conversationId = null)
                 }.let { onEvent(it) }
             }
+
             "next_options" -> {
                 try {
                     val opts = mutableListOf<String>()
@@ -211,16 +255,63 @@ class ChatStreamClient(
                     // 忽略
                 }
             }
+
             "error" -> {
                 val msg = try {
                     val json = JSONObject(data)
                     json.optString("detail").ifBlank {
                         json.optString("message")
                     }
-                } catch (_: Exception) { data }
+                } catch (_: Exception) {
+                    data
+                }
                 onEvent(ChatStreamEvent.Error(msg.ifBlank { data }))
             }
             // 其他未知事件：忽略，保持向前兼容
+        }
+    }
+
+    private fun emitStreamTextEvent(
+        channel: ChatStreamEvent.StreamText.Channel,
+        data: String,
+        onEvent: (ChatStreamEvent) -> Unit
+    ) {
+        val payload = runCatching { JSONObject(data) }.getOrNull()
+        val phase = when (payload?.optString("type")) {
+            "start" -> ChatStreamEvent.StreamText.Phase.START
+            "delta" -> ChatStreamEvent.StreamText.Phase.DELTA
+            "end" -> ChatStreamEvent.StreamText.Phase.END
+            else -> null
+        }
+
+        if (phase != null) {
+            val text = payload?.optString("text").orEmpty()
+            onEvent(ChatStreamEvent.StreamText(channel = channel, phase = phase, text = text))
+            return
+        }
+
+        val fallbackText = normalizeTextPayload(data)
+        if (fallbackText.isNotBlank()) {
+            onEvent(
+                ChatStreamEvent.StreamText(
+                    channel = channel,
+                    phase = ChatStreamEvent.StreamText.Phase.DELTA,
+                    text = fallbackText
+                )
+            )
+        }
+    }
+
+    private fun normalizeTextPayload(data: String): String {
+        val trimmed = data.trim()
+        if (trimmed.isBlank()) return ""
+
+        return if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+            runCatching { JSONObject("{\"value\":$trimmed}").optString("value") }
+                .getOrElse { trimmed.trim('"') }
+                .trim()
+        } else {
+            trimmed
         }
     }
 }

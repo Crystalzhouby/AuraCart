@@ -12,7 +12,6 @@ import com.ecomguide.model.ApiProduct
 import com.ecomguide.model.CartItem
 import com.ecomguide.network.RetrofitClient
 import com.ecomguide.repository.CartRepository
-import com.ecomguide.repository.DemoProducts
 import com.ecomguide.ui.detail.ProductDetailActivity
 import kotlinx.coroutines.launch
 
@@ -63,18 +62,11 @@ class CartActivity : AppCompatActivity() {
 
     /** 点击购物车商品 → 跳转详情页 */
     private fun openProductDetail(item: CartItem) {
-        // 1. 先从本地 Demo 数据查找
-        val localProduct = DemoProducts.findById(item.productId)
-        if (localProduct != null) {
-            navigateToDetail(localProduct)
-            return
-        }
-        // 2. Demo 里没有则尝试从 API 获取
         lifecycleScope.launch {
             val product = runCatching {
                 RetrofitClient.api.getProduct(item.productId)
             }.getOrElse {
-                // API 也失败时，用 CartItem 信息构造最小化商品对象
+                // API 失败时，用 CartItem 构造最小可展示商品，保证详情页可打开。
                 ApiProduct(
                     productId = item.productId,
                     title = item.title,

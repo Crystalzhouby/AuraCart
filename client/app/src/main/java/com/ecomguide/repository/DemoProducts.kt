@@ -296,3 +296,121 @@ object DemoProducts {
         scenarioHeadphone
     )
 }
+
+/**
+ * 侧边栏相关页面的临时演示数据。
+ *
+ * 说明：
+ * - 聊天主链路已全部走后端，这里仅保留“尚未接后端页面”的集中 mock 数据。
+ * - 统一收敛到一个对象，避免散落在 Activity 内部硬编码。
+ */
+object SidebarMockData {
+
+    enum class SidebarMessageType { PROMO, ORDER, SYSTEM }
+
+    data class SidebarMessage(
+        val icon: String,
+        val type: SidebarMessageType,
+        val title: String,
+        val preview: String,
+        val time: String,
+        val unread: Boolean = false
+    )
+
+    data class SidebarHistory(
+        val icon: String,
+        val title: String,
+        val preview: String,
+        val time: String
+    )
+
+    enum class SidebarOrderStatus { DELIVERED, SHIPPING, PROCESSING }
+
+    data class SidebarOrder(
+        val orderId: String,
+        val status: SidebarOrderStatus,
+        val imageUrls: List<String>,
+        val itemCount: Int,
+        val total: String,
+        val actionLabel: String
+    )
+
+    val messages = listOf(
+        SidebarMessage(
+            icon = "🎉",
+            type = SidebarMessageType.PROMO,
+            title = "专属优惠来啦！",
+            preview = "您关注的雅诗兰黛小棕瓶降价了，现在仅需¥680！",
+            time = "1小时前",
+            unread = true
+        ),
+        SidebarMessage(
+            icon = "📦",
+            type = SidebarMessageType.ORDER,
+            title = "订单物流更新",
+            preview = "您的华为 FreeBuds Pro 5 正在派送，预计今天送达",
+            time = "3小时前",
+            unread = true
+        ),
+        SidebarMessage(
+            icon = "🔔",
+            type = SidebarMessageType.SYSTEM,
+            title = "系统通知",
+            preview = "您的订单 #20240521001 已成功签收，欢迎评价！",
+            time = "昨天"
+        ),
+        SidebarMessage(
+            icon = "✨",
+            type = SidebarMessageType.PROMO,
+            title = "每日好物种草",
+            preview = "今日精选：兰蔻小黑瓶特价活动开始了，限时优惠…",
+            time = "2天前"
+        ),
+        SidebarMessage(
+            icon = "⭐",
+            type = SidebarMessageType.SYSTEM,
+            title = "评价邀请",
+            preview = "购买的 Nike Air Zoom Pegasus 41 到货了，分享你的使用感受吧",
+            time = "3天前"
+        )
+    )
+
+    val histories = listOf(
+        SidebarHistory("💄", "护肤精华推荐", "为你推荐了小棕瓶、红腰子、小黑瓶三款经典精华…", "今天"),
+        SidebarHistory("🎧", "降噪耳机选购", "对比了华为 FreeBuds Pro 5 和 AirPods Pro 3 的降噪…", "昨天"),
+        SidebarHistory("👟", "轻量跑鞋推荐", "Nike Air Zoom Pegasus 41 是日常训练的好选择…", "3天前"),
+        SidebarHistory("☀️", "防晒产品选择", "帮你筛选了不含酒精的物理防晒产品…", "上周"),
+        SidebarHistory("🛍️", "夏季穿搭建议", "从防晒到穿搭，帮你搭配了一套完整方案…", "上周"),
+        SidebarHistory("📱", "手机推荐", "对比了 iPhone 17 Pro 和华为 Pura 90 Pro 的拍照…", "2周前")
+    )
+
+    val orders = listOf(
+        SidebarOrder(
+            orderId = "#20240521001",
+            status = SidebarOrderStatus.DELIVERED,
+            imageUrls = listOf(
+                "https://picsum.photos/seed/p_beauty_001/80/80",
+                "https://picsum.photos/seed/p_beauty_004/80/80"
+            ),
+            itemCount = 2,
+            total = "¥1,610",
+            actionLabel = "再次购买"
+        ),
+        SidebarOrder(
+            orderId = "#20240519002",
+            status = SidebarOrderStatus.SHIPPING,
+            imageUrls = listOf("https://picsum.photos/seed/p_digital_007/80/80"),
+            itemCount = 1,
+            total = "¥1,299",
+            actionLabel = "查看物流"
+        ),
+        SidebarOrder(
+            orderId = "#20240515003",
+            status = SidebarOrderStatus.PROCESSING,
+            imageUrls = listOf("https://picsum.photos/seed/p_clothes_007/80/80"),
+            itemCount = 1,
+            total = "¥899",
+            actionLabel = "催发货"
+        )
+    )
+}

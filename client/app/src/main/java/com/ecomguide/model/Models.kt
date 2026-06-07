@@ -52,7 +52,8 @@ data class ApiProduct(
 data class SkuOption(
     @SerializedName("sku_id") val skuId: String = "",
     val properties: Map<String, String> = emptyMap(),
-    val price: Double = 0.0
+    val price: Double = 0.0,
+    val stock: Int? = null
 ) : Parcelable {
     val label: String get() = properties.entries.joinToString(" | ") { "${it.key}: ${it.value}" }
 }
@@ -63,6 +64,14 @@ data class RagKnowledge(
     @SerializedName("official_faq") val officialFaq: List<FaqItem> = emptyList(),
     @SerializedName("user_reviews") val userReviews: List<UserReview> = emptyList()
 ) : Parcelable
+
+data class ReviewResponse(
+    @SerializedName("rag_knowledge") val ragKnowledge: RagKnowledge? = null
+)
+
+data class ProductSkusResponse(
+    val skus: List<SkuOption> = emptyList()
+)
 
 @Parcelize
 data class FaqItem(val question: String = "", val answer: String = "") : Parcelable
@@ -100,6 +109,25 @@ sealed class ChatStreamEvent {
     /** 品类介绍过渡语（多品类）或单商品推荐理由 */
     data class ChatReply(val text: String) : ChatStreamEvent()
 
+    /** 流式文本增量事件（start / delta / end）。 */
+    data class StreamText(
+        val channel: Channel,
+        val phase: Phase,
+        val text: String = ""
+    ) : ChatStreamEvent() {
+        enum class Channel {
+            WELCOME,
+            CATEGORY_INTRO,
+            ENDING
+        }
+
+        enum class Phase {
+            START,
+            DELTA,
+            END
+        }
+    }
+
     /** 流结束 — 含结束语 text 和 conversation_id */
     data class Done(
         val text: String? = null,
@@ -127,17 +155,19 @@ sealed class ChatStreamEvent {
  */
 @Parcelize
 data class ScenarioCard(
-    val scenarioId: String,              // 场景唯一标识
-    val scenarioName: String,            // 入口名称，如 "春日连衣裙"、"春游穿搭"
-    val emoji: String = "🌸",           // 场景图标 emoji
-    val subtitle: String = "",          // 副标题描述，如 "（一件搞定懒人必备）"
+    val scenarioId: String,               // 场景唯一标识
+    val scenarioName: String,             // 入口名称，如 "春日连衣裙"、"春游穿搭"
+    val emoji: String = "🌸",            // 场景图标 emoji
+    val subtitle: String = "",           // 副标题描述，如 "（一件搞定懒人必备）"
+    val reason: String = "",             // 推荐理由（用于入口卡片与落地页展示）
     val category: String = "",           // 品类名
+    val subCategory: String = "",        // 子品类名
     val products: List<ApiProduct> = emptyList(),  // 该场景下的商品列表
     val firstProductTitle: String = "",  // 第一款商品名称
-    val firstProductPrice: Double = 0.0, // 第一款商品价格
+    val firstProductPrice: Double = 0.0,  // 第一款商品价格
     val firstProductImage: String? = null, // 第一款商品图片
-    val productCount: Int = 0,           // 商品总数，用于展示 "X件商品在售"
-    val shopHint: String = ""            // 店铺提示，如 "夕蒙seemon等多店在售"
+    val productCount: Int = 0,            // 商品总数，用于展示 "X件商品在售"
+    val shopHint: String = ""             // 店铺提示，如 "夕蒙seemon等多店在售"
 ) : Parcelable
 
 // ─── UI message items ──────────────────────────────────────────────────────────
@@ -148,7 +178,9 @@ sealed class MessageItem {
     /** 单个 AI 回复段：一段推荐文案 +（可选）对应商品卡片 */
     data class AiReplyBlock(
         val text: String,
-        val product: ApiProduct? = null
+        val product: ApiProduct? = null,
+        val scenarioCard: ScenarioCard? = null,
+        val placeholderToken: String = ""
     )
 
     /**

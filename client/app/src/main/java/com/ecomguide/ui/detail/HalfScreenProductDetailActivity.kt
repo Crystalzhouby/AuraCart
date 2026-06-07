@@ -6,15 +6,19 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.ecomguide.R
 import com.ecomguide.databinding.ActivityProductDetailHalfBinding
 import com.ecomguide.model.ApiProduct
+import com.ecomguide.model.SkuOption
+import com.ecomguide.network.RetrofitClient
 import com.ecomguide.repository.CartRepository
 import com.google.android.material.chip.Chip
+import kotlinx.coroutines.launch
 
 /**
- * 半屏商品详情页 — 从聊天横向卡片点击后底部滑出（参考图1）
+ * 半屏商品详情页 — 从聊天横向卡片点击后底部滑出
  *
  * 布局（从上到下）：
  *   - 标题栏：返回 + 标题 + 关闭
@@ -42,6 +46,7 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
     private var product: ApiProduct? = null
     private var selectedSkuIndex: Int = 0
     private var quantity: Int = 1
+    private var skuOptions: List<SkuOption> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +67,8 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
         bindData()
         setupSkus()
         setupActions()
+        fetchAllSkus()
+        fetchRagKnowledge()
     }
 
     // ─── Toolbar ──────────────────────────────────────────────────────────────
@@ -79,9 +86,9 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
         if (product == null) return
 
         // 大图
-        val primaryUrl = com.ecomguide.network.RetrofitClient.resolveImageUrl(product!!.resolvedImageUrl)
-        val endpointUrl = com.ecomguide.network.RetrofitClient.productImageUrl(product!!.resolvedId)
-        val fallbackUrl = com.ecomguide.network.RetrofitClient.resolveImageUrl(product!!.img)
+        val primaryUrl = RetrofitClient.resolveImageUrl(product!!.resolvedImageUrl)
+        val endpointUrl = RetrofitClient.productImageUrl(product!!.resolvedId)
+        val fallbackUrl = RetrofitClient.resolveImageUrl(product!!.img)
         val loadUrl = primaryUrl ?: endpointUrl ?: fallbackUrl
         if (loadUrl != null) {
             Glide.with(this)
@@ -106,21 +113,67 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
     }
 
     private fun setupSkus() {
-        renderSkus(product?.skus ?: emptyList())
+        skuOptions = product?.skus ?: emptyList()
+        renderSkus(skuOptions)
     }
 
-    private fun renderSkus(skus: List<com.ecomguide.model.SkuOption>) {
+    private fun renderSkus(skus: List<SkuOption>) {
         b.cgSkus.removeAllViews()
         skus.forEachIndexed { i, sku ->
             val chip = Chip(this).apply {
                 text = sku.label.ifBlank { "¥${formatPrice(sku.price)}" }
                 isCheckable = true
                 isChecked = i == selectedSkuIndex
-                setOnCheckedChangeListener { _, _ -> selectedSkuIndex = i }
+                setEnsureMinTouchTargetSize(false)
+                setChipBackgroundColorResource(if (i == selectedSkuIndex) R.color.colorAccentBg else R.color.colorSurface)
+                setChipStrokeColorResource(R.color.colorPrimary)
+                chipStrokeWidth = 1f
+                setTextColor(getColor(if (i == selectedSkuIndex) R.color.colorPrimary else R.color.colorTextPrimary))
+                shapeAppearanceModel = shapeAppearanceModel.withCornerSize(10f)
+                setOnClickListener {
+                    selectedSkuIndex = i
+                    b.tvPrice.text = formatPrice(sku.price)
+                    updateStockStatus()
+                    renderSkus(skus)
+                }
             }
             b.cgSkus.addView(chip)
         }
         b.cgSkus.visibility = if (skus.isNotEmpty()) View.VISIBLE else View.GONE
+    }
+
+    private fun fetchAllSkus() {
+        val productId = product?.resolvedId.orEmpty()
+        if (productId.isBlank()) return
+        lifecycleScope.launch {
+            runCatching {
+                RetrofitClient.api.getAllSkus(productId)
+            }.onSuccess { response ->
+                if (response.skus.isNotEmpty()) {
+                    skuOptions = response.skus
+                    selectedSkuIndex = 0
+                    b.tvPrice.text = formatPrice(skuOptions.first().price)
+                    renderSkus(skuOptions)
+                    updateStockStatus()
+                }
+            }
+        }
+    }
+
+    private fun fetchRagKnowledge() {
+        val productId = product?.resolvedId.orEmpty()
+        if (productId.isBlank()) return
+        lifecycleScope.launch {
+            runCatching {
+                RetrofitClient.api.getProductReview(productId)
+            }.onSuccess { response ->
+                val rk = response.ragKnowledge ?: return@onSuccess
+                val current = product ?: return@onSuccess
+                val merged = current.copy(ragKnowledge = rk)
+                product = merged
+                b.tvDescription.text = rk.marketingDescription ?: merged.description
+            }
+        }
     }
 
     // ─── 操作事件 ──────────────────────────────────────────────────────────────
@@ -142,15 +195,19 @@ class HalfScreenProductDetailActivity : AppCompatActivity() {
 
     private fun addToCart() {
         val p = product ?: return
-        CartRepository.add(p, p.skus.getOrNull(selectedSkuIndex)?.label ?: "", quantity)
+        val selectedSku = skuOptions.getOrNull(selectedSkuIndex)
+        val skuLabel = selectedSku?.label ?: p.skus.getOrNull(selectedSkuIndex)?.label.orEmpty()
+        CartRepository.add(p, skuLabel, quantity)
         Toast.makeText(this, "✅ 已加入购物车", Toast.LENGTH_SHORT).show()
         setResult(RESULT_OK)
         finish()
     }
 
     private fun updateStockStatus() {
-        val stock = product?.stock ?: 0
+        val selectedSkuStock = skuOptions.getOrNull(selectedSkuIndex)?.stock
+        val stock = selectedSkuStock ?: product?.stock
         b.tvStockStatus.text = when {
+            stock == null -> ""
             stock > 0 -> "有货"
             stock == 0 -> "缺货"
             else -> ""

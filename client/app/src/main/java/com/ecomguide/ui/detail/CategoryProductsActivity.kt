@@ -2,15 +2,12 @@ package com.ecomguide.ui.detail
 
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
-import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -19,9 +16,6 @@ import com.ecomguide.R
 import com.ecomguide.databinding.ActivityCategoryProductsBinding
 import com.ecomguide.model.ApiProduct
 import com.ecomguide.model.ScenarioCard
-import com.ecomguide.repository.CartRepository
-import com.google.android.material.chip.Chip
-
 /**
  * 品类商品落地页 — 场景推荐卡片点击后跳转的商品列表页（参考图2）
  *
@@ -30,7 +24,7 @@ import com.google.android.material.chip.Chip
  *   - Tab 筛选栏支持子场景切换（全部 / 春游法式 / 春季不规则 ...）
  *   - 双列瀑布流展示商品卡片（复用 item_product_card.xml 样式）
  *   - 点击商品 → 跳转 ProductDetailActivity
- *   - 加购 → 加入购物车
+ *   - 加购/加入购物车 → 跳转 HalfScreenProductDetailActivity
  */
 class CategoryProductsActivity : AppCompatActivity() {
 
@@ -70,6 +64,8 @@ class CategoryProductsActivity : AppCompatActivity() {
 
     private fun setupToolbar() {
         b.tvCategoryTitle.text = scenarioCard.scenarioName
+        b.tvCategoryReason.text = scenarioCard.reason
+        b.tvCategoryReason.visibility = if (scenarioCard.reason.isBlank()) View.GONE else View.VISIBLE
         b.btnBack.setOnClickListener { finish() }
     }
 
@@ -84,8 +80,7 @@ class CategoryProductsActivity : AppCompatActivity() {
                 })
             },
             onAddToCart = { product ->
-                CartRepository.add(product)
-                Toast.makeText(this, "✅ 已加入购物车", Toast.LENGTH_SHORT).show()
+                HalfScreenProductDetailActivity.start(this, product)
             }
         )
 
@@ -95,11 +90,6 @@ class CategoryProductsActivity : AppCompatActivity() {
             itemAnimator = null
         }
     }
-
-    // ─── 工具方法 ─────────────────────────────────────────────────────────────
-
-    private fun dpToPx(dp: Int): Float =
-        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp.toFloat(), resources.displayMetrics)
 
     // ════════════════════════════════════════════════════════════════════════════
     //  内部 Adapter — 双列商品卡片（复用 item_product_card.xml 样式）
@@ -137,15 +127,22 @@ class CategoryProductsActivity : AppCompatActivity() {
                 tvName.text = product.resolvedTitle
                 tvPrice.text = formatPrice(product.resolvedPrice)
 
+                // 优先在落地页展示每个商品推荐理由；没有理由时再显示评分。
+                if (product.reason.isNotBlank()) {
+                    tvRating.text = product.reason
+                    tvRating.maxLines = 2
+                } else {
+                    tvRating.maxLines = 1
+                    val avgRating = product.ragKnowledge?.userReviews?.let { reviews ->
+                        if (reviews.isEmpty()) null
+                        else reviews.sumOf { it.rating }.toFloat() / reviews.size
+                    }
+                    tvRating.text = if (avgRating != null) "⭐ ${"%.1f".format(avgRating)}" else ""
+                }
+                tvRating.visibility = if (tvRating.text.isNullOrBlank()) View.GONE else View.VISIBLE
+
                 // Hot badge：每个都隐藏（落地页不需要爆款角标）
                 tvHotLabel.visibility = View.GONE
-
-                // Rating
-                val avgRating = product.ragKnowledge?.userReviews?.let { reviews ->
-                    if (reviews.isEmpty()) null
-                    else reviews.sumOf { it.rating }.toFloat() / reviews.size
-                }
-                tvRating.text = if (avgRating != null) "⭐ ${"%.1f".format(avgRating)}" else ""
 
                 // Image
                 val primaryUrl = com.ecomguide.network.RetrofitClient.resolveImageUrl(product.resolvedImageUrl)
