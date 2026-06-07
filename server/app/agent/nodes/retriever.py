@@ -2,13 +2,12 @@
 Product Retrieval 节点。
 
 流水线：
-1. 欢迎语（由 router 节点生成，从 state 读取）
-2. 按品类分组检索（requirements 已按品类分组）
-3. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-25）并行
-4. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
-5. bge-reranker 精排（top-5）+ fallback
-6. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + product_reason 推荐理由）
-7. Memory 更新（原始查询按品类追加到 session_memory）
+1. 按品类分组检索（requirements 已按品类分组）
+2. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-25）并行
+3. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
+4. bge-reranker 精排（top-5）+ fallback
+5. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + product_reason 推荐理由）
+6. Memory 更新（原始查询按品类追加到 session_memory）
 """
 import asyncio
 import traceback
@@ -341,13 +340,7 @@ async def retrieval_node(
     logger.info("Retrieval 节点开始", user_query=user_query,
                 requirement_count=len(requirements))
 
-    # 1. 欢迎语（仅非流式模式: Router 已写入 state，此处读取并发送）
-    if not stream:
-        welcome_text = state.get("welcome_text", "")
-        if queue and welcome_text:
-            await queue.put({"event": "welcome", "data": welcome_text})
-
-    # 2. 并行检索
+    # 1. 并行检索
     semaphore = asyncio.Semaphore(settings.search.max_category_concurrency)
 
     async def _bounded_task(intent):
@@ -372,7 +365,7 @@ async def retrieval_node(
         else:
             safe_results.append(r)
 
-    # 3. SSE 逐品类 → 逐商品发送
+    # 2. SSE 逐品类 → 逐商品发送
     retrieval_results = []
     failed_categories = []
     total_valid = len([r for r in safe_results if not r.get("error")])
@@ -391,7 +384,7 @@ async def retrieval_node(
         category = r.get("category", "")
         sub_category = r.get("sub_category", "")
 
-        # 3a. 品类介绍语
+        # 2a. 品类介绍语
         if total_valid > 1:
             if stream and queue:
                 # 流式路径: 逐 token 推送 category_intro_stream
@@ -422,7 +415,7 @@ async def retrieval_node(
                 if queue and intro:
                     await queue.put({"event": "category_intro", "data": intro})
 
-        # 3b. 逐商品推荐
+        # 2b. 逐商品推荐
         if products:
             reason_tasks = [
                 _generate_product_reason(p, user_query, products, llm, session_memory=state.get("session_memory"))
@@ -447,7 +440,7 @@ async def retrieval_node(
                     if reason:
                         await queue.put({"event": "product_reason", "data": reason})
 
-    # 4. Memory 更新
+    # 3. Memory 更新
     new_memory = state.get("session_memory", [])
     if requirements and user_query:
         categories_list = [

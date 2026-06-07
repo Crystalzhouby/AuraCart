@@ -1,7 +1,7 @@
 """
-StateGraph 构建模块 — 将 6 个 Agent 节点组装为 LangGraph 工作流。
+StateGraph 构建模块 — 将 5 个 Agent 节点组装为 LangGraph 工作流。
 
-条件边路由：Intent Router → ChitChat / Extraction / Scenario Gen，
+条件边路由：Unified Router 直接输出 chat（→ END）/ explicit（→ Extraction）/ scenario（→ Scenario Gen），
 两条推荐路径在 retrieval 处汇合。
 """
 import json
@@ -13,7 +13,6 @@ from app.agent.nodes.extraction import extraction_node
 from app.agent.nodes.scenario_gen import scenario_gen_node
 from app.agent.nodes.retriever import retrieval_node
 from app.agent.nodes.option_gen import option_gen_node
-from app.agent.nodes.chitchat import chitchat_node
 
 logger = structlog.get_logger("agent.graph")
 
@@ -48,14 +47,14 @@ def route_intent(state: AgentState) -> str:
     """条件边函数：根据 intent 路由。
 
     路由规则:
-        intent == "chat"      → "chitchat"
+        intent == "chat"      → END（router 已发送 done）
         intent == "explicit"  → "extraction"
         intent == "scenario"  → "scenario_gen"
     """
     intent = state.get("intent", "explicit")
 
     if intent == "chat":
-        target = "chitchat"
+        target = "chat"
     elif intent == "scenario":
         target = "scenario_gen"
     else:
@@ -85,12 +84,6 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
         logger.debug("router 输入", state=_preview(state))
         result = await router_node(state, llm=llm, _sse_queue=state.get("_sse_queue"))
         logger.debug("router 输出", result=_preview(result))
-        return result
-
-    async def _chitchat(state: AgentState) -> dict:
-        logger.debug("chitchat 输入", state=_preview(state))
-        result = await chitchat_node(state, llm=llm)
-        logger.debug("chitchat 输出", result=_preview(result))
         return result
 
     async def _extraction(state: AgentState) -> dict:
@@ -130,7 +123,6 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
         return result
 
     graph.add_node("router", _router)
-    graph.add_node("chitchat", _chitchat)
     graph.add_node("extraction", _extraction)
     graph.add_node("scenario_gen", _scenario_gen)
     graph.add_node("retrieval", _retrieval)
@@ -143,13 +135,12 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
         "router",
         route_intent,
         {
-            "chitchat": "chitchat",
+            "chat": END,
             "extraction": "extraction",
             "scenario_gen": "scenario_gen",
         },
     )
 
-    graph.add_edge("chitchat", END)
     graph.add_edge("extraction", "retrieval")
     graph.add_edge("scenario_gen", "retrieval")
     graph.add_edge("retrieval", "option_gen")

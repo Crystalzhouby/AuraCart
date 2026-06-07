@@ -4,8 +4,7 @@
 curl http://localhost:8000/api/conversation
 
 推荐一款200元以下的防晒霜
-curl -N "http://localhost:8000/api/search?
-q=%E6%8E%A8%E8%8D%90%E4%B8%80%E6%AC%BE200%E5%85%83%E4%BB%A5%E4%B8%8B%E7%9A%84%E9%98%B2%E6%99%92%E9%9C%9C"
+curl -N "http://localhost:8000/api/search/e7b37fc5-95ce-4cea-bf89-cbadc0d8c222?q=%E6%8E%A8%E8%8D%90%E4%B8%80%E6%AC%BE200%E5%85%83%E4%BB%A5%E4%B8%8B%E7%9A%84%E9%98%B2%E6%99%92%E9%9C%9C"
 
 推荐一款不含酒精的防晒霜
 curl -N "http://localhost:8000/api/search?

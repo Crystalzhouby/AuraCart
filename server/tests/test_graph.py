@@ -13,10 +13,10 @@ sys.modules["langgraph.graph"] = MagicMock()
 
 
 def test_route_intent_chat():
-    """route_intent 应将 intent=chat 路由到 chitchat。"""
+    """route_intent 应将 intent=chat 路由到 'chat' (→ END)。"""
     from app.agent.graph import route_intent
     state = {"intent": "chat"}
-    assert route_intent(state) == "chitchat"
+    assert route_intent(state) == "chat"
 
 
 def test_route_intent_scenario():
@@ -41,8 +41,8 @@ def test_route_intent_missing_keys_defaults():
 
 
 @pytest.mark.asyncio
-async def test_build_graph_registers_six_nodes():
-    """build_graph 应向 StateGraph 注册 6 个节点。"""
+async def test_build_graph_registers_five_nodes():
+    """build_graph 应向 StateGraph 注册 5 个节点（post-chitchat 删除）。"""
     from app.agent.graph import build_graph
 
     mock_llm = MagicMock()

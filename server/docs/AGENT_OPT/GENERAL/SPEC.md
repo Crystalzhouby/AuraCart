@@ -1,37 +1,45 @@
 # 1 核心Agent组件
 
-> 更新日期：2026-06-07 | 变更：商品级检索 + SSE 事件流修正 + ChatMessage 持久化 + 前端补充接口
+> 更新日期：2026-06-07 | 变更：MERGE_OPT（删除查询改写 + 合并结束语/选项）+ MERGE_OPT2（统一 Router 合并 ChitChat + 欢迎语）+ OUTPUT_OPT（流式 SSE）
 
-整体采用 **LangGraph 工作流架构**，6 节点管线：
+整体采用 **LangGraph 工作流架构**，5 节点管线：
 
 ```
-START → Router → ChitChat / Extraction / ScenarioGen → Retrieval → OptionGen → END
+START → Router → Extraction / ScenarioGen → Retrieval → OptionGen → END
 ```
 
-节点间共享 `AgentState` 作为状态通道。Memory 作为集中式会话记忆，存储用户原始查询并按 `(category, sub_category)` 分组。SSE 事件通过 `asyncio.Queue` 注入 `state["_sse_queue"]`，由 `_agent_event_stream` 消费循环统一转发；`next_options` 和 `done` 由消费循环的 finally 块从 `final_state` 读取后发送。
+Router 作为统一入口，单次 LLM 调用完成意图分类 + 回复生成（闲聊或欢迎语），chat 路径直接发送 `done` 结束。节点间共享 `AgentState` 作为状态通道。Memory 作为集中式会话记忆，存储用户原始查询并按 `(category, sub_category)` 分组。SSE 事件通过 `asyncio.Queue` 注入 `state["_sse_queue"]`，由 `_agent_event_stream` 消费循环统一转发；`next_options` 和 `done` 由消费循环的 finally 块从 `final_state` 读取后发送。
 
 ---
 
-## (1) 意图路由与查询改写 (Intent Router)
+## (1) 统一意图路由 (Unified Router)
 
-**节点函数**: `router_node(state, llm)` → `app/agent/nodes/router.py`
+**节点函数**: `router_node(state, llm, _sse_queue=None)` → `app/agent/nodes/router.py`
 
-作为工作流的第一个节点，结合当前用户提问和对话历史，完成三项任务：
+作为工作流的第一个节点，单次 LLM 调用完成三项任务（原 Router + ChitChat + Welcome 合并）：
 
-- **意图分类**：单次 LLM 调用判定意图为三类之一：`chat`（闲聊）、`explicit`（明确商品查询）、`scenario`（场景化推荐）
-- **查询改写**：当意图为 `explicit` 或 `scenario` 时，利用 `session_memory` 中最近 N 轮历史改写当前查询，补充查询主体。例如："要轻量的" → "要轻量的跑鞋"；完整查询透传不改写。
-- **欢迎语生成**：为 `explicit`/`scenario` 路径生成欢迎语（单品类突出特点，多品类突出场景感），写入 `welcome_text`
+- **意图分类**：判定意图为三类之一：`chat`（闲聊）、`explicit`（明确商品查询）、`scenario`（场景化推荐）
+- **回复生成**：根据意图生成对应内容 —— chat 时生成闲聊回复（引导购物），explicit/scenario 时生成欢迎语（单品类突出特点、多品类突出场景感）
+- **SSE 推送**：流式逐 token 推送 `welcome_chat_stream` 事件；非流式发送 `chat_reply`（chat）或 `welcome`（推荐）
 
-改写时从 `session_memory` 检索该会话最近 N 轮原始查询（N 可配置，默认 10）。
+使用统一提示词 `UNIFIED_ROUTER_SYSTEM`（`app/agent/prompts/unified_router_prompt.py`），合并原 ROUTER_SYSTEM + CHITCHAT_SYSTEM + WELCOME_SYSTEM。输出格式：
+```json
+{"welcome_chat": "<回复内容>", "intent": "chat|explicit|scenario"}
+```
+
+> **MERGE_OPT2 变更**：Router 不再单独调用分类 + 欢迎语两次 LLM，改为单次统一调用。ChitChat 节点已删除（功能合并到 Router）。chat 路径由 Router 直接发送 SSE + `done` 结束，不再经过独立闲聊节点。
 
 ### 输出内容
 
 | 通道 | 内容 | 说明 |
 |------|------|------|
 | **State** | `intent`: `"chat"` \| `"explicit"` \| `"scenario"` | 驱动条件边路由 |
-| **State** | `welcome_text`: `str` | explicit/scenario 时的欢迎语；chat 时为空串 |
+| **State** | `welcome_text`: `str` | 推荐路径时写入欢迎语（供日志/调试）；chat 路径为空串 |
+| **SSE** | `welcome_chat_stream`（流式） | start → delta × N → end，chat 时为闲聊回复，推荐时为欢迎语 |
+| **SSE** | `chat_reply` / `welcome`（非流式） | 路径特定事件名，向后兼容 |
+| **SSE** | `done` | 仅 chat 路径由 Router 直接发送，结束 SSE 流 |
 
-> Router 不直接发送 SSE 事件。`welcome_text` 由 Retrieval 节点读取后通过 queue 以 `welcome` 事件发送。
+> Router 推荐路径不再将 welcome 延迟到 Retrieval 发送。所有 welcome/chat_reply SSE 事件均由 Router 统一负责。
 
 ---
 
@@ -41,11 +49,11 @@ START → Router → ChitChat / Extraction / ScenarioGen → Retrieval → Optio
 
 处理明确商品需求路径（`intent == "explicit"`）。三步流程：
 
-**Step 1 — 提取品类/品牌意图**：从改写后的查询中提取 `brand`/`category`/`sub_category`，借助 DB Tool（`query_field_values`）校验合法取值。`category`/`sub_category` 取值参考 `category_lookup` 表，`brand` 取值参考 `product` 表中该品类下的实际品牌。
+**Step 1 — 提取品类/品牌意图**：从 `user_query` 中提取 `brand`/`category`/`sub_category`，借助 DB Tool（`query_field_values`）校验合法取值。
 
-**Step 2 — 检索历史并拼接**：按 `(category, sub_category)` 从 `session_memory` 检索历史原始查询，与当前改写查询按时间顺序平铺拼接。
+**Step 2 — 检索历史并拼接**：按 `(category, sub_category)` 从 `session_memory` 检索历史原始查询，与当前 `user_query` 按时间顺序平铺拼接。
 
-**Step 3 — 分组提取意图**：按 `(category, sub_category)` 分组，从拼接文本中提取结构化查询条件（`structured_filter`：price/stock）和语义查询条件（`semantic`：text 字段）。冲突以后续意图为准。
+**Step 3 — 分组提取意图**：按 `(category, sub_category)` 分组，从拼接文本中提取结构化查询条件和语义查询条件。
 
 **不再生成 keyword 策略的查询分支**。
 
@@ -114,10 +122,12 @@ START → Router → ChitChat / Extraction / ScenarioGen → Retrieval → Optio
 1. **SQL 条件转换**：将意图中的 `category`/`sub_category`/`min_price`/`max_price`/`order_num`/`brand` 转换为 SQL WHERE 条件
 2. **语义检索**：在 SQL 条件基础上，用 `text` embedding 进行余弦相似度匹配，返回 top-25
 3. **关键词检索**：在 SQL 条件基础上，用 `plainto_tsquery('chinese', ...)` + tsvector 进行全文检索，返回 top-25
-4. **RRF 融合**：加权 RRF 综合语义（权重 0.7）和关键词（权重 0.3）结果，取 top-25。**按 product_id 聚合**（`ROW_NUMBER() OVER PARTITION BY product_id`，同 product 多 SKU 去重）
+4. **RRF 融合**：加权 RRF 综合语义（权重 0.7）和关键词（权重 0.3）结果，取 top-25。**按 product_id 聚合**
 5. **bge-reranker 精排**：调用 SiliconFlow API（`BAAI/bge-reranker-v2-m3`）对 RRF top-25 精排，取 top-5。API 失败时 fallback 到 RRF top-5
 6. **推荐理由生成**：按品类 LLM 生成推荐理由（`PRODUCT_REASON_SYSTEM` 提示词），每个商品一条
-7. **品类顺序式 SSE 返回**：按品类顺序发送 `welcome` → `category_intro`（品类介绍，仅多品类）→ `products` + `product_reason`（逐商品）→ `ending`（结束语）
+7. **品类顺序式 SSE 返回**：按品类顺序发送 `category_intro`（品类介绍，仅多品类）→ `products` + `product_reason`（逐商品）
+
+> **MERGE_OPT2 变更**：`welcome` 事件改由 Router 发送，Retrieval 不再发送 welcome。**MERGE_OPT 变更**：`ending` 事件改由 Option Gen 发送，Retrieval 不再生成结束语。
 
 **并行检索**：各品类并行执行，通过 `asyncio.Semaphore` 限流（`max_category_concurrency`，默认 5）。每个并行任务独立 `AsyncSession`。
 
