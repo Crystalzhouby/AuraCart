@@ -12,7 +12,8 @@ import json
 import re
 import structlog
 from app.agent.prompts.extraction_prompt import EXTRACTION_STEP1_SYSTEM, EXTRACTION_STEP3_SYSTEM
-from app.agent.memory import get_queries_by_category
+from app.agent.memory import get_queries_by_category, get_recent_queries
+from app.config import settings
 from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.extraction")
@@ -106,6 +107,7 @@ async def _extract_categories_and_brands(
     user_query: str,
     llm: LLMService,
     db_session_factory,
+    session_memory: list[dict] | None = None,
 ) -> list[dict]:
     """Step 1: LLM 提取品类/品牌 + Tool 校验合法性。
 
@@ -113,6 +115,7 @@ async def _extract_categories_and_brands(
         user_query: 用户查询。
         llm: LLMService 实例。
         db_session_factory: async_session 工厂函数。
+        session_memory: 会话记忆列表，用于注入历史查询辅助品类推断。
 
     返回值:
         [{"category": "美妆护肤", "sub_category": "防晒", "brand": ["安热沙"]}, ...]
@@ -127,7 +130,17 @@ async def _extract_categories_and_brands(
     except Exception as e:
         logger.warning("extraction Step1 品类加载失败", error=str(e))
 
-    prompt = EXTRACTION_STEP1_SYSTEM.replace("{category_list}", category_list)
+    # 格式化最近几轮历史查询
+    history_text = "(无历史对话)"
+    if session_memory:
+        recent = get_recent_queries(session_memory, settings.search.memory_recent_rounds)
+        if recent:
+            lines = [f"#{i} {q['query']}" for i, q in enumerate(recent, 1)]
+            history_text = "\n".join(lines)
+
+    prompt = (EXTRACTION_STEP1_SYSTEM
+              .replace("{category_list}", category_list)
+              .replace("{recent_queries}", history_text))
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": user_query},
@@ -247,7 +260,7 @@ async def extraction_node(
 
     # ---- Step 1: 提取品类/品牌 ----
     categories = await _extract_categories_and_brands(
-        user_query, llm, db_session_factory
+        user_query, llm, db_session_factory, session_memory
     )
 
     if not categories:

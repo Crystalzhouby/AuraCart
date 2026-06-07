@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.agent.nodes.extraction import (
     extraction_node,
     _build_context_with_memory,
+    _extract_categories_and_brands,
     _parse_json_array,
 )
 
@@ -206,3 +207,102 @@ async def test_extraction_uses_user_query():
     assert "requirements" in result
     reqs = result["requirements"]
     assert len(reqs) >= 1
+
+
+# ---------------------------------------------------------------------------
+# EXTRACT_OPT: Step 1 注入对话历史测试
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_step1_prompt_contains_recent_queries_placeholder():
+    """验证 EXTRACTION_STEP1_SYSTEM 模板已包含 {recent_queries} 占位符。"""
+    from app.agent.prompts.extraction_prompt import EXTRACTION_STEP1_SYSTEM
+    assert "{recent_queries}" in EXTRACTION_STEP1_SYSTEM
+
+
+@pytest.mark.asyncio
+async def test_step1_with_history_infers_category():
+    """session_memory 含历史查询时，prompt 应包含格式化后的历史查询文本。"""
+    mock_llm = AsyncMock()
+
+    captured_messages = []
+    async def capture_chat(messages, **kwargs):
+        captured_messages.extend(messages)
+        return json.dumps([{"category": "服饰运动", "sub_category": "跑步鞋", "brand": None}])
+
+    mock_llm.chat = capture_chat
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+    mock_session.execute.return_value.fetchall.return_value = []
+
+    session_memory = [{
+        "category": "服饰运动",
+        "sub_category": "跑步鞋",
+        "queries": [
+            {"query": "帮我推荐跑鞋", "timestamp": "2026-06-04T10:00:00"},
+            {"query": "要轻量的", "timestamp": "2026-06-04T10:01:00"},
+        ],
+    }]
+
+    with patch("app.services.category_lookup_service.fetch_category_context",
+               AsyncMock(return_value=("", set()))):
+        await _extract_categories_and_brands(
+            "预算500以内", mock_llm, mock_session_factory, session_memory,
+        )
+
+    system_prompt = captured_messages[0]["content"]
+    assert "#1 要轻量的" in system_prompt
+    assert "#2 帮我推荐跑鞋" in system_prompt
+
+
+@pytest.mark.asyncio
+async def test_step1_empty_memory_shows_placeholder():
+    """session_memory=[] 时 prompt 包含 '(无历史对话)'。"""
+    mock_llm = AsyncMock()
+
+    captured_messages = []
+    async def capture_chat(messages, **kwargs):
+        captured_messages.extend(messages)
+        return json.dumps([{"category": "美妆护肤", "sub_category": "防晒", "brand": None}])
+
+    mock_llm.chat = capture_chat
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+    mock_session.execute.return_value.fetchall.return_value = []
+
+    with patch("app.services.category_lookup_service.fetch_category_context",
+               AsyncMock(return_value=("", set()))):
+        await _extract_categories_and_brands(
+            "推荐防晒", mock_llm, mock_session_factory, [],
+        )
+
+    system_prompt = captured_messages[0]["content"]
+    assert "(无历史对话)" in system_prompt
+
+
+@pytest.mark.asyncio
+async def test_step1_none_memory_handles_gracefully():
+    """session_memory=None 时 prompt 包含 '(无历史对话)'，不崩溃。"""
+    mock_llm = AsyncMock()
+
+    captured_messages = []
+    async def capture_chat(messages, **kwargs):
+        captured_messages.extend(messages)
+        return json.dumps([{"category": "美妆护肤", "sub_category": "防晒", "brand": None}])
+
+    mock_llm.chat = capture_chat
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+    mock_session.execute.return_value.fetchall.return_value = []
+
+    with patch("app.services.category_lookup_service.fetch_category_context",
+               AsyncMock(return_value=("", set()))):
+        await _extract_categories_and_brands(
+            "推荐防晒", mock_llm, mock_session_factory, None,
+        )
+
+    system_prompt = captured_messages[0]["content"]
+    assert "(无历史对话)" in system_prompt
