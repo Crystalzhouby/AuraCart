@@ -198,6 +198,8 @@ async def _extract_intents_per_category(
     context: str,
     llm: LLMService,
     brand_reference: str = "",
+    category_list: str = "",
+    valid_categories: set[tuple[str, str]] | None = None,
 ) -> list[dict]:
     """Step 3: 从拼接文本中按品类分组提取结构化+语义意图。
 
@@ -205,12 +207,15 @@ async def _extract_intents_per_category(
         context: Step 2 输出的拼接文本。
         llm: LLMService 实例。
         brand_reference: 格式化的品牌参考文本，注入到 prompt。
+        category_list: 格式化的合法品类列表，注入到 prompt。
+        valid_categories: 合法 (category, sub_category) 集合，用于兜底校验。
 
     返回值:
         [{category, sub_category, text, min_price, max_price, order_num, brand}, ...]
     """
     prompt = (EXTRACTION_STEP3_SYSTEM
               .replace("{brand_reference}", brand_reference or "(品牌数据暂不可用)")
+              .replace("{category_list}", category_list or "(品类数据暂不可用)")
               .replace("{context}", context))
     messages = [
         {"role": "system", "content": prompt},
@@ -226,10 +231,24 @@ async def _extract_intents_per_category(
 
     # 字段标准化
     result = []
+    valid_top_categories = {cat for cat, _ in valid_categories} if valid_categories else set()
     for item in parsed:
+        cat = item.get("category")
+        sub = item.get("sub_category")
+        if valid_categories and cat and sub and (cat, sub) not in valid_categories:
+            if cat in valid_top_categories:
+                logger.info("Step3 子品类不合法，降级为大类检索",
+                            category=cat, sub_category=sub)
+                sub = None
+            else:
+                logger.info("Step3 品类不合法，置 null",
+                            category=cat, sub_category=sub)
+                cat = None
+                sub = None
+
         result.append({
-            "category": item.get("category"),
-            "sub_category": item.get("sub_category"),
+            "category": cat,
+            "sub_category": sub,
             "text": (item.get("text") or "").strip(),
             "min_price": int(item.get("min_price", 0) or 0),
             "max_price": int(item.get("max_price", 4294967295) or 4294967295),
@@ -271,6 +290,16 @@ async def extraction_node(
     # ---- Step 2: 检索历史并拼接 ----
     context = _build_context_with_memory(user_query, categories, session_memory)
 
+    # ---- 加载合法品类列表，注入 Step3 并做输出兜底校验 ----
+    category_list = ""
+    valid_categories = set()
+    try:
+        from app.services.category_lookup_service import fetch_category_context
+        async with db_session_factory() as session:
+            category_list, valid_categories = await fetch_category_context(session)
+    except Exception as e:
+        logger.warning("extraction Step3 品类加载失败", error=str(e))
+
     # ---- 查询品牌列表并注入 Step3 context ----
     brand_reference = ""
     try:
@@ -294,7 +323,9 @@ async def extraction_node(
         logger.warning("Step3 品牌查询失败", error=str(e))
 
     # ---- Step 3: 分组提取意图 ----
-    requirements = await _extract_intents_per_category(context, llm, brand_reference)
+    requirements = await _extract_intents_per_category(
+        context, llm, brand_reference, category_list, valid_categories
+    )
 
     if not requirements:
         logger.warning("extraction Step3 未提取到意图，使用 fallback")
