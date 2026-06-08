@@ -306,3 +306,169 @@ async def test_step1_none_memory_handles_gracefully():
 
     system_prompt = captured_messages[0]["content"]
     assert "(无历史对话)" in system_prompt
+
+
+# ---------------------------------------------------------------------------
+# MULTI_CHAT_OPT: 自然语言价格调整测试
+# ---------------------------------------------------------------------------
+
+def test_step3_prompt_contains_price_adjustment_rules():
+    """EXTRACTION_STEP3_SYSTEM 应包含自然语言价格调整规则。"""
+    from app.agent.prompts.extraction_prompt import EXTRACTION_STEP3_SYSTEM
+    assert "自然语言价格调整" in EXTRACTION_STEP3_SYSTEM
+    assert "更平价" in EXTRACTION_STEP3_SYSTEM
+    assert "基线" in EXTRACTION_STEP3_SYSTEM
+
+
+@pytest.mark.asyncio
+async def test_natural_language_price_down():
+    """'300元以下' → '更平价' 后 max_price 应从 300 下降。"""
+    mock_llm = AsyncMock()
+    step1_json = json.dumps([{"category": "美妆护肤", "sub_category": "防晒", "brand": None}])
+    step3_json = json.dumps([{
+        "category": "美妆护肤", "sub_category": "防晒",
+        "text": "", "min_price": 0, "max_price": 250,
+        "order_num": 1, "brand": None,
+    }])
+    responses = [step1_json, step3_json]
+
+    async def mock_chat(*args, **kwargs):
+        return responses.pop(0)
+
+    mock_llm.chat = mock_chat
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+    mock_session.execute.return_value.fetchall.return_value = []
+
+    state = {
+        "user_query": "请推荐更平价的产品",
+        "session_memory": [
+            {"category": "美妆护肤", "sub_category": "防晒",
+             "queries": [{"query": "推荐300元以下的防晒霜", "timestamp": "2026-06-04T10:00:00"}]}
+        ],
+    }
+
+    with patch("app.services.category_lookup_service.fetch_category_context",
+               AsyncMock(return_value=("", set()))):
+        result = await extraction_node(state, llm=mock_llm,
+                                        db_session_factory=mock_session_factory)
+
+    reqs = result["requirements"]
+    assert len(reqs) >= 1
+    max_p = reqs[0]["max_price"]
+    assert max_p < 300, f"期望 max_price 下调，实际 {max_p}"
+    assert max_p >= 1, f"max_price 不应跌破底线"
+
+
+@pytest.mark.asyncio
+async def test_natural_language_price_up():
+    """'200元左右' → '可以稍微贵一点' 后 max_price 应上升。"""
+    mock_llm = AsyncMock()
+    step1_json = json.dumps([{"category": "数码电子", "sub_category": "蓝牙耳机", "brand": None}])
+    step3_json = json.dumps([{
+        "category": "数码电子", "sub_category": "蓝牙耳机",
+        "text": "", "min_price": 200, "max_price": 260,
+        "order_num": 1, "brand": None,
+    }])
+    responses = [step1_json, step3_json]
+
+    async def mock_chat(*args, **kwargs):
+        return responses.pop(0)
+
+    mock_llm.chat = mock_chat
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+    mock_session.execute.return_value.fetchall.return_value = []
+
+    state = {
+        "user_query": "可以稍微贵一点",
+        "session_memory": [
+            {"category": "数码电子", "sub_category": "蓝牙耳机",
+             "queries": [{"query": "推荐200元左右的蓝牙耳机", "timestamp": "2026-06-04T10:00:00"}]}
+        ],
+    }
+
+    with patch("app.services.category_lookup_service.fetch_category_context",
+               AsyncMock(return_value=("", set()))):
+        result = await extraction_node(state, llm=mock_llm,
+                                        db_session_factory=mock_session_factory)
+
+    reqs = result["requirements"]
+    max_p = reqs[0]["max_price"]
+    assert max_p > 200, f"期望 max_price 上调，实际 {max_p}"
+
+
+@pytest.mark.asyncio
+async def test_no_baseline_no_relative_adjustment():
+    """历史无显式数值时，'更便宜' 直接按语义提取价格，不崩溃。"""
+    mock_llm = AsyncMock()
+    step1_json = json.dumps([{"category": "美妆护肤", "sub_category": "防晒", "brand": None}])
+    step3_json = json.dumps([{
+        "category": "美妆护肤", "sub_category": "防晒",
+        "text": "", "min_price": 0, "max_price": 500,
+        "order_num": 1, "brand": None,
+    }])
+    responses = [step1_json, step3_json]
+
+    async def mock_chat(*args, **kwargs):
+        return responses.pop(0)
+
+    mock_llm.chat = mock_chat
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+    mock_session.execute.return_value.fetchall.return_value = []
+
+    state = {
+        "user_query": "推荐更便宜的防晒霜",
+        "session_memory": [],
+    }
+
+    with patch("app.services.category_lookup_service.fetch_category_context",
+               AsyncMock(return_value=("", set()))):
+        result = await extraction_node(state, llm=mock_llm,
+                                        db_session_factory=mock_session_factory)
+
+    reqs = result["requirements"]
+    assert len(reqs) >= 1
+    assert reqs[0]["max_price"] < 4294967295
+
+
+@pytest.mark.asyncio
+async def test_explicit_number_wins_over_natural_language():
+    """当前查询含显式数值时，不走相对调整逻辑，直接使用显式数值。"""
+    mock_llm = AsyncMock()
+    step1_json = json.dumps([{"category": "美妆护肤", "sub_category": "防晒", "brand": None}])
+    step3_json = json.dumps([{
+        "category": "美妆护肤", "sub_category": "防晒",
+        "text": "", "min_price": 0, "max_price": 150,
+        "order_num": 1, "brand": None,
+    }])
+    responses = [step1_json, step3_json]
+
+    async def mock_chat(*args, **kwargs):
+        return responses.pop(0)
+
+    mock_llm.chat = mock_chat
+
+    mock_session = AsyncMock()
+    mock_session_factory = MagicMock(return_value=mock_session)
+    mock_session.execute.return_value.fetchall.return_value = []
+
+    state = {
+        "user_query": "150元以下的有没有",
+        "session_memory": [
+            {"category": "美妆护肤", "sub_category": "防晒",
+             "queries": [{"query": "推荐300元以下的防晒霜", "timestamp": "2026-06-04T10:00:00"}]}
+        ],
+    }
+
+    with patch("app.services.category_lookup_service.fetch_category_context",
+               AsyncMock(return_value=("", set()))):
+        result = await extraction_node(state, llm=mock_llm,
+                                        db_session_factory=mock_session_factory)
+
+    reqs = result["requirements"]
+    assert reqs[0]["max_price"] == 150
