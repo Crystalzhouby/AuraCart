@@ -41,7 +41,7 @@ ENDING_OPTION_SYSTEM = """# 人设
 ## 场景描述
 {scenario_description}
 
-## 对话历史
+## 对话历史（越近的对话越重要，优先关注最近对话的需求）
 {recent_queries}
 
 ## 当前用户需求

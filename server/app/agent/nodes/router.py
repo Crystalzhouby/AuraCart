@@ -7,10 +7,11 @@ Intent Router 节点 — 工作流第一个节点，统一入口。
 """
 import json
 import re
+from datetime import datetime
 import structlog
 from app.config import settings
 from app.agent.prompts.unified_router_prompt import UNIFIED_ROUTER_SYSTEM
-from app.agent.memory import get_recent_queries
+from app.agent.memory import get_recent_queries, append_query
 from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.router")
@@ -133,7 +134,11 @@ async def router_node(state: dict, llm: LLMService, _sse_queue=None) -> dict:
 
         if intent == "chat":
             await queue.put({"event": "done", "data": {}})
-            return {"intent": "chat", "welcome_text": ""}
+            new_memory = append_query(
+                session_memory, user_query, [],
+                timestamp=datetime.now().isoformat(),
+            )
+            return {"intent": "chat", "welcome_text": "", "session_memory": new_memory}
 
         return {"intent": intent, "welcome_text": welcome_chat}
 
@@ -156,7 +161,11 @@ async def router_node(state: dict, llm: LLMService, _sse_queue=None) -> dict:
                     "data": welcome_chat or "我主要可以帮助您推荐和比较商品，有需要的话随时告诉我！",
                 })
                 await queue.put({"event": "done", "data": {}})
-            return {"intent": "chat", "welcome_text": ""}
+            new_memory = append_query(
+                session_memory, user_query, [],
+                timestamp=datetime.now().isoformat(),
+            )
+            return {"intent": "chat", "welcome_text": "", "session_memory": new_memory}
 
         if queue and welcome_chat:
             await queue.put({"event": "welcome", "data": welcome_chat})

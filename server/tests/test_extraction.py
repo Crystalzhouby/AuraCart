@@ -65,6 +65,7 @@ def test_build_context_with_history():
     assert "帮我推荐跑鞋" in context
     assert "要轻量的" in context
     assert "预算500以内" in context
+    assert "越新越重要" in context
 
 
 def test_build_context_multiple_categories():
@@ -84,6 +85,7 @@ def test_build_context_multiple_categories():
     assert "防晒" in context
     assert "跑步鞋" in context
     assert "夏天到了" in context
+    assert "越新越重要" in context
 
 
 # ---------------------------------------------------------------------------
@@ -215,9 +217,10 @@ async def test_extraction_uses_user_query():
 
 @pytest.mark.asyncio
 async def test_step1_prompt_contains_recent_queries_placeholder():
-    """验证 EXTRACTION_STEP1_SYSTEM 模板已包含 {recent_queries} 占位符。"""
+    """验证 EXTRACTION_STEP1_SYSTEM 模板已包含 {recent_queries} 占位符和时间提示。"""
     from app.agent.prompts.extraction_prompt import EXTRACTION_STEP1_SYSTEM
     assert "{recent_queries}" in EXTRACTION_STEP1_SYSTEM
+    assert "越近的查询越重要" in EXTRACTION_STEP1_SYSTEM
 
 
 @pytest.mark.asyncio

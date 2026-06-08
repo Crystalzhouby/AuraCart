@@ -92,7 +92,7 @@ def _build_context_with_memory(
 
         lines = [f"## 品类 {i}: {label}"]
         if sorted_history:
-            lines.append("历史查询（按时间顺序）：")
+            lines.append("历史查询（按时间顺序，越新越重要）：")
             for j, hq in enumerate(sorted_history, 1):
                 lines.append(f"  #{j} [{hq.get('timestamp', '')}] {hq.get('query', '')}")
         else:

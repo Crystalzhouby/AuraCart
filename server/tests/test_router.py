@@ -57,6 +57,8 @@ async def test_router_chat():
 
     assert result["intent"] == "chat"
     assert result["welcome_text"] == ""
+    assert "session_memory" in result
+    assert len(result["session_memory"]) >= 1
 
 
 @pytest.mark.asyncio
@@ -170,6 +172,8 @@ async def test_router_stream_chat():
 
     assert result["intent"] == "chat"
     assert result["welcome_text"] == ""
+    assert "session_memory" in result
+    assert len(result["session_memory"]) >= 1
 
     events = []
     while not queue.empty():
@@ -258,6 +262,8 @@ async def test_router_nonstream_chat_sends_chat_reply_and_done():
 
     assert result["intent"] == "chat"
     assert result["welcome_text"] == ""
+    assert "session_memory" in result
+    assert len(result["session_memory"]) >= 1
 
     events = []
     while not queue.empty():
@@ -293,3 +299,13 @@ async def test_router_nonstream_explicit_sends_welcome():
 
     assert events[0] == {"event": "welcome", "data": "帮你找到了防晒霜～"}
     assert not any(e["event"] == "done" for e in events)
+
+
+# ---------------------------------------------------------------------------
+# HISTORY_OPT: prompt 时间关注度提示
+# ---------------------------------------------------------------------------
+
+def test_router_prompt_has_time_hint():
+    """UNIFIED_ROUTER_SYSTEM 应包含时间关注度提示。"""
+    from app.agent.prompts.unified_router_prompt import UNIFIED_ROUTER_SYSTEM
+    assert "越近的对话越重要" in UNIFIED_ROUTER_SYSTEM

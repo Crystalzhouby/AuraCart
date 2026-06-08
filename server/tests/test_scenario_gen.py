@@ -142,3 +142,13 @@ async def test_scenario_gen_cross_validates_llm_output():
     assert len(reqs) == 1
     assert reqs[0]["category"] == "美妆护肤"
     assert reqs[0]["sub_category"] == "防晒"  # 空格被修正
+
+
+# ---------------------------------------------------------------------------
+# HISTORY_OPT: prompt 时间关注度提示
+# ---------------------------------------------------------------------------
+
+def test_scenario_gen_prompt_has_time_hint():
+    """SCENARIO_GEN_SYSTEM 应包含时间关注度提示。"""
+    from app.agent.prompts.scenario_gen_prompt import SCENARIO_GEN_SYSTEM
+    assert "越近的查询越重要" in SCENARIO_GEN_SYSTEM

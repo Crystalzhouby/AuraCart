@@ -36,7 +36,7 @@ UNIFIED_ROUTER_SYSTEM = """# 角色
 只返回 JSON，不要输出解释。注意：welcome_chat 字段必须排在 intent 字段前面。
 {"welcome_chat": "<回复内容（闲聊或欢迎语）>", "intent": "chat|explicit|scenario"}
 
-# 对话历史
+# 对话历史（越近的对话越重要，优先参考最近的对话判断当前意图）
 {recent_queries}
 
 # 当前用户查询

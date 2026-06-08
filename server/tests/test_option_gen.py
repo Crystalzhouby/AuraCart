@@ -144,3 +144,13 @@ async def test_option_gen_empty_failed_categories():
     result = await option_gen_node(state, llm=mock_llm)
 
     assert len(result["next_options"]) >= 2
+
+
+# ---------------------------------------------------------------------------
+# HISTORY_OPT: prompt 时间关注度提示
+# ---------------------------------------------------------------------------
+
+def test_option_gen_prompt_has_time_hint():
+    """ENDING_OPTION_SYSTEM 应包含时间关注度提示。"""
+    from app.agent.prompts.option_gen_prompt import ENDING_OPTION_SYSTEM
+    assert "越近的对话越重要" in ENDING_OPTION_SYSTEM
