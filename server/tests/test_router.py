@@ -274,6 +274,55 @@ async def test_router_nonstream_chat_sends_chat_reply_and_done():
 
 
 @pytest.mark.asyncio
+async def test_router_blocks_unsupported_order_action_before_llm():
+    """订单/支付类能力边界请求应确定性拦截，不调用 LLM，不进入检索链路。"""
+    mock_llm = AsyncMock()
+    mock_llm.chat.return_value = json.dumps({
+        "welcome_chat": "你还没告诉我想买什么商品哦～",
+        "intent": "explicit",
+    })
+
+    queue = asyncio.Queue()
+    state = {
+        "user_query": "帮我直接下单",
+        "stream": False,
+        "_sse_queue": queue,
+    }
+    result = await router_node(state, llm=mock_llm)
+
+    assert result["intent"] == "chat"
+    assert result["welcome_text"] == ""
+    assert "没法直接帮你下单" in result["chat_reply"]
+    mock_llm.chat.assert_not_called()
+
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+
+    assert events[0]["event"] == "chat_reply"
+    assert "下单" in events[0]["data"]
+    assert events[1] == {"event": "done", "data": {}}
+
+
+@pytest.mark.asyncio
+async def test_router_blocks_unsupported_after_sales_action_before_llm():
+    """客服/退货类能力边界请求应确定性拦截，不调用 LLM。"""
+    mock_llm = AsyncMock()
+
+    queue = asyncio.Queue()
+    state = {
+        "user_query": "你能替我联系客服退货吗",
+        "stream": False,
+        "_sse_queue": queue,
+    }
+    result = await router_node(state, llm=mock_llm)
+
+    assert result["intent"] == "chat"
+    assert "售后" in result["chat_reply"]
+    mock_llm.chat.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_router_nonstream_explicit_sends_welcome():
     """非流式 explicit: 应发送 welcome SSE 事件。"""
     mock_llm = AsyncMock()
