@@ -1,0 +1,44 @@
+{
+  "product_id": "p_test_aware_002",
+  "title": "DATABASE_OPT_TEST_MARKER 胶原紧致面霜抗皱淡纹深层滋润50g",
+  "brand": "测试品牌B",
+  "category": "美妆护肤",
+  "sub_category": "面霜",
+  "base_price": 359.0,
+  "image_path": "ecommerce_agent_dataset/images/p_beauty_001_live.jpg",
+  "skus": [
+    {
+      "sku_id": "s_test_aware_002_1",
+      "properties": {"规格": "50g"},
+      "price": 359.0,
+      "stock": 40
+    },
+    {
+      "sku_id": "s_test_aware_002_2",
+      "properties": {"规格": "100g 家庭装"},
+      "price": 599.0,
+      "stock": 20
+    }
+  ],
+  "rag_knowledge": {
+    "marketing_description": "DATABASE_OPT_TEST_MARKER 胶原紧致面霜含高浓度胶原蛋白和胜肽复合物，深层滋养肌肤，促进胶原再生，有效紧致轮廓、淡化干纹细纹。质地丰润不油腻，尤其适合干性与熟龄肌。",
+    "official_faq": [
+      {
+        "question": "DATABASE_OPT_TEST_MARKER 面霜多久见效？",
+        "answer": "连续使用2-4周可见肌肤紧致度和光泽度提升，坚持使用8周以上抗皱效果更显著。"
+      }
+    ],
+    "user_reviews": [
+      {
+        "nickname": "测试用户3",
+        "rating": 5,
+        "content": "DATABASE_OPT_TEST_MARKER 面霜用了三周，皮肤明显变紧致，法令纹淡了很多！"
+      },
+      {
+        "nickname": "测试用户4",
+        "rating": 3,
+        "content": "DATABASE_OPT_TEST_MARKER 保湿还行，但紧致效果暂时没看到，可能还需要再用一段时间。"
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 """单商品推荐理由提示词模板。"""
 
-PRODUCT_REASON_SYSTEM = """你是一个专业导购。根据用户需求和商品信息，为指定商品撰写简短推荐理由。
+PRODUCT_RECOMMENDATION_SYSTEM = """你是一个专业导购。根据用户需求和商品信息，为指定商品撰写简短推荐理由。
 
 ## 用户需求
 {user_intent}

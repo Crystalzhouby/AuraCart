@@ -7,19 +7,18 @@ Product Retrieval 节点。
 3. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
 4. bge-reranker 精排（top-5）+ fallback
 5. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + product_reason 推荐理由）
-6. Memory 更新（原始查询按品类追加到 session_memory）
+6. 返回检索结果（不再写 session_memory）
 """
 import asyncio
 import traceback
-from datetime import datetime
 import structlog
 
 from app.config import settings
 from app.services.retriever_service import Retriever, SubQuery, Merger
 from app.utils.search_util import truncate_texts
-from app.agent.memory import append_query
-from app.agent.prompts.category_intro_prompt import CATEGORY_INTRO_SYSTEM
-from app.agent.prompts.product_reason_prompt import PRODUCT_REASON_SYSTEM
+from app.agent.history import get_chat_history_window
+from app.agent.prompts.category_introduct_prompt import CATEGORY_INTRODUCT_SYSTEM
+from app.agent.prompts.product_recommendation_prompt import PRODUCT_RECOMMENDATION_SYSTEM
 
 logger = structlog.get_logger("agent.retrieval")
 
@@ -247,7 +246,7 @@ async def _generate_category_intro(
     if not llm:
         return ""
     try:
-        prompt = CATEGORY_INTRO_SYSTEM.format(
+        prompt = CATEGORY_INTRODUCT_SYSTEM.format(
             category=category or "",
             sub_category=sub_category or "",
             index=index,
@@ -270,23 +269,27 @@ async def _generate_product_reason(
     user_intent: str,
     category_products: list[dict],
     llm,
-    session_memory: list[dict] | None = None,
+    db_session_factory=None,
+    conversation_id: str = "",
 ) -> str:
-    """为单个商品生成推荐理由。"""
+    """为单个商品生成推荐理由。2b 阶段注入品类相关的对话历史。"""
     if not llm:
         return ""
     try:
-        user_history = ""
-        if session_memory:
-            from app.agent.memory import get_queries_by_category
-            cat = product.get("category", "")
-            sub = product.get("sub_category", "")
-            queries = get_queries_by_category(session_memory, cat, sub)
-            if queries:
-                user_history = (
-                    "用户此前对该品类的关注：\n"
-                    + "\n".join(f"- {q['query']}" for q in queries)
-                )
+        user_history = "无"
+        if db_session_factory and conversation_id:
+            try:
+                cat = product.get("category", "")
+                sub = product.get("sub_category", "")
+                filter_cats = [f"{cat}/{sub}"] if cat and sub else None
+                async with db_session_factory() as session:
+                    user_history = await get_chat_history_window(
+                        session, conversation_id,
+                        settings.search.memory_recent_rounds,
+                        category_filter=filter_cats,
+                    )
+            except Exception as e:
+                logger.warning("推荐理由历史加载失败", error=str(e))
 
         product_detail = _build_product_context([product])
         category_overview = (
@@ -294,13 +297,13 @@ async def _generate_product_reason(
             if len(category_products) > 1
             else product_detail
         )
-        prompt = PRODUCT_REASON_SYSTEM.format(
+        prompt = PRODUCT_RECOMMENDATION_SYSTEM.format(
             user_intent=user_intent or "推荐合适的商品",
             total_in_category=len(category_products),
             category_overview=category_overview,
             product_detail=product_detail,
             max_chars=settings.search.reasoning_max_chars,
-            user_history=user_history or "无",
+            user_history=user_history,
         )
         messages = [
             {"role": "system", "content": prompt},
@@ -313,7 +316,7 @@ async def _generate_product_reason(
         return ""
 
 
-async def retrieval_node(
+async def product_retrieve_node(
     state: dict,
     llm=None,
     emb_service=None,
@@ -328,12 +331,12 @@ async def retrieval_node(
     user_query = state.get("user_query", "")
     requirements = state.get("requirements", [])
     scenario_description = state.get("scenario_description", "")
+    conversation_id = state.get("conversation_id", "")
     queue = _sse_queue or state.get("_sse_queue")
     stream = state.get("stream", True)
 
     if not requirements:
-        return {"retrieval_results": [], "failed_categories": [],
-                "session_memory": state.get("session_memory", [])}
+        return {"retrieval_results": [], "failed_categories": []}
 
     logger.info("Retrieval 节点开始", user_query=user_query,
                 requirement_count=len(requirements))
@@ -387,7 +390,7 @@ async def retrieval_node(
             if stream and queue:
                 # 流式路径: 逐 token 推送 category_intro_stream
                 try:
-                    prompt = CATEGORY_INTRO_SYSTEM.format(
+                    prompt = CATEGORY_INTRODUCT_SYSTEM.format(
                         category=category or "",
                         sub_category=sub_category or "",
                         index=idx + 1,
@@ -416,7 +419,9 @@ async def retrieval_node(
         # 2b. 逐商品推荐
         if products:
             reason_tasks = [
-                _generate_product_reason(p, user_query, products, llm, session_memory=state.get("session_memory"))
+                _generate_product_reason(p, user_query, products, llm,
+                                         db_session_factory=async_session_factory,
+                                         conversation_id=conversation_id)
                 for p in products
             ]
             reasons = await asyncio.gather(*reason_tasks, return_exceptions=True)
@@ -438,20 +443,6 @@ async def retrieval_node(
                     if reason:
                         await queue.put({"event": "product_reason", "data": reason})
 
-    # 3. Memory 更新
-    new_memory = state.get("session_memory", [])
-    if requirements and user_query:
-        categories_list = [
-            {"category": req.get("category"), "sub_category": req.get("sub_category")}
-            for req in requirements
-        ]
-        new_memory = append_query(
-            new_memory,
-            query=user_query,
-            categories=categories_list,
-            timestamp=datetime.now().isoformat(),
-        )
-
     logger.info("Retrieval 节点完成",
                 total_products=len(retrieval_results),
                 failed_categories=len(failed_categories))
@@ -459,5 +450,4 @@ async def retrieval_node(
     return {
         "retrieval_results": retrieval_results,
         "failed_categories": [f["sub_category"] for f in failed_categories],
-        "session_memory": new_memory,
     }

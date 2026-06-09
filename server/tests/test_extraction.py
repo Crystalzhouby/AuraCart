@@ -3,8 +3,8 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.agent.nodes.extraction import (
-    extraction_node,
+from app.agent.nodes.intent_extract_agent import (
+    intent_extract_node,
     _build_context_with_memory,
     _extract_categories_and_brands,
     _parse_json_array,
@@ -35,57 +35,56 @@ def test_parse_json_array_with_markdown_fence():
 # _build_context_with_memory 测试
 # ---------------------------------------------------------------------------
 
-def test_build_context_empty_memory():
-    """无历史 memory 时，context 只包含当前查询。"""
-    context = _build_context_with_memory(
-        "要轻量的跑鞋",
-        [{"category": "服饰运动", "sub_category": "跑步鞋", "brand": None}],
-        [],
-    )
+@pytest.mark.asyncio
+async def test_build_context_empty_memory():
+    """无历史记录时，context 只包含当前查询。"""
+    with patch("app.agent.nodes.intent_extract_agent.get_chat_history_window",
+               AsyncMock(return_value="(无历史记录)")):
+        context = await _build_context_with_memory(
+            "要轻量的跑鞋",
+            [{"category": "服饰运动", "sub_category": "跑步鞋", "brand": None}],
+            MagicMock(),
+            "test-cid",
+        )
     assert "跑步鞋" in context
     assert "要轻量的跑鞋" in context
-    assert "(无)" in context
 
 
-def test_build_context_with_history():
-    """有历史 memory 时，应拼接历史查询和当前查询。"""
-    memory = [{
-        "category": "服饰运动",
-        "sub_category": "跑步鞋",
-        "queries": [
-            {"query": "帮我推荐跑鞋", "timestamp": "2026-06-04T10:00:00"},
-            {"query": "要轻量的", "timestamp": "2026-06-04T10:01:00"},
-        ],
-    }]
-    context = _build_context_with_memory(
-        "预算500以内",
-        [{"category": "服饰运动", "sub_category": "跑步鞋", "brand": None}],
-        memory,
-    )
+@pytest.mark.asyncio
+async def test_build_context_with_history():
+    """有历史记录时，应拼接历史查询和当前查询。"""
+    history_text = "用户: 帮我推荐跑鞋\n助手: 好的\n用户: 要轻量的\n助手: 有轻量化的"
+    with patch("app.agent.nodes.intent_extract_agent.get_chat_history_window",
+               AsyncMock(return_value=history_text)):
+        context = await _build_context_with_memory(
+            "预算500以内",
+            [{"category": "服饰运动", "sub_category": "跑步鞋", "brand": None}],
+            MagicMock(),
+            "test-cid",
+        )
     assert "帮我推荐跑鞋" in context
     assert "要轻量的" in context
     assert "预算500以内" in context
-    assert "越新越重要" in context
 
 
-def test_build_context_multiple_categories():
+@pytest.mark.asyncio
+async def test_build_context_multiple_categories():
     """多品类时每品类有独立的历史+当前拼接段。"""
-    memory = [
-        {"category": "美妆护肤", "sub_category": "防晒",
-         "queries": [{"query": "夏天到了", "timestamp": "2026-06-01"}]},
-    ]
-    context = _build_context_with_memory(
-        "推荐不粘腻的防晒和舒服的跑鞋",
-        [
-            {"category": "美妆护肤", "sub_category": "防晒", "brand": None},
-            {"category": "服饰运动", "sub_category": "跑步鞋", "brand": None},
-        ],
-        memory,
-    )
+    history_text = "用户: 夏天到了"
+    with patch("app.agent.nodes.intent_extract_agent.get_chat_history_window",
+               AsyncMock(return_value=history_text)):
+        context = await _build_context_with_memory(
+            "推荐不粘腻的防晒和舒服的跑鞋",
+            [
+                {"category": "美妆护肤", "sub_category": "防晒", "brand": None},
+                {"category": "服饰运动", "sub_category": "跑步鞋", "brand": None},
+            ],
+            MagicMock(),
+            "test-cid",
+        )
     assert "防晒" in context
     assert "跑步鞋" in context
     assert "夏天到了" in context
-    assert "越新越重要" in context
 
 
 # ---------------------------------------------------------------------------
@@ -125,13 +124,13 @@ async def test_extraction_new_format_output():
 
     state = {
         "user_query": "200元以下的蓝牙耳机",
-        "session_memory": [],
+        "conversation_id": "",
         
     }
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(
+        result = await intent_extract_node(
             state, llm=mock_llm,
             db_session_factory=mock_session_factory,
         )
@@ -155,11 +154,11 @@ async def test_extraction_fallback_on_llm_error():
 
     state = {
         "user_query": "蓝牙耳机",
-        "session_memory": [],
+        "conversation_id": "",
         
     }
 
-    result = await extraction_node(
+    result = await intent_extract_node(
         state, llm=mock_llm,
         db_session_factory=mock_session_factory,
     )
@@ -195,13 +194,13 @@ async def test_extraction_uses_user_query():
 
     state = {
         "user_query": "要轻量的跑鞋",
-        "session_memory": [],
+        "conversation_id": "",
 
     }
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(
+        result = await intent_extract_node(
             state, llm=mock_llm,
             db_session_factory=mock_session_factory,
         )
@@ -217,15 +216,15 @@ async def test_extraction_uses_user_query():
 
 @pytest.mark.asyncio
 async def test_step1_prompt_contains_recent_queries_placeholder():
-    """验证 EXTRACTION_STEP1_SYSTEM 模板已包含 {recent_queries} 占位符和时间提示。"""
-    from app.agent.prompts.extraction_prompt import EXTRACTION_STEP1_SYSTEM
-    assert "{recent_queries}" in EXTRACTION_STEP1_SYSTEM
-    assert "越近的查询越重要" in EXTRACTION_STEP1_SYSTEM
+    """验证 INTENT_EXTRACT_STEP1_SYSTEM 模板已包含 {recent_queries} 占位符和时间提示。"""
+    from app.agent.prompts.intent_extract_prompt import INTENT_EXTRACT_STEP1_SYSTEM
+    assert "{recent_queries}" in INTENT_EXTRACT_STEP1_SYSTEM
+    assert "越近的查询越重要" in INTENT_EXTRACT_STEP1_SYSTEM
 
 
 @pytest.mark.asyncio
 async def test_step1_with_history_infers_category():
-    """session_memory 含历史查询时，prompt 应包含格式化后的历史查询文本。"""
+    """会话有历史记录时，prompt 应包含格式化后的历史查询文本。"""
     mock_llm = AsyncMock()
 
     captured_messages = []
@@ -239,29 +238,24 @@ async def test_step1_with_history_infers_category():
     mock_session_factory = MagicMock(return_value=mock_session)
     mock_session.execute.return_value.fetchall.return_value = []
 
-    session_memory = [{
-        "category": "服饰运动",
-        "sub_category": "跑步鞋",
-        "queries": [
-            {"query": "帮我推荐跑鞋", "timestamp": "2026-06-04T10:00:00"},
-            {"query": "要轻量的", "timestamp": "2026-06-04T10:01:00"},
-        ],
-    }]
+    history_text = "用户: 要轻量的\n助手: 好的\n用户: 帮我推荐跑鞋\n助手: 推荐了几款"
 
     with patch("app.services.category_lookup_service.fetch_category_context",
-               AsyncMock(return_value=("", set()))):
+               AsyncMock(return_value=("", set()))), \
+         patch("app.agent.nodes.intent_extract_agent.get_chat_history_window",
+               AsyncMock(return_value=history_text)):
         await _extract_categories_and_brands(
-            "预算500以内", mock_llm, mock_session_factory, session_memory,
+            "预算500以内", mock_llm, mock_session_factory, "test-cid",
         )
 
     system_prompt = captured_messages[0]["content"]
-    assert "#1 要轻量的" in system_prompt
-    assert "#2 帮我推荐跑鞋" in system_prompt
+    assert "要轻量的" in system_prompt
+    assert "帮我推荐跑鞋" in system_prompt
 
 
 @pytest.mark.asyncio
 async def test_step1_empty_memory_shows_placeholder():
-    """session_memory=[] 时 prompt 包含 '(无历史对话)'。"""
+    """conversation_id="" 时 prompt 包含 '(无历史记录)'。"""
     mock_llm = AsyncMock()
 
     captured_messages = []
@@ -278,7 +272,7 @@ async def test_step1_empty_memory_shows_placeholder():
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
         await _extract_categories_and_brands(
-            "推荐防晒", mock_llm, mock_session_factory, [],
+            "推荐防晒", mock_llm, mock_session_factory, "",
         )
 
     system_prompt = captured_messages[0]["content"]
@@ -287,7 +281,7 @@ async def test_step1_empty_memory_shows_placeholder():
 
 @pytest.mark.asyncio
 async def test_step1_none_memory_handles_gracefully():
-    """session_memory=None 时 prompt 包含 '(无历史对话)'，不崩溃。"""
+    """conversation_id="" 时 prompt 包含 '(无历史记录)'，不崩溃。"""
     mock_llm = AsyncMock()
 
     captured_messages = []
@@ -304,7 +298,7 @@ async def test_step1_none_memory_handles_gracefully():
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
         await _extract_categories_and_brands(
-            "推荐防晒", mock_llm, mock_session_factory, None,
+            "推荐防晒", mock_llm, mock_session_factory, "",
         )
 
     system_prompt = captured_messages[0]["content"]
@@ -316,11 +310,11 @@ async def test_step1_none_memory_handles_gracefully():
 # ---------------------------------------------------------------------------
 
 def test_step3_prompt_contains_price_adjustment_rules():
-    """EXTRACTION_STEP3_SYSTEM 应包含自然语言价格调整规则。"""
-    from app.agent.prompts.extraction_prompt import EXTRACTION_STEP3_SYSTEM
-    assert "自然语言价格调整" in EXTRACTION_STEP3_SYSTEM
-    assert "更平价" in EXTRACTION_STEP3_SYSTEM
-    assert "基线" in EXTRACTION_STEP3_SYSTEM
+    """INTENT_EXTRACT_STEP3_SYSTEM 应包含自然语言价格调整规则。"""
+    from app.agent.prompts.intent_extract_prompt import INTENT_EXTRACT_STEP3_SYSTEM
+    assert "自然语言价格调整" in INTENT_EXTRACT_STEP3_SYSTEM
+    assert "更平价" in INTENT_EXTRACT_STEP3_SYSTEM
+    assert "基线" in INTENT_EXTRACT_STEP3_SYSTEM
 
 
 @pytest.mark.asyncio
@@ -346,15 +340,12 @@ async def test_natural_language_price_down():
 
     state = {
         "user_query": "请推荐更平价的产品",
-        "session_memory": [
-            {"category": "美妆护肤", "sub_category": "防晒",
-             "queries": [{"query": "推荐300元以下的防晒霜", "timestamp": "2026-06-04T10:00:00"}]}
-        ],
+        "conversation_id": "",
     }
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(state, llm=mock_llm,
+        result = await intent_extract_node(state, llm=mock_llm,
                                         db_session_factory=mock_session_factory)
 
     reqs = result["requirements"]
@@ -387,15 +378,12 @@ async def test_natural_language_price_up():
 
     state = {
         "user_query": "可以稍微贵一点",
-        "session_memory": [
-            {"category": "数码电子", "sub_category": "蓝牙耳机",
-             "queries": [{"query": "推荐200元左右的蓝牙耳机", "timestamp": "2026-06-04T10:00:00"}]}
-        ],
+        "conversation_id": "",
     }
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(state, llm=mock_llm,
+        result = await intent_extract_node(state, llm=mock_llm,
                                         db_session_factory=mock_session_factory)
 
     reqs = result["requirements"]
@@ -426,12 +414,12 @@ async def test_no_baseline_no_relative_adjustment():
 
     state = {
         "user_query": "推荐更便宜的防晒霜",
-        "session_memory": [],
+        "conversation_id": "",
     }
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(state, llm=mock_llm,
+        result = await intent_extract_node(state, llm=mock_llm,
                                         db_session_factory=mock_session_factory)
 
     reqs = result["requirements"]
@@ -462,15 +450,12 @@ async def test_explicit_number_wins_over_natural_language():
 
     state = {
         "user_query": "150元以下的有没有",
-        "session_memory": [
-            {"category": "美妆护肤", "sub_category": "防晒",
-             "queries": [{"query": "推荐300元以下的防晒霜", "timestamp": "2026-06-04T10:00:00"}]}
-        ],
+        "conversation_id": "",
     }
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(state, llm=mock_llm,
+        result = await intent_extract_node(state, llm=mock_llm,
                                         db_session_factory=mock_session_factory)
 
     reqs = result["requirements"]

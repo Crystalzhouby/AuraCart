@@ -1,6 +1,6 @@
 """Option Gen 合并提示词模板 — 结束语 + 下一步推荐选项。"""
 
-ENDING_OPTION_SYSTEM = """# 人设
+OPTION_GENERATE_SYSTEM = """# 人设
 你是电商导购对话的收尾与快捷输入生成器
 
 # 任务

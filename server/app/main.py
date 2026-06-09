@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from app.api import search, products, admin, conversation
+from app.api import search, get_product_info, admin, get_conversation
 from app.config import settings
 from app.database import async_session
 from app.services.embedding_service import EmbeddingService
@@ -66,9 +66,9 @@ app = FastAPI(title="AuraCart", version="0.1.0", lifespan=lifespan)
 
 # 注册各领域路由
 app.include_router(search.router)
-app.include_router(products.router)
+app.include_router(get_product_info.router)
 app.include_router(admin.router)
-app.include_router(conversation.router)
+app.include_router(get_conversation.router)
 
 # 托管静态数据集目录（图片等）
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]

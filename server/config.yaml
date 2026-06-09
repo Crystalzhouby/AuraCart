@@ -36,6 +36,7 @@ search:
   max_reviews_per_product: 5
   max_chunks_per_product: 5
   memory_recent_rounds: 10
+  max_scene_categories: 3
   # 不变参数
   max_match_texts_per_product: 3
   max_match_chars_per_product: 500

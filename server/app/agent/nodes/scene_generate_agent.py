@@ -7,8 +7,8 @@ LLM 端到端输出场景描述 + 新格式的品类分组意图列表。
 import json
 import re
 import structlog
-from app.agent.prompts.scenario_gen_prompt import SCENARIO_GEN_SYSTEM
-from app.agent.memory import get_queries_by_category
+from app.agent.prompts.scene_generate_prompt import SCENE_GENERATE_SYSTEM
+from app.agent.history import get_chat_history_window
 from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.scenario_gen")
@@ -87,38 +87,47 @@ def _cross_validate_categories(
     return None, None
 
 
-def _build_scenario_history_context(
+async def _build_scenario_history_context(
     user_query: str,
     category_list: str,
-    session_memory: list[dict],
+    db_session,
+    conversation_id: str,
 ) -> str:
-    """为 Scenario Gen 构建历史查询上下文。
+    """为 Scenario Gen 构建对话历史上下文。
 
-    先从品类列表中提取相关品类，再检索其历史查询，格式化为文本。
+    从品类列表中提取相关品类，查询滑动窗口对话历史，格式化为文本。
 
     参数:
         user_query: 用户查询。
         category_list: 可用品类列表字符串。
-        session_memory: session_memory 列表。
+        db_session: 异步 DB session。
+        conversation_id: 会话 ID。
 
     返回值:
-        str: 格式化的历史查询文本。无历史时返回 "(无历史记录)"。
+        str: 格式化的对话历史文本。无历史时返回 "(无历史记录)"。
     """
-    if not session_memory:
+    from app.config import settings
+
+    if not conversation_id:
         return "(无历史记录)"
 
     # 提取可能相关的品类
     lookup = _parse_category_list(category_list)
+    max_cats = settings.search.max_scene_categories
 
     parts = []
-    for cat, sub in list(lookup)[:6]:  # 最多 6 个品类
-        history = get_queries_by_category(session_memory, cat, sub)
-        if history:
-            sorted_h = sorted(history, key=lambda q: q.get("timestamp", ""))
-            lines = [f"- {cat}/{sub}:"]
-            for j, hq in enumerate(sorted_h, 1):
-                lines.append(f"  #{j} [{hq.get('timestamp', '')}] {hq.get('query', '')}")
-            parts.append("\n".join(lines))
+    for cat, sub in list(lookup)[:max_cats]:
+        filter_cats = [f"{cat}/{sub}"]
+        try:
+            history_text = await get_chat_history_window(
+                db_session, conversation_id,
+                settings.search.memory_recent_rounds,
+                category_filter=filter_cats,
+            )
+            if history_text and history_text != "(无历史记录)":
+                parts.append(f"- {cat}/{sub}:\n  {history_text}")
+        except Exception:
+            pass
 
     return "\n".join(parts) if parts else "(无历史记录)"
 
@@ -149,7 +158,7 @@ def _parse_json_dict(raw: str) -> dict | None:
             return None
 
 
-async def scenario_gen_node(
+async def scene_generate_node(
     state: dict,
     llm: LLMService,
     category_list: str = "",
@@ -167,12 +176,18 @@ async def scenario_gen_node(
         dict: {"scenario_description": str, "requirements": [新格式]}
     """
     user_query = state.get("user_query", "")
-    session_memory = state.get("session_memory", [])
+    conversation_id = state.get("conversation_id", "")
 
-    # 构建历史查询上下文
-    history_context = _build_scenario_history_context(
-        user_query, category_list, session_memory
-    )
+    # 构建对话历史上下文
+    history_context = "(无历史记录)"
+    if conversation_id and db_session_factory:
+        try:
+            async with db_session_factory() as session:
+                history_context = await _build_scenario_history_context(
+                    user_query, category_list, session, conversation_id
+                )
+        except Exception as e:
+            logger.warning("scene_gen 历史加载失败", error=str(e))
 
     # 内部加载 category_list（与 extraction_node 模式一致）
     if not category_list and db_session_factory:
@@ -201,7 +216,7 @@ async def scenario_gen_node(
         except Exception as e:
             logger.warning("scenario_gen 品牌查询失败", error=str(e))
 
-    prompt = (SCENARIO_GEN_SYSTEM
+    prompt = (SCENE_GENERATE_SYSTEM
               .replace("{category_list}", category_list)
               .replace("{history_context}", history_context)
               .replace("{brand_map}", brand_map_text)

@@ -1,14 +1,14 @@
 """Retrieval 节点测试 — 重构后。
 
-测试 intent-to-SubQuery 转换、category_task 流程、retrieval_node SSE 发送。
+测试 intent-to-SubQuery 转换、category_task 流程、product_retrieve_node SSE 发送。
 """
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from app.agent.nodes.retriever import (
+from app.agent.nodes.product_retrieve_agent import (
     _intent_to_sub_queries,
-    retrieval_node,
+    product_retrieve_node,
 )
 from app.services.retriever_service import SubQuery
 
@@ -100,64 +100,25 @@ def test_intent_to_sub_queries_empty_text():
 
 
 # ---------------------------------------------------------------------------
-# retrieval_node 测试
+# product_retrieve_node 测试
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_retrieval_node_empty_requirements():
+async def test_product_retrieve_node_empty_requirements():
     """空 requirements 时 early return 空结果。"""
     state = {
         "user_query": "推荐",
         "requirements": [],
-        "session_memory": [],
+        "conversation_id": "",
     }
 
-    result = await retrieval_node(
+    result = await product_retrieve_node(
         state,
         emb_service=MagicMock(),
         async_session_factory=MagicMock(),
     )
     assert result["retrieval_results"] == []
     assert result["failed_categories"] == []
-
-
-@pytest.mark.asyncio
-async def test_retrieval_node_writes_session_memory():
-    """retrieval_node 应在检索完成后将原始查询写入 session_memory。"""
-    state = {
-        "user_query": "跑鞋推荐",
-        "requirements": [
-            {"category": "服饰运动", "sub_category": "跑步鞋",
-             "text": "轻量化", "min_price": 0, "max_price": 500,
-             "order_num": 1, "brand": None},
-        ],
-        "session_memory": [],
-        
-    }
-
-    # Mock async_session
-    mock_session = AsyncMock()
-    mock_session_factory = MagicMock()
-
-    # Mock category_task to return empty (no DB)
-    async def mock_category_task(intent, factory, emb, reranker, llm=None):
-        return {"category": intent.get("category", ""),
-                "sub_category": intent.get("sub_category", ""),
-                "skus": [], "product_ids": [], "reasoning_text": "", "error": None}
-
-    with patch("app.agent.nodes.retriever._category_task", mock_category_task):
-        result = await retrieval_node(
-            state,
-            emb_service=MagicMock(),
-            async_session_factory=mock_session_factory,
-        )
-
-    # 应写入 session_memory
-    assert "session_memory" in result
-    mem = result["session_memory"]
-    assert len(mem) >= 1
-    assert mem[0]["category"] == "服饰运动"
-    assert mem[0]["queries"][0]["query"] == "跑鞋推荐"
 
 
 from unittest.mock import patch

@@ -8,11 +8,11 @@ import json
 import structlog
 from langgraph.graph import StateGraph, START, END
 from app.agent.state import AgentState
-from app.agent.nodes.router import router_node
-from app.agent.nodes.extraction import extraction_node
-from app.agent.nodes.scenario_gen import scenario_gen_node
-from app.agent.nodes.retriever import retrieval_node
-from app.agent.nodes.option_gen import option_gen_node
+from app.agent.nodes.intent_route_agent import intent_route_node
+from app.agent.nodes.intent_extract_agent import intent_extract_node
+from app.agent.nodes.scene_generate_agent import scene_generate_node
+from app.agent.nodes.product_retrieve_agent import product_retrieve_node
+from app.agent.nodes.option_generate_agent import option_generate_node
 
 logger = structlog.get_logger("agent.graph")
 
@@ -82,13 +82,17 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
 
     async def _router(state: AgentState) -> dict:
         logger.debug("router 输入", state=_preview(state))
-        result = await router_node(state, llm=llm, _sse_queue=state.get("_sse_queue"))
+        result = await intent_route_node(
+            state, llm=llm,
+            _sse_queue=state.get("_sse_queue"),
+            db_session_factory=async_session_factory,
+        )
         logger.debug("router 输出", result=_preview(result))
         return result
 
     async def _extraction(state: AgentState) -> dict:
         logger.debug("extraction 输入", state=_preview(state))
-        result = await extraction_node(
+        result = await intent_extract_node(
             state, llm=llm,
             db_session_factory=async_session_factory,
         )
@@ -97,7 +101,7 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
 
     async def _scenario_gen(state: AgentState) -> dict:
         logger.debug("scenario_gen 输入", state=_preview(state))
-        result = await scenario_gen_node(
+        result = await scene_generate_node(
             state, llm=llm,
             db_session_factory=async_session_factory,
         )
@@ -106,7 +110,7 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
 
     async def _retrieval(state: AgentState) -> dict:
         logger.debug("retrieval 输入", state=_preview(state))
-        result = await retrieval_node(
+        result = await product_retrieve_node(
             state,
             llm=llm,
             emb_service=emb_service,
@@ -118,7 +122,10 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
 
     async def _option_gen(state: AgentState) -> dict:
         logger.debug("option_gen 输入", state=_preview(state))
-        result = await option_gen_node(state, llm=llm)
+        result = await option_generate_node(
+            state, llm=llm,
+            db_session_factory=async_session_factory,
+        )
         logger.debug("option_gen 输出", result=_preview(result))
         return result
 

@@ -2,7 +2,7 @@
 import json
 import pytest
 from unittest.mock import AsyncMock
-from app.agent.nodes.option_gen import option_gen_node
+from app.agent.nodes.option_generate_agent import option_generate_node
 
 
 @pytest.mark.asyncio
@@ -25,7 +25,7 @@ async def test_option_gen_basic():
         
         "scenario_description": None,
     }
-    result = await option_gen_node(state, llm=mock_llm)
+    result = await option_generate_node(state, llm=mock_llm)
 
     assert "next_options" in result
     assert 2 <= len(result["next_options"]) <= 4
@@ -43,7 +43,7 @@ async def test_option_gen_fallback_on_error():
         
         "scenario_description": None,
     }
-    result = await option_gen_node(state, llm=mock_llm)
+    result = await option_generate_node(state, llm=mock_llm)
 
     assert "next_options" in result
     assert result["next_options"] == []
@@ -63,7 +63,7 @@ async def test_option_gen_truncates_too_many():
         
         "scenario_description": None,
     }
-    result = await option_gen_node(state, llm=mock_llm)
+    result = await option_generate_node(state, llm=mock_llm)
 
     assert len(result["next_options"]) <= 4
 
@@ -94,7 +94,7 @@ async def test_option_gen_injects_failed_categories_into_prompt():
         "scenario_description": None,
         "failed_categories": ["防晒", "墨镜"],  # 检索失败的品类
     }
-    await option_gen_node(state, llm=mock_llm)
+    await option_generate_node(state, llm=mock_llm)
 
     # 验证提示词中注入了失败品类信息（区别于 retrieval_results）
     assert len(captured_system_content) == 1
@@ -121,7 +121,7 @@ async def test_option_gen_omits_failed_categories_when_empty():
         "scenario_description": None,
         "failed_categories": [],
     }
-    result = await option_gen_node(state, llm=mock_llm)
+    result = await option_generate_node(state, llm=mock_llm)
 
     assert len(result["next_options"]) >= 2
 
@@ -141,7 +141,7 @@ async def test_option_gen_empty_failed_categories():
         "scenario_description": None,
         "failed_categories": [],
     }
-    result = await option_gen_node(state, llm=mock_llm)
+    result = await option_generate_node(state, llm=mock_llm)
 
     assert len(result["next_options"]) >= 2
 
@@ -150,7 +150,7 @@ async def test_option_gen_empty_failed_categories():
 # HISTORY_OPT: prompt 时间关注度提示
 # ---------------------------------------------------------------------------
 
-def test_option_gen_prompt_has_time_hint():
-    """ENDING_OPTION_SYSTEM 应包含时间关注度提示。"""
-    from app.agent.prompts.option_gen_prompt import ENDING_OPTION_SYSTEM
-    assert "越近的对话越重要" in ENDING_OPTION_SYSTEM
+def test_option_generate_prompt_has_time_hint():
+    """OPTION_GENERATE_SYSTEM 应包含时间关注度提示。"""
+    from app.agent.prompts.option_generate_prompt import OPTION_GENERATE_SYSTEM
+    assert "越近的对话越重要" in OPTION_GENERATE_SYSTEM
