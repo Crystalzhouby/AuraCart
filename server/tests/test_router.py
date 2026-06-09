@@ -63,26 +63,52 @@ async def test_router_chat():
 
 @pytest.mark.asyncio
 async def test_router_fallback_on_llm_error():
-    """LLM 调用失败时 fallback 为 explicit。"""
+    """LLM 调用失败时应重试，最终 fallback 为 chat，避免误入检索。"""
     mock_llm = AsyncMock()
     mock_llm.chat.side_effect = Exception("LLM connection error")
 
-    state = {"user_query": "蓝牙耳机"}
+    queue = asyncio.Queue()
+    state = {"user_query": "蓝牙耳机", "stream": False, "_sse_queue": queue}
+    result = await intent_route_node(state, llm=mock_llm)
+
+    assert result["intent"] == "chat"
+    assert mock_llm.chat.call_count == 2
+
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+
+    assert events[0]["event"] == "chat_reply"
+    assert events[1] == {"event": "done", "data": {}}
+
+
+@pytest.mark.asyncio
+async def test_router_retries_llm_error_then_uses_successful_response():
+    """Router LLM 首次失败后，第二次成功应使用成功响应。"""
+    mock_llm = AsyncMock()
+    mock_llm.chat.side_effect = [
+        Exception("temporary error"),
+        json.dumps({"welcome_chat": "帮你找到了几款耳机～", "intent": "explicit"}),
+    ]
+
+    state = {"user_query": "蓝牙耳机", "stream": False}
     result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "explicit"
+    assert result["welcome_text"] == "帮你找到了几款耳机～"
+    assert mock_llm.chat.call_count == 2
 
 
 @pytest.mark.asyncio
 async def test_router_fallback_on_bad_json():
-    """LLM 返回无效 JSON 时 fallback 为 explicit。"""
+    """LLM 返回无效 JSON 时 fallback 为 chat，避免误入检索。"""
     mock_llm = AsyncMock()
     mock_llm.chat.return_value = "这不是有效的 JSON"
 
-    state = {"user_query": "蓝牙耳机"}
+    state = {"user_query": "蓝牙耳机", "stream": False}
     result = await intent_route_node(state, llm=mock_llm)
 
-    assert result["intent"] == "explicit"
+    assert result["intent"] == "chat"
 
 
 # ---------------------------------------------------------------------------
@@ -114,13 +140,13 @@ def test_parse_route_response_text_before_json():
 def test_parse_route_response_empty_returns_fallback():
     """_parse_route_response 在空字符串时应返回 fallback。"""
     result = _parse_route_response("")
-    assert result == {"intent": "explicit"}
+    assert result["intent"] == "chat"
 
 
 def test_parse_route_response_pure_text_returns_fallback():
     """_parse_route_response 在纯文本无 JSON 时应返回 fallback。"""
     result = _parse_route_response("这是纯文本回复，不包含任何 JSON 对象")
-    assert result == {"intent": "explicit"}
+    assert result["intent"] == "chat"
 
 
 def test_parse_route_response_unified_format():
@@ -403,3 +429,17 @@ def test_router_prompt_has_ambiguous_reference_boundary():
     assert "先要求确认具体商品" in INTENT_ROUTER_SYSTEM
     assert "不能推荐商品" in INTENT_ROUTER_SYSTEM
     assert "不限于安全问题" in INTENT_ROUTER_SYSTEM
+
+
+def test_router_prompt_treats_knowledge_requests_as_chat():
+    """知识科普类请求应是 chat，不应触发商品推荐。"""
+    from app.agent.prompts.intent_router_prompt import INTENT_ROUTER_SYSTEM
+    assert "讲个护肤小知识" in INTENT_ROUTER_SYSTEM
+    assert "内容型 chat" in INTENT_ROUTER_SYSTEM
+    assert "不能进入商品推荐" in INTENT_ROUTER_SYSTEM
+
+
+def test_parse_route_response_alias_exists():
+    """非流式 router 路径使用的解析函数名应存在。"""
+    from app.agent.nodes import intent_route_agent
+    assert intent_route_agent._parse_route_response is intent_route_agent._parse_router_response
