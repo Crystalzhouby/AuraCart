@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from app.main import app
-from app.api.products import _normalize_ids
+from app.api.get_product_info import _normalize_ids
 
 
 @pytest.mark.asyncio

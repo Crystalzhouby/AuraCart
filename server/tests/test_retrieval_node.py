@@ -1,14 +1,14 @@
 """Retrieval 节点测试 — 重构后。
 
-测试 intent-to-SubQuery 转换、category_task 流程、retrieval_node SSE 发送。
+测试 intent-to-SubQuery 转换、category_task 流程、product_retrieve_node SSE 发送。
 """
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from app.agent.nodes.retriever import (
+from app.agent.nodes.product_retrieve_agent import (
     _intent_to_sub_queries,
-    retrieval_node,
+    product_retrieve_node,
 )
 from app.services.retriever_service import SubQuery
 
@@ -100,11 +100,11 @@ def test_intent_to_sub_queries_empty_text():
 
 
 # ---------------------------------------------------------------------------
-# retrieval_node 测试
+# product_retrieve_node 测试
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_retrieval_node_empty_requirements():
+async def test_product_retrieve_node_empty_requirements():
     """空 requirements 时 early return 空结果。"""
     state = {
         "user_query": "推荐",
@@ -112,7 +112,7 @@ async def test_retrieval_node_empty_requirements():
         "session_memory": [],
     }
 
-    result = await retrieval_node(
+    result = await product_retrieve_node(
         state,
         emb_service=MagicMock(),
         async_session_factory=MagicMock(),
@@ -122,8 +122,8 @@ async def test_retrieval_node_empty_requirements():
 
 
 @pytest.mark.asyncio
-async def test_retrieval_node_writes_session_memory():
-    """retrieval_node 应在检索完成后将原始查询写入 session_memory。"""
+async def test_product_retrieve_node_writes_session_memory():
+    """product_retrieve_node 应在检索完成后将原始查询写入 session_memory。"""
     state = {
         "user_query": "跑鞋推荐",
         "requirements": [
@@ -145,8 +145,8 @@ async def test_retrieval_node_writes_session_memory():
                 "sub_category": intent.get("sub_category", ""),
                 "skus": [], "product_ids": [], "reasoning_text": "", "error": None}
 
-    with patch("app.agent.nodes.retriever._category_task", mock_category_task):
-        result = await retrieval_node(
+    with patch("app.agent.nodes.product_retrieve_agent._category_task", mock_category_task):
+        result = await product_retrieve_node(
             state,
             emb_service=MagicMock(),
             async_session_factory=mock_session_factory,

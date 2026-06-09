@@ -2,7 +2,7 @@
 import json
 import pytest
 from unittest.mock import patch
-from app.agent.nodes.scenario_gen import scenario_gen_node, _cross_validate_categories
+from app.agent.nodes.scene_generate_agent import scene_generate_node, _cross_validate_categories
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ async def test_scenario_gen_basic():
 
         "session_memory": [],
     }
-    result = await scenario_gen_node(state, llm=mock_llm, category_list="美妆护肤|防晒\n服饰|墨镜")
+    result = await scene_generate_node(state, llm=mock_llm, category_list="美妆护肤|防晒\n服饰|墨镜")
 
     assert "scenario_description" in result
     assert "requirements" in result
@@ -70,7 +70,7 @@ async def test_scenario_gen_fallback_on_llm_error():
 
         "session_memory": [],
     }
-    result = await scenario_gen_node(state, llm=mock_llm, category_list="美妆护肤|防晒")
+    result = await scene_generate_node(state, llm=mock_llm, category_list="美妆护肤|防晒")
 
     assert "requirements" in result
     assert result["requirements"] == []
@@ -133,7 +133,7 @@ async def test_scenario_gen_cross_validates_llm_output():
         "session_memory": [],
     }
 
-    result = await scenario_gen_node(
+    result = await scene_generate_node(
         state, llm=mock_llm,
         category_list="美妆护肤|防晒\n服饰|墨镜\n服饰运动|帽子"
     )
@@ -148,7 +148,7 @@ async def test_scenario_gen_cross_validates_llm_output():
 # HISTORY_OPT: prompt 时间关注度提示
 # ---------------------------------------------------------------------------
 
-def test_scenario_gen_prompt_has_time_hint():
-    """SCENARIO_GEN_SYSTEM 应包含时间关注度提示。"""
-    from app.agent.prompts.scenario_gen_prompt import SCENARIO_GEN_SYSTEM
-    assert "越近的查询越重要" in SCENARIO_GEN_SYSTEM
+def test_scene_generate_prompt_has_time_hint():
+    """SCENE_GENERATE_SYSTEM 应包含时间关注度提示。"""
+    from app.agent.prompts.scene_generate_prompt import SCENE_GENERATE_SYSTEM
+    assert "越近的查询越重要" in SCENE_GENERATE_SYSTEM

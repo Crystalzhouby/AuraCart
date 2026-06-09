@@ -6,7 +6,7 @@ import json
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from app.agent.nodes.router import router_node, _parse_router_response, _format_recent_queries
+from app.agent.nodes.intent_route_agent import intent_route_node, _parse_route_response, _format_recent_queries
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ async def test_router_explicit():
     })
 
     state = {"user_query": "200元以下的蓝牙耳机"}
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "explicit"
     assert "welcome_text" in result
@@ -36,7 +36,7 @@ async def test_router_scenario():
     })
 
     state = {"user_query": "去三亚度假需要准备什么"}
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "scenario"
     assert "welcome_text" in result
@@ -53,7 +53,7 @@ async def test_router_chat():
     })
 
     state = {"user_query": "讲个笑话"}
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "chat"
     assert result["welcome_text"] == ""
@@ -68,7 +68,7 @@ async def test_router_fallback_on_llm_error():
     mock_llm.chat.side_effect = Exception("LLM connection error")
 
     state = {"user_query": "蓝牙耳机"}
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "explicit"
 
@@ -80,7 +80,7 @@ async def test_router_fallback_on_bad_json():
     mock_llm.chat.return_value = "这不是有效的 JSON"
 
     state = {"user_query": "蓝牙耳机"}
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "explicit"
 
@@ -90,43 +90,43 @@ async def test_router_fallback_on_bad_json():
 # ---------------------------------------------------------------------------
 
 
-def test_parse_router_response_markdown_fence():
-    """_parse_router_response 应能处理 markdown 代码围栏包裹的 JSON。"""
+def test_parse_route_response_markdown_fence():
+    """_parse_route_response 应能处理 markdown 代码围栏包裹的 JSON。"""
     raw = '```json\n{"intent": "scenario"}\n```'
-    result = _parse_router_response(raw)
+    result = _parse_route_response(raw)
     assert result["intent"] == "scenario"
 
 
-def test_parse_router_response_trailing_comma():
-    """_parse_router_response 应能处理 JSON 中的尾随逗号（常见 LLM 错误）。"""
+def test_parse_route_response_trailing_comma():
+    """_parse_route_response 应能处理 JSON 中的尾随逗号（常见 LLM 错误）。"""
     raw = '{"intent": "chat",}'
-    result = _parse_router_response(raw)
+    result = _parse_route_response(raw)
     assert result["intent"] == "chat"
 
 
-def test_parse_router_response_text_before_json():
-    """_parse_router_response 应能从非 JSON 文本中提取 JSON 对象。"""
+def test_parse_route_response_text_before_json():
+    """_parse_route_response 应能从非 JSON 文本中提取 JSON 对象。"""
     raw = '分析结果如下：用户想要推荐商品。\n{"intent": "explicit"}'
-    result = _parse_router_response(raw)
+    result = _parse_route_response(raw)
     assert result["intent"] == "explicit"
 
 
-def test_parse_router_response_empty_returns_fallback():
-    """_parse_router_response 在空字符串时应返回 fallback。"""
-    result = _parse_router_response("")
+def test_parse_route_response_empty_returns_fallback():
+    """_parse_route_response 在空字符串时应返回 fallback。"""
+    result = _parse_route_response("")
     assert result == {"intent": "explicit"}
 
 
-def test_parse_router_response_pure_text_returns_fallback():
-    """_parse_router_response 在纯文本无 JSON 时应返回 fallback。"""
-    result = _parse_router_response("这是纯文本回复，不包含任何 JSON 对象")
+def test_parse_route_response_pure_text_returns_fallback():
+    """_parse_route_response 在纯文本无 JSON 时应返回 fallback。"""
+    result = _parse_route_response("这是纯文本回复，不包含任何 JSON 对象")
     assert result == {"intent": "explicit"}
 
 
-def test_parse_router_response_unified_format():
-    """_parse_router_response 应正确解析统一 prompt 的完整 JSON 输出。"""
+def test_parse_route_response_unified_format():
+    """_parse_route_response 应正确解析统一 prompt 的完整 JSON 输出。"""
     raw = '{"welcome_chat": "帮你找到了防晒霜～", "intent": "explicit"}'
-    result = _parse_router_response(raw)
+    result = _parse_route_response(raw)
     assert result["intent"] == "explicit"
     assert result["welcome_chat"] == "帮你找到了防晒霜～"
 
@@ -138,7 +138,7 @@ async def test_router_handles_markdown_fence_response():
     mock_llm.chat.return_value = '```json\n{"welcome_chat": "你好！", "intent": "chat"}\n```'
 
     state = {"user_query": "你好"}
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "chat"
 
@@ -168,7 +168,7 @@ async def test_router_stream_chat():
         "stream": True,
         "_sse_queue": queue,
     }
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "chat"
     assert result["welcome_text"] == ""
@@ -198,7 +198,7 @@ async def test_router_stream_explicit():
         "stream": True,
         "_sse_queue": queue,
     }
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "explicit"
     assert "帮你找到了" in result["welcome_text"]
@@ -226,7 +226,7 @@ async def test_router_stream_scenario():
         "stream": True,
         "_sse_queue": queue,
     }
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "scenario"
     assert "度假" in result["welcome_text"]
@@ -258,7 +258,7 @@ async def test_router_nonstream_chat_sends_chat_reply_and_done():
         "stream": False,
         "_sse_queue": queue,
     }
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "chat"
     assert result["welcome_text"] == ""
@@ -288,7 +288,7 @@ async def test_router_nonstream_explicit_sends_welcome():
         "stream": False,
         "_sse_queue": queue,
     }
-    result = await router_node(state, llm=mock_llm)
+    result = await intent_route_node(state, llm=mock_llm)
 
     assert result["intent"] == "explicit"
     assert result["welcome_text"] == "帮你找到了防晒霜～"
@@ -306,6 +306,6 @@ async def test_router_nonstream_explicit_sends_welcome():
 # ---------------------------------------------------------------------------
 
 def test_router_prompt_has_time_hint():
-    """UNIFIED_ROUTER_SYSTEM 应包含时间关注度提示。"""
-    from app.agent.prompts.unified_router_prompt import UNIFIED_ROUTER_SYSTEM
-    assert "越近的对话越重要" in UNIFIED_ROUTER_SYSTEM
+    """INTENT_ROUTER_SYSTEM 应包含时间关注度提示。"""
+    from app.agent.prompts.intent_router_prompt import INTENT_ROUTER_SYSTEM
+    assert "越近的对话越重要" in INTENT_ROUTER_SYSTEM

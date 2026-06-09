@@ -1,7 +1,7 @@
 """
 会话 API 路由
 
-模块: app.api.conversation
+模块: app.api.get_conversation
 
 提供多会话支持接口：
 - GET /api/conversation/ — 创建新会话，返回 conversation_id (UUID)

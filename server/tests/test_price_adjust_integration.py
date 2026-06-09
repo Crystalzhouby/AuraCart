@@ -7,8 +7,8 @@
 import pytest
 from app.config import settings
 from app.services.llm_service import LLMService
-from app.agent.nodes.extraction import _extract_intents_per_category
-from app.agent.prompts.extraction_prompt import EXTRACTION_STEP3_SYSTEM
+from app.agent.nodes.intent_extract_agent import _extract_intents_per_category
+from app.agent.prompts.intent_extract_prompt import INTENT_EXTRACT_STEP3_SYSTEM
 
 
 @pytest.mark.integration

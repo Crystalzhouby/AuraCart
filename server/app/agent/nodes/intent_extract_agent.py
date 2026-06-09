@@ -11,7 +11,7 @@ Intent Extraction 节点 — 明确商品需求路径。
 import json
 import re
 import structlog
-from app.agent.prompts.extraction_prompt import EXTRACTION_STEP1_SYSTEM, EXTRACTION_STEP3_SYSTEM
+from app.agent.prompts.intent_extract_prompt import INTENT_EXTRACT_STEP1_SYSTEM, INTENT_EXTRACT_STEP3_SYSTEM
 from app.agent.memory import get_queries_by_category, get_recent_queries
 from app.config import settings
 from app.services.llm_service import LLMService
@@ -138,7 +138,7 @@ async def _extract_categories_and_brands(
             lines = [f"#{i} {q['query']}" for i, q in enumerate(recent, 1)]
             history_text = "\n".join(lines)
 
-    prompt = (EXTRACTION_STEP1_SYSTEM
+    prompt = (INTENT_EXTRACT_STEP1_SYSTEM
               .replace("{category_list}", category_list)
               .replace("{recent_queries}", history_text))
     messages = [
@@ -213,7 +213,7 @@ async def _extract_intents_per_category(
     返回值:
         [{category, sub_category, text, min_price, max_price, order_num, brand}, ...]
     """
-    prompt = (EXTRACTION_STEP3_SYSTEM
+    prompt = (INTENT_EXTRACT_STEP3_SYSTEM
               .replace("{brand_reference}", brand_reference or "(品牌数据暂不可用)")
               .replace("{category_list}", category_list or "(品类数据暂不可用)")
               .replace("{context}", context))
@@ -259,7 +259,7 @@ async def _extract_intents_per_category(
     return result
 
 
-async def extraction_node(
+async def intent_extract_node(
     state: dict,
     llm: LLMService,
     db_session_factory,

@@ -7,7 +7,7 @@ Option Gen 节点 — 合并生成结束语 + 下一步推荐选项。
 """
 import json
 import structlog
-from app.agent.prompts.option_gen_prompt import ENDING_OPTION_SYSTEM
+from app.agent.prompts.option_generate_prompt import OPTION_GENERATE_SYSTEM
 from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.option_gen")
@@ -89,7 +89,7 @@ def _build_recent_queries_text(state: dict) -> str:
     return "\n".join(f"- {q['query']}" for q in sorted_q)
 
 
-async def option_gen_node(state: dict, llm: LLMService) -> dict:
+async def option_generate_node(state: dict, llm: LLMService) -> dict:
     """Option Gen 节点函数 — 合并生成结束语 + 下一步推荐选项。
 
     参数:
@@ -127,7 +127,7 @@ async def option_gen_node(state: dict, llm: LLMService) -> dict:
 
         # 4. LLM 调用合并 prompt
         prompt = (
-            ENDING_OPTION_SYSTEM
+            OPTION_GENERATE_SYSTEM
             .replace("{user_query}", user_query)
             .replace("{categories_summary}", categories_summary)
             .replace("{product_count}", str(product_count))

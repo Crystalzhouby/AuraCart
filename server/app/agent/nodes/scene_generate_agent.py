@@ -7,7 +7,7 @@ LLM 端到端输出场景描述 + 新格式的品类分组意图列表。
 import json
 import re
 import structlog
-from app.agent.prompts.scenario_gen_prompt import SCENARIO_GEN_SYSTEM
+from app.agent.prompts.scene_generate_prompt import SCENE_GENERATE_SYSTEM
 from app.agent.memory import get_queries_by_category
 from app.services.llm_service import LLMService
 
@@ -149,7 +149,7 @@ def _parse_json_dict(raw: str) -> dict | None:
             return None
 
 
-async def scenario_gen_node(
+async def scene_generate_node(
     state: dict,
     llm: LLMService,
     category_list: str = "",
@@ -201,7 +201,7 @@ async def scenario_gen_node(
         except Exception as e:
             logger.warning("scenario_gen 品牌查询失败", error=str(e))
 
-    prompt = (SCENARIO_GEN_SYSTEM
+    prompt = (SCENE_GENERATE_SYSTEM
               .replace("{category_list}", category_list)
               .replace("{history_context}", history_context)
               .replace("{brand_map}", brand_map_text)

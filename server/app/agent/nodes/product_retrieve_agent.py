@@ -18,8 +18,8 @@ from app.config import settings
 from app.services.retriever_service import Retriever, SubQuery, Merger
 from app.utils.search_util import truncate_texts
 from app.agent.memory import append_query
-from app.agent.prompts.category_intro_prompt import CATEGORY_INTRO_SYSTEM
-from app.agent.prompts.product_reason_prompt import PRODUCT_REASON_SYSTEM
+from app.agent.prompts.category_introduct_prompt import CATEGORY_INTRODUCT_SYSTEM
+from app.agent.prompts.product_recommendation_prompt import PRODUCT_RECOMMENDATION_SYSTEM
 
 logger = structlog.get_logger("agent.retrieval")
 
@@ -247,7 +247,7 @@ async def _generate_category_intro(
     if not llm:
         return ""
     try:
-        prompt = CATEGORY_INTRO_SYSTEM.format(
+        prompt = CATEGORY_INTRODUCT_SYSTEM.format(
             category=category or "",
             sub_category=sub_category or "",
             index=index,
@@ -294,7 +294,7 @@ async def _generate_product_reason(
             if len(category_products) > 1
             else product_detail
         )
-        prompt = PRODUCT_REASON_SYSTEM.format(
+        prompt = PRODUCT_RECOMMENDATION_SYSTEM.format(
             user_intent=user_intent or "推荐合适的商品",
             total_in_category=len(category_products),
             category_overview=category_overview,
@@ -313,7 +313,7 @@ async def _generate_product_reason(
         return ""
 
 
-async def retrieval_node(
+async def product_retrieve_node(
     state: dict,
     llm=None,
     emb_service=None,
@@ -387,7 +387,7 @@ async def retrieval_node(
             if stream and queue:
                 # 流式路径: 逐 token 推送 category_intro_stream
                 try:
-                    prompt = CATEGORY_INTRO_SYSTEM.format(
+                    prompt = CATEGORY_INTRODUCT_SYSTEM.format(
                         category=category or "",
                         sub_category=sub_category or "",
                         index=idx + 1,

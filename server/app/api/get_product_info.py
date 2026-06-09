@@ -1,7 +1,7 @@
 """
 产品、SKU 与前端补充数据查询 API 路由
 
-模块: app.api.products
+模块: app.api.get_product_info
 
 提供产品基本信息、产品图片、SKU 详情、会话历史、商品 RAG 知识等查询接口。
 使用 SQLAlchemy 异步会话实现非阻塞数据库访问。

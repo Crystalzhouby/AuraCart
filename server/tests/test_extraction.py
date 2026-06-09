@@ -3,8 +3,8 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.agent.nodes.extraction import (
-    extraction_node,
+from app.agent.nodes.intent_extract_agent import (
+    intent_extract_node,
     _build_context_with_memory,
     _extract_categories_and_brands,
     _parse_json_array,
@@ -131,7 +131,7 @@ async def test_extraction_new_format_output():
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(
+        result = await intent_extract_node(
             state, llm=mock_llm,
             db_session_factory=mock_session_factory,
         )
@@ -159,7 +159,7 @@ async def test_extraction_fallback_on_llm_error():
         
     }
 
-    result = await extraction_node(
+    result = await intent_extract_node(
         state, llm=mock_llm,
         db_session_factory=mock_session_factory,
     )
@@ -201,7 +201,7 @@ async def test_extraction_uses_user_query():
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(
+        result = await intent_extract_node(
             state, llm=mock_llm,
             db_session_factory=mock_session_factory,
         )
@@ -217,10 +217,10 @@ async def test_extraction_uses_user_query():
 
 @pytest.mark.asyncio
 async def test_step1_prompt_contains_recent_queries_placeholder():
-    """验证 EXTRACTION_STEP1_SYSTEM 模板已包含 {recent_queries} 占位符和时间提示。"""
-    from app.agent.prompts.extraction_prompt import EXTRACTION_STEP1_SYSTEM
-    assert "{recent_queries}" in EXTRACTION_STEP1_SYSTEM
-    assert "越近的查询越重要" in EXTRACTION_STEP1_SYSTEM
+    """验证 INTENT_EXTRACT_STEP1_SYSTEM 模板已包含 {recent_queries} 占位符和时间提示。"""
+    from app.agent.prompts.intent_extract_prompt import INTENT_EXTRACT_STEP1_SYSTEM
+    assert "{recent_queries}" in INTENT_EXTRACT_STEP1_SYSTEM
+    assert "越近的查询越重要" in INTENT_EXTRACT_STEP1_SYSTEM
 
 
 @pytest.mark.asyncio
@@ -316,11 +316,11 @@ async def test_step1_none_memory_handles_gracefully():
 # ---------------------------------------------------------------------------
 
 def test_step3_prompt_contains_price_adjustment_rules():
-    """EXTRACTION_STEP3_SYSTEM 应包含自然语言价格调整规则。"""
-    from app.agent.prompts.extraction_prompt import EXTRACTION_STEP3_SYSTEM
-    assert "自然语言价格调整" in EXTRACTION_STEP3_SYSTEM
-    assert "更平价" in EXTRACTION_STEP3_SYSTEM
-    assert "基线" in EXTRACTION_STEP3_SYSTEM
+    """INTENT_EXTRACT_STEP3_SYSTEM 应包含自然语言价格调整规则。"""
+    from app.agent.prompts.intent_extract_prompt import INTENT_EXTRACT_STEP3_SYSTEM
+    assert "自然语言价格调整" in INTENT_EXTRACT_STEP3_SYSTEM
+    assert "更平价" in INTENT_EXTRACT_STEP3_SYSTEM
+    assert "基线" in INTENT_EXTRACT_STEP3_SYSTEM
 
 
 @pytest.mark.asyncio
@@ -354,7 +354,7 @@ async def test_natural_language_price_down():
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(state, llm=mock_llm,
+        result = await intent_extract_node(state, llm=mock_llm,
                                         db_session_factory=mock_session_factory)
 
     reqs = result["requirements"]
@@ -395,7 +395,7 @@ async def test_natural_language_price_up():
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(state, llm=mock_llm,
+        result = await intent_extract_node(state, llm=mock_llm,
                                         db_session_factory=mock_session_factory)
 
     reqs = result["requirements"]
@@ -431,7 +431,7 @@ async def test_no_baseline_no_relative_adjustment():
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(state, llm=mock_llm,
+        result = await intent_extract_node(state, llm=mock_llm,
                                         db_session_factory=mock_session_factory)
 
     reqs = result["requirements"]
@@ -470,7 +470,7 @@ async def test_explicit_number_wins_over_natural_language():
 
     with patch("app.services.category_lookup_service.fetch_category_context",
                AsyncMock(return_value=("", set()))):
-        result = await extraction_node(state, llm=mock_llm,
+        result = await intent_extract_node(state, llm=mock_llm,
                                         db_session_factory=mock_session_factory)
 
     reqs = result["requirements"]

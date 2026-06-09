@@ -10,14 +10,14 @@ import re
 from datetime import datetime
 import structlog
 from app.config import settings
-from app.agent.prompts.unified_router_prompt import UNIFIED_ROUTER_SYSTEM
+from app.agent.prompts.intent_router_prompt import INTENT_ROUTER_SYSTEM
 from app.agent.memory import get_recent_queries, append_query
 from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.router")
 
 
-def _parse_router_response(raw: str) -> dict:
+def _parse_route_response(raw: str) -> dict:
     """从 LLM 原始响应中提取 JSON，失败返回 fallback 默认值。
 
     增强容错：
@@ -75,11 +75,11 @@ def _format_recent_queries(recent_queries: list[dict]) -> str:
     return "\n".join(lines)
 
 
-async def router_node(state: dict, llm: LLMService, _sse_queue=None) -> dict:
+async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None) -> dict:
     """Intent Router 节点函数 — 统一入口。
 
     单次 LLM 调用完成分类 + 回复生成：
-    1. 构建 UNIFIED_ROUTER_SYSTEM prompt（含对话历史）
+    1. 构建 INTENT_ROUTER_SYSTEM prompt（含对话历史）
     2. 流式: stream_json_field 提取 welcome_chat 逐 token 推送
     3. 非流式: 同步 LLM → 解析 JSON → 发送对应事件
     - chat 路径: 发送 done → 直接结束
@@ -102,7 +102,7 @@ async def router_node(state: dict, llm: LLMService, _sse_queue=None) -> dict:
     n_rounds = settings.search.memory_recent_rounds
     recent_queries = get_recent_queries(session_memory, n_rounds)
     history_text = _format_recent_queries(recent_queries)
-    prompt = (UNIFIED_ROUTER_SYSTEM
+    prompt = (INTENT_ROUTER_SYSTEM
               .replace("{user_query}", user_query)
               .replace("{recent_queries}", history_text))
     messages = [
@@ -146,7 +146,7 @@ async def router_node(state: dict, llm: LLMService, _sse_queue=None) -> dict:
         # 非流式路径: 同步 LLM → 解析 JSON
         try:
             raw = await llm.chat(messages, temperature=0.1)
-            parsed = _parse_router_response(raw)
+            parsed = _parse_route_response(raw)
             intent = parsed.get("intent", "explicit")
             welcome_chat = parsed.get("welcome_chat", "")
         except Exception as e:
