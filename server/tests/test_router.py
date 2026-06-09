@@ -323,6 +323,41 @@ async def test_router_blocks_unsupported_after_sales_action_before_llm():
 
 
 @pytest.mark.asyncio
+async def test_router_handles_ambiguous_pregnancy_caffeine_question_as_chat():
+    """无上下文的孕期咖啡因安全咨询由 Router 判为 chat 并先澄清具体商品。"""
+    mock_llm = AsyncMock()
+    mock_llm.chat.return_value = json.dumps({
+        "welcome_chat": (
+            "需要先确认你说的是哪款具体商品。孕期咖啡因通常建议每日总量不超过200mg，"
+            "特殊情况请遵医嘱。"
+        ),
+        "intent": "chat",
+    })
+
+    queue = asyncio.Queue()
+    state = {
+        "user_query": "孕妇可以喝这款咖啡吗",
+        "stream": False,
+        "_sse_queue": queue,
+        "session_memory": [],
+    }
+    result = await router_node(state, llm=mock_llm)
+
+    assert result["intent"] == "chat"
+    assert result["welcome_text"] == ""
+    mock_llm.chat.assert_called_once()
+
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+
+    assert events[0]["event"] == "chat_reply"
+    assert "具体商品" in events[0]["data"]
+    assert "不超过200mg" in events[0]["data"]
+    assert events[1] == {"event": "done", "data": {}}
+
+
+@pytest.mark.asyncio
 async def test_router_nonstream_explicit_sends_welcome():
     """非流式 explicit: 应发送 welcome SSE 事件。"""
     mock_llm = AsyncMock()
@@ -358,3 +393,13 @@ def test_router_prompt_has_time_hint():
     """UNIFIED_ROUTER_SYSTEM 应包含时间关注度提示。"""
     from app.agent.prompts.unified_router_prompt import UNIFIED_ROUTER_SYSTEM
     assert "越近的对话越重要" in UNIFIED_ROUTER_SYSTEM
+
+
+def test_router_prompt_has_ambiguous_reference_boundary():
+    """Router prompt 应要求无上下文指代问题先澄清，不推荐商品。"""
+    from app.agent.prompts.unified_router_prompt import UNIFIED_ROUTER_SYSTEM
+    assert "缺少明确商品上下文的指代咨询" in UNIFIED_ROUTER_SYSTEM
+    assert "这款" in UNIFIED_ROUTER_SYSTEM
+    assert "先要求确认具体商品" in UNIFIED_ROUTER_SYSTEM
+    assert "不能推荐商品" in UNIFIED_ROUTER_SYSTEM
+    assert "不限于安全问题" in UNIFIED_ROUTER_SYSTEM
