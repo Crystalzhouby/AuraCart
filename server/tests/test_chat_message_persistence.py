@@ -1,4 +1,4 @@
-"""DATABASE_OPT F1: ChatMessage 持久化单元测试。
+"""DATABASE_OPT F1: ChatHistory 持久化单元测试。
 
 验证 intent_route_node 和 option_generate_node 返回 dict 中包含 chat_reply 字段。
 """
@@ -102,7 +102,6 @@ async def test_option_gen_returns_chat_reply():
         ],
         "requirements": [{"category": "运动户外", "sub_category": "跑鞋", "text": "跑鞋"}],
         "scenario_description": "",
-        "session_memory": [],
     }
     result = await option_generate_node(state, llm=mock_llm)
 
@@ -122,7 +121,6 @@ async def test_option_gen_empty_ending():
         "retrieval_results": [],
         "requirements": [{"category": "运动户外", "sub_category": "跑鞋"}],
         "scenario_description": "",
-        "session_memory": [],
     }
     result = await option_generate_node(state, llm=mock_llm)
 

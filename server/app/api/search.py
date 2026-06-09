@@ -173,8 +173,7 @@ async def _agent_event_stream(
 
     stream_log = structlog.get_logger("agent_stream")
 
-    # ---- 校验 conversation 存在性 + 加载会话记忆 ----
-    initial_session_memory: list[dict] = []
+    # ---- 校验 conversation 存在性 ----
     try:
         from app.database import async_session
         from sqlalchemy import select
@@ -182,25 +181,17 @@ async def _agent_event_stream(
 
         async with async_session() as session:
             result = await session.execute(
-                select(Conversation.memory).where(
+                select(Conversation.conversation_id).where(
                     Conversation.conversation_id == conversation_id
                 )
             )
-            row = result.scalar_one_or_none()
-            if row is None:
+            if result.scalar_one_or_none() is None:
                 yield {
                     "event": "error",
                     "data": json.dumps({"detail": "conversation not found"}),
                 }
                 yield {"event": "done", "data": "{}"}
                 return
-            # asyncpg JSONB → Python list[dict] 自动反序列化
-            initial_session_memory = row
-            stream_log.debug(
-                "会话记忆已加载",
-                conversation_id=conversation_id,
-                groups=len(initial_session_memory),
-            )
     except Exception as e:
         yield {
             "event": "error",
@@ -212,9 +203,9 @@ async def _agent_event_stream(
     # 构建初始状态
     initial_state: AgentState = {
         "user_query": user_query,
+        "conversation_id": conversation_id,
         "welcome_text": "",
         "stream": stream,
-        "session_memory": initial_session_memory,
         "intent": "explicit",
         "requirements": [],               # 新格式: list[dict]
         "scenario_description": None,
@@ -293,53 +284,21 @@ async def _agent_event_stream(
             except Exception:
                 pass
 
-        # ---- 持久化会话记忆 ----
+        # ---- 持久化聊天记录 ----
         if final_state:
-            try:
-                from app.database import async_session
-                from sqlalchemy.dialects.postgresql import insert as pg_insert
-                from app.models.conversation import Conversation
-
-                memory = final_state.get("session_memory", [])
-                async with async_session() as session:
-                    stmt = pg_insert(Conversation).values(
-                        conversation_id=conversation_id,
-                        memory=memory,
-                    ).on_conflict_do_update(
-                        constraint="conversation_pkey",
-                        set_={
-                            "memory": memory,
-                            "updated_at": sa.func.now(),
-                        },
-                    )
-                    await session.execute(stmt)
-                    await session.commit()
-                    stream_log.debug(
-                        "会话记忆已保存",
-                        conversation_id=conversation_id,
-                        groups=len(memory),
-                    )
-            except Exception as e:
-                stream_log.warning(
-                    "保存会话记忆失败",
-                    conversation_id=conversation_id,
-                    error=str(e),
-                )
-
-            # ---- 持久化聊天记录 ----
             try:
                 user_query = final_state.get("user_query", "")
                 chat_reply = final_state.get("chat_reply", "")
                 if user_query and chat_reply:
                     from app.database import async_session as _chat_async_session
-                    from app.models.chat_message import ChatMessage
+                    from app.models.chat_history import ChatHistory
                     async with _chat_async_session() as chat_session:
-                        chat_session.add(ChatMessage(
+                        chat_session.add(ChatHistory(
                             conversation_id=conversation_id,
                             role="user",
                             content=user_query,
                         ))
-                        chat_session.add(ChatMessage(
+                        chat_session.add(ChatHistory(
                             conversation_id=conversation_id,
                             role="assistant",
                             content=chat_reply,

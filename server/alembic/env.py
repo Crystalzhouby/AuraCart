@@ -45,7 +45,7 @@ from app.models import (  # noqa: F401  -- 为其对 metadata 的副作用而导
     UserReview,
     CategoryLookup,
     Conversation,
-    ChatMessage,
+    ChatHistory,
 )
 
 # Alembic Config 对象 – 提供对 alembic.ini 中配置值的访问。

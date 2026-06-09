@@ -3,7 +3,7 @@ Intent Extraction 节点 — 明确商品需求路径。
 
 三步流程：
 1. LLM 提取品类/品牌意图 + Tool 校验合法性
-2. 从 session_memory 按品类检索历史查询并拼接
+2. 从 ChatHistory 表按品类检索历史查询并拼接
 3. LLM 分组提取结构化+语义意图
 
 输出新格式: [{category, sub_category, text, min_price, max_price, order_num, brand}]
@@ -12,7 +12,7 @@ import json
 import re
 import structlog
 from app.agent.prompts.intent_extract_prompt import INTENT_EXTRACT_STEP1_SYSTEM, INTENT_EXTRACT_STEP3_SYSTEM
-from app.agent.memory import get_queries_by_category, get_recent_queries
+from app.agent.history import get_chat_history_window
 from app.config import settings
 from app.services.llm_service import LLMService
 
@@ -61,24 +61,27 @@ def _parse_json_array(raw: str) -> list:
     return []
 
 
-def _build_context_with_memory(
+async def _build_context_with_memory(
     user_query: str,
     categories: list[dict],
-    session_memory: list[dict],
+    db_session,
+    conversation_id: str,
 ) -> str:
-    """Step 2: 按品类从 session_memory 检索历史查询，与当前查询拼接。
+    """Step 2: 按品类查询滑动窗口对话历史，与当前查询拼接。
 
-    每个品类的历史查询按时间升序编号，末尾追加当前查询。
+    各品类历史按品类过滤后注入，末尾追加当前查询。
     所有品类拼接为一个文本块供 Step 3 一次性处理。
 
     参数:
         user_query: 用户查询。
         categories: Step 1 输出的品类列表 [{category, sub_category, ...}]。
-        session_memory: session_memory 列表。
+        db_session: 异步 DB session。
+        conversation_id: 会话 ID。
 
     返回值:
         str: 拼接后的文本，多品类分段展示。
     """
+    from app.config import settings
     parts = []
 
     for i, cat in enumerate(categories, 1):
@@ -86,17 +89,19 @@ def _build_context_with_memory(
         sub_name = cat.get("sub_category")
         label = f"{cat_name or '未知'}/{sub_name or '未知'}"
 
-        # 检索该品类的历史查询
-        history = get_queries_by_category(session_memory, cat_name, sub_name)
-        sorted_history = sorted(history, key=lambda q: q.get("timestamp", ""))
+        filter_cats = [f"{cat_name}/{sub_name}"] if cat_name and sub_name else None
+        history_text = "(无)"
+        try:
+            history_text = await get_chat_history_window(
+                db_session, conversation_id,
+                settings.search.memory_recent_rounds,
+                category_filter=filter_cats,
+            )
+        except Exception:
+            pass
 
         lines = [f"## 品类 {i}: {label}"]
-        if sorted_history:
-            lines.append("历史查询（按时间顺序，越新越重要）：")
-            for j, hq in enumerate(sorted_history, 1):
-                lines.append(f"  #{j} [{hq.get('timestamp', '')}] {hq.get('query', '')}")
-        else:
-            lines.append("历史查询：(无)")
+        lines.append(f"历史查询：\n{history_text}")
         lines.append(f"当前查询: {user_query}")
         parts.append("\n".join(lines))
 
@@ -107,7 +112,7 @@ async def _extract_categories_and_brands(
     user_query: str,
     llm: LLMService,
     db_session_factory,
-    session_memory: list[dict] | None = None,
+    conversation_id: str = "",
 ) -> list[dict]:
     """Step 1: LLM 提取品类/品牌 + Tool 校验合法性。
 
@@ -115,7 +120,7 @@ async def _extract_categories_and_brands(
         user_query: 用户查询。
         llm: LLMService 实例。
         db_session_factory: async_session 工厂函数。
-        session_memory: 会话记忆列表，用于注入历史查询辅助品类推断。
+        conversation_id: 会话 ID，用于加载对话历史辅助品类推断。
 
     返回值:
         [{"category": "美妆护肤", "sub_category": "防晒", "brand": ["安热沙"]}, ...]
@@ -130,13 +135,16 @@ async def _extract_categories_and_brands(
     except Exception as e:
         logger.warning("extraction Step1 品类加载失败", error=str(e))
 
-    # 格式化最近几轮历史查询
+    # 加载滑动窗口对话历史
     history_text = "(无历史对话)"
-    if session_memory:
-        recent = get_recent_queries(session_memory, settings.search.memory_recent_rounds)
-        if recent:
-            lines = [f"#{i} {q['query']}" for i, q in enumerate(recent, 1)]
-            history_text = "\n".join(lines)
+    if conversation_id:
+        try:
+            async with db_session_factory() as session:
+                history_text = await get_chat_history_window(
+                    session, conversation_id, settings.search.memory_recent_rounds
+                )
+        except Exception as e:
+            logger.warning("extraction Step1 历史加载失败", error=str(e))
 
     prompt = (INTENT_EXTRACT_STEP1_SYSTEM
               .replace("{category_list}", category_list)
@@ -275,11 +283,11 @@ async def intent_extract_node(
         dict: {"requirements": [新格式]}，写入 AgentState。
     """
     user_query = state.get("user_query", "")
-    session_memory = state.get("session_memory", [])
+    conversation_id = state.get("conversation_id", "")
 
     # ---- Step 1: 提取品类/品牌 ----
     categories = await _extract_categories_and_brands(
-        user_query, llm, db_session_factory, session_memory
+        user_query, llm, db_session_factory, conversation_id
     )
 
     if not categories:
@@ -288,7 +296,16 @@ async def intent_extract_node(
         categories = [{"category": None, "sub_category": None, "brand": None}]
 
     # ---- Step 2: 检索历史并拼接 ----
-    context = _build_context_with_memory(user_query, categories, session_memory)
+    context = "(无)"
+    if conversation_id:
+        try:
+            async with db_session_factory() as session:
+                context = await _build_context_with_memory(
+                    user_query, categories, session, conversation_id
+                )
+        except Exception as e:
+            logger.warning("extraction Step2 历史加载失败", error=str(e))
+            context = user_query
 
     # ---- 加载合法品类列表，注入 Step3 并做输出兜底校验 ----
     category_list = ""

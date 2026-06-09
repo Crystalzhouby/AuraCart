@@ -12,10 +12,9 @@ class AgentState(TypedDict):
 
     字段:
         user_query: 当前轮用户原始输入。
+        conversation_id: 当前会话 ID。
         welcome_text: Router 生成的欢迎词文本（仅非流式模式，retrieval 节点发送 SSE 用）。
         stream: 是否流式输出，控制各节点 SSE 事件推送粒度。
-        session_memory: 会话记忆 — 按 (category,sub_category) 分组的原始查询列表。
-            格式: [{category, sub_category, queries: [{query, timestamp}]}]
         intent: "chat" | "explicit" | "scenario"。
         requirements: 提取后的意图列表。
             格式: [{category, sub_category, text, min_price, max_price, order_num, brand}]。
@@ -28,9 +27,9 @@ class AgentState(TypedDict):
     """
 
     user_query: str
+    conversation_id: str
     welcome_text: str
     stream: bool
-    session_memory: list[dict]
     intent: str
     requirements: list[dict]
     scenario_description: str | None

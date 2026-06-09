@@ -82,7 +82,11 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
 
     async def _router(state: AgentState) -> dict:
         logger.debug("router 输入", state=_preview(state))
-        result = await intent_route_node(state, llm=llm, _sse_queue=state.get("_sse_queue"))
+        result = await intent_route_node(
+            state, llm=llm,
+            _sse_queue=state.get("_sse_queue"),
+            db_session_factory=async_session_factory,
+        )
         logger.debug("router 输出", result=_preview(result))
         return result
 
@@ -118,7 +122,10 @@ def build_graph(llm, emb_service, async_session_factory, reranker_service=None):
 
     async def _option_gen(state: AgentState) -> dict:
         logger.debug("option_gen 输入", state=_preview(state))
-        result = await option_generate_node(state, llm=llm)
+        result = await option_generate_node(
+            state, llm=llm,
+            db_session_factory=async_session_factory,
+        )
         logger.debug("option_gen 输出", result=_preview(result))
         return result
 

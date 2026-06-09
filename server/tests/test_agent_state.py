@@ -14,7 +14,9 @@ def test_agent_state_default_values():
     state = AgentState(
         user_query="测试查询",
 
-session_memory=[],
+        conversation_id="",
+        welcome_text="",
+        stream=False,
         intent="",
         requirements=[],
         retrieval_results=[],
@@ -24,7 +26,7 @@ session_memory=[],
         scenario_description=None,
     )
     assert state["user_query"] == "测试查询"
-    assert state["session_memory"] == []
+    assert state["user_query"] == "测试查询"
     assert state["intent"] == ""
     assert state["requirements"] == []
     assert state["retrieval_results"] == []
@@ -39,7 +41,9 @@ def test_agent_state_sse_queue_injection():
     state = AgentState(
         user_query="test",
 
-session_memory=[],
+        conversation_id="",
+        welcome_text="",
+        stream=False,
         intent="",
         requirements=[],
         retrieval_results=[],
@@ -58,7 +62,9 @@ def test_agent_state_sse_queue_in_annotations():
     state = AgentState(
         user_query="test",
 
-session_memory=[],
+        conversation_id="",
+        welcome_text="",
+        stream=False,
         intent="",
         requirements=[],
         retrieval_results=[],
@@ -78,7 +84,9 @@ async def test_sse_queue_put_get():
     state = AgentState(
         user_query="test",
 
-session_memory=[],
+        conversation_id="",
+        welcome_text="",
+        stream=False,
         intent="",
         requirements=[],
         retrieval_results=[],

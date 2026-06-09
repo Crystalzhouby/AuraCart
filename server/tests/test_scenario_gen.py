@@ -45,9 +45,7 @@ async def test_scenario_gen_basic():
 
     state = {
         "user_query": "去三亚度假需要准备什么",
-
-
-        "session_memory": [],
+        "conversation_id": "",
     }
     result = await scene_generate_node(state, llm=mock_llm, category_list="美妆护肤|防晒\n服饰|墨镜")
 
@@ -66,9 +64,7 @@ async def test_scenario_gen_fallback_on_llm_error():
 
     state = {
         "user_query": "去三亚度假",
-
-
-        "session_memory": [],
+        "conversation_id": "",
     }
     result = await scene_generate_node(state, llm=mock_llm, category_list="美妆护肤|防晒")
 
@@ -128,9 +124,7 @@ async def test_scenario_gen_cross_validates_llm_output():
 
     state = {
         "user_query": "去三亚度假需要准备什么",
-
-
-        "session_memory": [],
+        "conversation_id": "",
     }
 
     result = await scene_generate_node(

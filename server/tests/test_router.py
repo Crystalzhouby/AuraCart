@@ -6,7 +6,7 @@ import json
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from app.agent.nodes.intent_route_agent import intent_route_node, _parse_route_response, _format_recent_queries
+from app.agent.nodes.intent_route_agent import intent_route_node, _parse_route_response
 
 
 @pytest.mark.asyncio
@@ -57,8 +57,8 @@ async def test_router_chat():
 
     assert result["intent"] == "chat"
     assert result["welcome_text"] == ""
-    assert "session_memory" in result
-    assert len(result["session_memory"]) >= 1
+    assert "chat_reply" in result
+    assert len(result["chat_reply"]) >= 1
 
 
 @pytest.mark.asyncio
@@ -172,8 +172,8 @@ async def test_router_stream_chat():
 
     assert result["intent"] == "chat"
     assert result["welcome_text"] == ""
-    assert "session_memory" in result
-    assert len(result["session_memory"]) >= 1
+    assert "chat_reply" in result
+    assert len(result["chat_reply"]) >= 1
 
     events = []
     while not queue.empty():
@@ -262,8 +262,8 @@ async def test_router_nonstream_chat_sends_chat_reply_and_done():
 
     assert result["intent"] == "chat"
     assert result["welcome_text"] == ""
-    assert "session_memory" in result
-    assert len(result["session_memory"]) >= 1
+    assert "chat_reply" in result
+    assert len(result["chat_reply"]) >= 1
 
     events = []
     while not queue.empty():

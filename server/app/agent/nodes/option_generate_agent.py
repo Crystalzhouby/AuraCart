@@ -75,26 +75,13 @@ def _build_ending_context(state: dict) -> dict:
     }
 
 
-def _build_recent_queries_text(state: dict) -> str:
-    """从 session_memory 构建最近查询文本。"""
-    from app.agent.memory import get_recent_queries
-    from app.config import settings
-    memory = state.get("session_memory", [])
-    if not memory:
-        return "(无历史记录)"
-    recent = get_recent_queries(memory, settings.search.memory_recent_rounds)
-    if not recent:
-        return "(无历史记录)"
-    sorted_q = sorted(recent, key=lambda x: x["timestamp"])
-    return "\n".join(f"- {q['query']}" for q in sorted_q)
-
-
-async def option_generate_node(state: dict, llm: LLMService) -> dict:
+async def option_generate_node(state: dict, llm: LLMService, db_session_factory=None) -> dict:
     """Option Gen 节点函数 — 合并生成结束语 + 下一步推荐选项。
 
     参数:
         state: AgentState 字典。
         llm: LLMService 实例。
+        db_session_factory: async_session 工厂函数，用于加载对话历史。
 
     返回值:
         dict: {"next_options": [...]}
@@ -110,8 +97,19 @@ async def option_generate_node(state: dict, llm: LLMService) -> dict:
         categories_summary = ending_ctx["categories_summary"]
         product_count = ending_ctx["product_count"]
 
-        # 2. 构建最近查询
-        recent_queries = _build_recent_queries_text(state)
+        # 2. 构建最近查询（从 ChatHistory 表加载滑动窗口）
+        recent_queries = "(无历史记录)"
+        conversation_id = state.get("conversation_id", "")
+        if db_session_factory and conversation_id:
+            try:
+                from app.config import settings
+                from app.agent.history import get_chat_history_window
+                async with db_session_factory() as session:
+                    recent_queries = await get_chat_history_window(
+                        session, conversation_id, settings.search.memory_recent_rounds
+                    )
+            except Exception:
+                pass
 
         # 3. 构建选项上下文
         user_query = state.get("user_query", "")

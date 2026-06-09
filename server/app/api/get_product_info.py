@@ -18,7 +18,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.product import Product
 from app.models.sku import Sku
-from app.models.chat_message import ChatMessage
+from app.models.chat_history import ChatHistory
 from app.models.conversation import Conversation
 from app.models.product_marketing import ProductMarketing
 from app.models.product_faq import ProductFaq
@@ -304,12 +304,12 @@ async def get_history(
     """获取指定会话的对话历史（用户查询+助手回复，按时间排序）。
 
     若 conversation_id 不存在于 conversation 表，返回 404。
-    若存在但 chat_message 表中无记录，返回空数组。
+    若存在但 chat_history 表中无记录，返回空数组。
     """
     rows = await db.execute(
-        select(ChatMessage.role, ChatMessage.content, ChatMessage.created_at)
-        .where(ChatMessage.conversation_id == conversation_id)
-        .order_by(ChatMessage.created_at.asc())
+        select(ChatHistory.role, ChatHistory.content, ChatHistory.created_at)
+        .where(ChatHistory.conversation_id == conversation_id)
+        .order_by(ChatHistory.created_at.asc())
     )
     messages = rows.all()
 

@@ -144,6 +144,9 @@ class SearchSettings(BaseSettings):
     memory_recent_rounds: int = 10
     """Router 改写时检索的最近历史查询轮数。"""
 
+    max_scene_categories: int = 3
+    """Scene Generate 节点最多处理的品类数。"""
+
     # --- 不变的参数 ---
     max_match_texts_per_product: int = 3
     """每个 product 最多附带几条 product_review 评论文本。"""

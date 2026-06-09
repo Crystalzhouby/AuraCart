@@ -7,11 +7,10 @@ Intent Router 节点 — 工作流第一个节点，统一入口。
 """
 import json
 import re
-from datetime import datetime
 import structlog
 from app.config import settings
 from app.agent.prompts.intent_router_prompt import INTENT_ROUTER_SYSTEM
-from app.agent.memory import get_recent_queries, append_query
+from app.agent.history import get_chat_history_window
 from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.router")
@@ -52,30 +51,7 @@ def _parse_route_response(raw: str) -> dict:
     return {"intent": "explicit"}
 
 
-def _format_recent_queries(recent_queries: list[dict]) -> str:
-    """将最近 N 轮原始查询格式化为提示词可用的平铺文本。
-
-    格式: #1 [2026-06-04T10:00:00] 帮我推荐跑鞋
-          #2 [2026-06-04T10:01:00] 要轻量的
-
-    参数:
-        recent_queries: get_recent_queries() 的返回结果（已按时间降序）。
-
-    返回值:
-        str: 格式化后的多行文本。空列表返回 "(无历史记录)"。
-    """
-    if not recent_queries:
-        return "(无历史记录)"
-
-    # 按时间升序展示（最早→最新），便于理解对话发展
-    sorted_queries = sorted(recent_queries, key=lambda q: q["timestamp"])
-    lines = []
-    for i, q in enumerate(sorted_queries, 1):
-        lines.append(f"#{i} [{q['timestamp']}] {q['query']}")
-    return "\n".join(lines)
-
-
-async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None) -> dict:
+async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None, db_session_factory=None) -> dict:
     """Intent Router 节点函数 — 统一入口。
 
     单次 LLM 调用完成分类 + 回复生成：
@@ -94,14 +70,19 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None) -> di
         dict: {"intent", "welcome_text"}
     """
     user_query = state.get("user_query", "")
-    session_memory = state.get("session_memory", [])
+    conversation_id = state.get("conversation_id", "")
     stream = state.get("stream", True)
     queue = _sse_queue or state.get("_sse_queue")
 
     # ---- 构建统一 prompt ----
     n_rounds = settings.search.memory_recent_rounds
-    recent_queries = get_recent_queries(session_memory, n_rounds)
-    history_text = _format_recent_queries(recent_queries)
+    history_text = "(无历史记录)"
+    if db_session_factory and conversation_id:
+        try:
+            async with db_session_factory() as session:
+                history_text = await get_chat_history_window(session, conversation_id, n_rounds)
+        except Exception as e:
+            logger.warning("Router 历史加载失败", error=str(e))
     prompt = (INTENT_ROUTER_SYSTEM
               .replace("{user_query}", user_query)
               .replace("{recent_queries}", history_text))
@@ -134,11 +115,7 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None) -> di
 
         if intent == "chat":
             await queue.put({"event": "done", "data": {}})
-            new_memory = append_query(
-                session_memory, user_query, [],
-                timestamp=datetime.now().isoformat(),
-            )
-            return {"intent": "chat", "welcome_text": "", "chat_reply": welcome_chat, "session_memory": new_memory}
+            return {"intent": "chat", "welcome_text": "", "chat_reply": welcome_chat}
 
         return {"intent": intent, "welcome_text": welcome_chat}
 
@@ -161,11 +138,7 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None) -> di
                     "data": welcome_chat or "我主要可以帮助您推荐和比较商品，有需要的话随时告诉我！",
                 })
                 await queue.put({"event": "done", "data": {}})
-            new_memory = append_query(
-                session_memory, user_query, [],
-                timestamp=datetime.now().isoformat(),
-            )
-            return {"intent": "chat", "welcome_text": "", "chat_reply": welcome_chat, "session_memory": new_memory}
+            return {"intent": "chat", "welcome_text": "", "chat_reply": welcome_chat}
 
         if queue and welcome_chat:
             await queue.put({"event": "welcome", "data": welcome_chat})

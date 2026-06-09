@@ -1,7 +1,7 @@
 """
-ChatMessage ORM 模型
--------------------
-定义 ``ChatMessage`` 实体 —— 按时间顺序存储每轮对话的用户查询与助手回复。
+ChatHistory ORM 模型
+--------------------
+定义 ``ChatHistory`` 实体 —— 按时间顺序存储每轮对话的用户查询与助手回复。
 """
 
 from sqlalchemy import String, DateTime, Text, Integer
@@ -10,7 +10,7 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
-class ChatMessage(Base):
+class ChatHistory(Base):
     """单条对话消息，按 created_at 排序即为对话时间线。
 
     属性
@@ -27,7 +27,7 @@ class ChatMessage(Base):
         行创建时间戳，由数据库服务器自动设置。
     """
 
-    __tablename__ = "chat_message"
+    __tablename__ = "chat_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 

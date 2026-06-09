@@ -109,7 +109,7 @@ async def test_product_retrieve_node_empty_requirements():
     state = {
         "user_query": "推荐",
         "requirements": [],
-        "session_memory": [],
+        "conversation_id": "",
     }
 
     result = await product_retrieve_node(
@@ -119,45 +119,6 @@ async def test_product_retrieve_node_empty_requirements():
     )
     assert result["retrieval_results"] == []
     assert result["failed_categories"] == []
-
-
-@pytest.mark.asyncio
-async def test_product_retrieve_node_writes_session_memory():
-    """product_retrieve_node 应在检索完成后将原始查询写入 session_memory。"""
-    state = {
-        "user_query": "跑鞋推荐",
-        "requirements": [
-            {"category": "服饰运动", "sub_category": "跑步鞋",
-             "text": "轻量化", "min_price": 0, "max_price": 500,
-             "order_num": 1, "brand": None},
-        ],
-        "session_memory": [],
-        
-    }
-
-    # Mock async_session
-    mock_session = AsyncMock()
-    mock_session_factory = MagicMock()
-
-    # Mock category_task to return empty (no DB)
-    async def mock_category_task(intent, factory, emb, reranker, llm=None):
-        return {"category": intent.get("category", ""),
-                "sub_category": intent.get("sub_category", ""),
-                "skus": [], "product_ids": [], "reasoning_text": "", "error": None}
-
-    with patch("app.agent.nodes.product_retrieve_agent._category_task", mock_category_task):
-        result = await product_retrieve_node(
-            state,
-            emb_service=MagicMock(),
-            async_session_factory=mock_session_factory,
-        )
-
-    # 应写入 session_memory
-    assert "session_memory" in result
-    mem = result["session_memory"]
-    assert len(mem) >= 1
-    assert mem[0]["category"] == "服饰运动"
-    assert mem[0]["queries"][0]["query"] == "跑鞋推荐"
 
 
 from unittest.mock import patch
