@@ -1,0 +1,44 @@
+{
+  "product_id": "p_test_aware_003",
+  "title": "DATABASE_OPT_TEST_MARKER 温和净透洁面乳深层清洁控油保湿120ml",
+  "brand": "测试品牌C",
+  "category": "美妆护肤",
+  "sub_category": "洁面",
+  "base_price": 129.0,
+  "image_path": "ecommerce_agent_dataset/images/p_beauty_001_live.jpg",
+  "skus": [
+    {
+      "sku_id": "s_test_aware_003_1",
+      "properties": {"容量": "120ml"},
+      "price": 129.0,
+      "stock": 100
+    },
+    {
+      "sku_id": "s_test_aware_003_2",
+      "properties": {"容量": "200ml 大容量"},
+      "price": 189.0,
+      "stock": 60
+    }
+  ],
+  "rag_knowledge": {
+    "marketing_description": "DATABASE_OPT_TEST_MARKER 温和净透洁面乳采用氨基酸表活配方，温和洁净不紧绷。含茶树精油和水杨酸，有效控油祛痘，同时添加神经酰胺修护皮肤屏障。适合油性和混合性肤质。",
+    "official_faq": [
+      {
+        "question": "DATABASE_OPT_TEST_MARKER 洁面乳适合敏感肌吗？",
+        "answer": "本产品采用温和氨基酸配方，不含皂基和SLS，对敏感肌友好。建议先在耳后测试。"
+      }
+    ],
+    "user_reviews": [
+      {
+        "nickname": "测试用户5",
+        "rating": 5,
+        "content": "DATABASE_OPT_TEST_MARKER 洁面乳洗完不紧绷，控油效果很好，T区出油明显减少了！"
+      },
+      {
+        "nickname": "测试用户6",
+        "rating": 4,
+        "content": "DATABASE_OPT_TEST_MARKER 清洁力适中，泡沫丰富，很温和的一款洁面乳。"
+      }
+    ]
+  }
+}

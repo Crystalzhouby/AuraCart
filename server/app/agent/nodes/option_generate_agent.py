@@ -188,4 +188,4 @@ async def option_generate_node(state: dict, llm: LLMService) -> dict:
     if len(options) > 3:
         options = options[:3]
 
-    return {"next_options": options}
+    return {"next_options": options, "chat_reply": ending}

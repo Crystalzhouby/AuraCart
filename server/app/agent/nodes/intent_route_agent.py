@@ -138,7 +138,7 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None) -> di
                 session_memory, user_query, [],
                 timestamp=datetime.now().isoformat(),
             )
-            return {"intent": "chat", "welcome_text": "", "session_memory": new_memory}
+            return {"intent": "chat", "welcome_text": "", "chat_reply": welcome_chat, "session_memory": new_memory}
 
         return {"intent": intent, "welcome_text": welcome_chat}
 
@@ -165,7 +165,7 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None) -> di
                 session_memory, user_query, [],
                 timestamp=datetime.now().isoformat(),
             )
-            return {"intent": "chat", "welcome_text": "", "session_memory": new_memory}
+            return {"intent": "chat", "welcome_text": "", "chat_reply": welcome_chat, "session_memory": new_memory}
 
         if queue and welcome_chat:
             await queue.put({"event": "welcome", "data": welcome_chat})
