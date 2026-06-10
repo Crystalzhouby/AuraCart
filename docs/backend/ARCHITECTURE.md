@@ -1,7 +1,5 @@
 # AuraCart Ecom Agent — 架构设计文档
 
-> 更新日期：2026-06-10 | 基于现有实现 + 最新变更（HISTORY_OPT2 / DATABASE_OPT / EXTRACT_OPT / REFACT_OPT / MERGE_OPT）
-
 ---
 
 ## 1. 系统架构总览
@@ -374,34 +372,3 @@ YAML + Pydantic Settings 双层: `config.yaml` → `app/config.py` Settings.from
 | Option Gen | LLM 失败 → next_options=[], ending="" |
 
 ---
-
-## 8. 最新变更记录
-
-### HISTORY_OPT2 (2026-06-10)
-- ChatMessage → ChatHistory 表重命名
-- Conversation 表精简为 3 字段 (去掉 memory JSONB)
-- 删除 session_memory 机制 (app/agent/memory.py)
-- 所有节点注入 ChatHistory 滑动窗口对话历史
-- Retrieve 3.Memory 更新阶段删除
-- scene_generate 硬编码 [:6] → configurable max_scene_categories: 3
-
-### DATABASE_OPT (2026-06-07)
-- ChatMessage 持久化: user_query (role=user) + chat_reply (role=assistant)
-- chat_reply 由 Router (chat 路径) 和 Option Gen (ending) 写入 AgentState
-
-### EXTRACT_OPT (2026-06-03)
-- Extraction Step1 注入 category_lookup 上下文 + 品牌映射
-- 品类合法性校验（精确匹配），不合法 → null
-
-### MERGE_OPT / MERGE_OPT2 (2026-05)
-- Router + ChitChat + Welcome 合并为统一 Router
-- 单次 LLM 调用完成意图分类 + 回复生成
-- Option Gen 合并 ending + next_options 为单次调用
-
-### REFACT_OPT (2026-05)
-- router.py → intent_route_agent.py
-- extraction.py → intent_extract_agent.py
-- retriever.py → product_retrieve_agent.py
-- scenario_gen.py → scene_generate_agent.py
-- option_gen.py → option_generate_agent.py
-- 统一命名规范: *_agent.py

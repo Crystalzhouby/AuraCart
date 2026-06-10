@@ -1,7 +1,5 @@
 # AuraCart — 系统设计文档
 
-> 更新日期：2026-06-10 | 版本：v2.5
-
 ---
 
 ## 1. 系统概述
@@ -218,7 +216,7 @@ chat_reply → done
 
 #### 2.2.7 ChatHistory（对话历史机制）
 
-通过 `chat_history` 表 + 滑动窗口查询实现多轮对话上下文（**HISTORY_OPT2：已删除 `session_memory` 机制，原 `app/agent/memory.py` 已移除**）。
+通过 `chat_history` 表 + 滑动窗口查询实现多轮对话上下文。
 
 **数据模型**：
 
@@ -595,10 +593,9 @@ llm:
 
 ### 7.4 会话记忆隔离与持久化
 
-**问题**：多轮对话需要上下文记忆，多会话需要隔离，且需要在服务重启后保持。原 `session_memory` 机制（内存 JSON + `conversation.memory` JSONB 持久化）存在维护复杂、与 `chat_message` 表数据分裂的问题。
+**问题**：多轮对话需要上下文记忆，多会话需要隔离，且需要在服务重启后保持。
 
-**方案**（HISTORY_OPT2）：
-- 删除 `session_memory` 机制和 `app/agent/memory.py`
+**方案**：
 - `conversation` 表精简为 3 字段（仅存证），`chat_history` 表作为唯一对话记录
 - 各节点通过 `get_chat_history_window()` 独立查询滑动窗口历史，按品类过滤
 - 消费循环 finally 块统一持久化 2 条 `chat_history`（user + assistant）
@@ -641,11 +638,9 @@ llm:
 
 ### 7.9 ChatHistory 持久化修复
 
-**问题**（DATABASE_OPT）：原 `chat_message` 表始终为空，`chat_reply` 字段未被任何 Agent 节点设置。
+原 `chat_message` 表始终为空，原因在于 `chat_reply` 字段未被任何 Agent 节点设置。解决方案：Router 节点在返回时写入 `chat_reply`（welcome_chat 内容）；OptionGen 节点写入 `chat_reply`（ending 内容）。消费循环 finally 块从 `final_state` 读取并持久化到 `chat_history` 表（user + assistant 各一条，仅当两者均非空）。
 
-**方案**：Router 节点在返回时写入 `chat_reply`（welcome_chat 内容）；OptionGen 节点写入 `chat_reply`（ending 内容）。消费循环 finally 块从 `final_state` 读取并持久化到 `chat_history` 表（user + assistant 各一条，仅当两者均非空）。
-
-**HISTORY_OPT2 后续变更**：`chat_message` 表重命名为 `chat_history`；`conversation` 表移除 `memory` JSONB 列；删除 `session_memory` 机制。
+随后将 `chat_message` 表重命名为 `chat_history`，`conversation` 表移除 `memory` JSONB 列，以 ChatHistory 滑动窗口替代 session_memory 机制。
 
 ### 7.10 pgvector 写入方式
 

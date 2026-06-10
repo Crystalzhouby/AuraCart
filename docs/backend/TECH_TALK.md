@@ -132,11 +132,7 @@ next_options 和 done 不是任何节点发送的，而是消费循环的 finall
 
 ## 对话历史机制 (30s)
 
-HISTORY_OPT2 重构后，我们删除了 session_memory 机制，改用 ChatHistory 表 + 滑动窗口。
-
-以前的问题：session_memory 是内存中的 JSON，按 (category, sub_category) 分组存储原始查询，写入 conversation.memory JSONB 列。问题在于 memory 和 chat_message 两处都要维护，复杂且容易分裂。
-
-现在的方案：只保留 ChatHistory 表，每次搜索完成后插入 2 条记录（user + assistant）。各节点调用 `get_chat_history_window()` 查询最近 N 轮对话，按品类过滤。Conversation 表精简为 3 字段，只用于会话存在性校验。
+对话历史采用 ChatHistory 表 + 滑动窗口机制。每次搜索完成后插入 2 条记录（user + assistant），各节点调用 `get_chat_history_window()` 查询最近 N 轮对话，按品类过滤。Conversation 表精简为 3 字段，只用于会话存在性校验。
 
 ---
 

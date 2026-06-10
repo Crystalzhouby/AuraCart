@@ -1,7 +1,5 @@
 # AuraCart API 接口文档
 
-> **版本**：v2.5（REFACT_OPT 命名规范化 + DATABASE_OPT ChatMessage 修复 + HISTORY_OPT 时间提示增强） | **更新日期**：2026-06-10
-
 ## 1. 基础信息
 
 - **Base URL**: `http://localhost:8000`
@@ -106,7 +104,7 @@ event: welcome_chat_stream
 data: {"type": "end"}
 ```
 
-> **v2.4 新增**：`welcome_chat_stream` 替代旧版 `welcome_stream` 和 `chat_reply_stream`，由 Unified Router 在所有流式路径（chat/explicit/scenario）统一发送。前端收到 `start` 后清空 buffer，收到 `delta` 逐字追加，收到 `end` 完成渲染。
+`welcome_chat_stream` 由 Unified Router 在所有流式路径（chat/explicit/scenario）统一发送。前端收到 `start` 后清空 buffer，收到 `delta` 逐字追加，收到 `end` 完成渲染。
 
 ### 4.2.1 welcome 事件（非流式，推荐路径）
 
@@ -157,7 +155,7 @@ event: category_intro_stream
 data: {"type": "end"}
 ```
 
-> **v2.4 新增**：非流式模式下仍使用 `category_intro`（§4.5）。
+非流式模式下仍使用 `category_intro`（§4.5）。
 
 ### 4.7 ending_stream 事件（流式）
 
@@ -174,7 +172,7 @@ event: ending_stream
 data: {"type": "end"}
 ```
 
-> **v2.4 新增**：结束语和后续选项合并为单次 LLM 调用生成。非流式模式下仍使用 `ending`（§4.8）。
+结束语和后续选项合并为单次 LLM 调用生成。非流式模式下仍使用 `ending`（§4.8）。
 
 ### 4.8 ending 事件（非流式）
 
@@ -619,7 +617,7 @@ curl -X POST http://localhost:8000/api/admin/sync
 5. **LLM/Embedding 依赖** — `/api/search` 需有效的 LLM 和 Embedding API Key，Agent 工作流强依赖 LLM 进行意图分类、回复生成、推荐理由生成等
 6. **Batch API 限制** — 单次最多 20 个 ID（`config.yaml` 中 `search.max_batch_ids` 可配）
 7. **端口** — 默认 8000，Docker 映射同端口
-8. **会话记忆持久化** — `conversation_id` 为必填路径参数，所有查询均归属于一个会话，记忆（原始查询按品类分组）自动持久化到 `conversation` 表的 `memory` JSONB 字段
-9. **聊天记录持久化** — 每轮对话的用户查询和助手完整回复自动写入 `chat_message` 表，可通过 `/api/history/{conversation_id}` 查询
-10. **多轮对话** — Unified Router 利用历史记忆（原始查询）生成上下文感知的欢迎语；Memory 按 `(category, sub_category)` 分组存储原始查询。已删除查询改写（v2.4），Extraction/Scenario Gen 直接拼接历史原始查询
-11. **商品级检索** — `products` SSE 事件为商品级（v2.3+），不再包含 `sku_id` 字段；前端收到 `product_id` 后通过 `/api/all_skus/{product_id}` 获取该商品所有 SKU 变体
+8. **会话记忆持久化** — `conversation_id` 为必填路径参数，所有查询均归属于一个会话，对话历史持久化到 `chat_history` 表
+9. **聊天记录持久化** — 每轮对话的用户查询和助手完整回复自动写入 `chat_history` 表，可通过 `/api/history/{conversation_id}` 查询
+10. **多轮对话** — Unified Router 利用 ChatHistory 滑动窗口生成上下文感知的欢迎语；Extraction/Scenario Gen 直接拼接 ChatHistory 中按品类过滤的历史查询
+11. **商品级检索** — `products` SSE 事件为商品级，不再包含 `sku_id` 字段；前端收到 `product_id` 后通过 `/api/all_skus/{product_id}` 获取该商品所有 SKU 变体
