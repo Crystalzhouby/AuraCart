@@ -29,6 +29,9 @@ from app.services.llm_service import LLMService
 
 logger = structlog.get_logger("agent.router")
 
+_ROUTER_LLM_MAX_ATTEMPTS = 2
+_ROUTER_FALLBACK_CHAT_REPLY = "刚刚网络有点开小差，没能处理成功。请稍后再试一下～😊"
+
 
 _UNSUPPORTED_ACTION_PATTERNS = [
     r"(帮我|替我|给我|直接|现在|马上)?.{0,6}(下单|付款|支付|结算)",
@@ -70,13 +73,13 @@ def _parse_router_response(raw: str) -> dict:
     - JSON 前后的说明文字
     """
     if not raw:
-        return {"intent": "explicit"}
+        return {"welcome_chat": _ROUTER_FALLBACK_CHAT_REPLY, "intent": "chat"}
 
     # 尝试提取第一个 { ... } JSON 对象
     start = raw.find("{")
     end = raw.rfind("}") + 1
     if start < 0 or end <= start:
-        return {"intent": "explicit"}
+        return {"welcome_chat": _ROUTER_FALLBACK_CHAT_REPLY, "intent": "chat"}
 
     json_str = raw[start:end]
 
@@ -93,7 +96,10 @@ def _parse_router_response(raw: str) -> dict:
     except json.JSONDecodeError:
         pass
 
-    return {"intent": "explicit"}
+    return {"welcome_chat": _ROUTER_FALLBACK_CHAT_REPLY, "intent": "chat"}
+
+
+_parse_route_response = _parse_router_response
 
 
 async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None, db_session_factory=None) -> dict:
@@ -133,15 +139,10 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None, db_se
         if queue:
             await queue.put({"event": "chat_reply", "data": boundary_reply})
             await queue.put({"event": "done", "data": {}})
-        new_memory = append_query(
-            session_memory, user_query, [],
-            timestamp=datetime.now().isoformat(),
-        )
         return {
             "intent": "chat",
             "welcome_text": "",
             "chat_reply": boundary_reply,
-            "session_memory": new_memory,
         }
 
     # ---- 构建统一 prompt ----
@@ -165,6 +166,7 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None, db_se
     if stream and queue:
         from app.agent.utils.stream_json import stream_json_field
 
+        stream_failed = False
         try:
             await queue.put({"event": "welcome_chat_stream", "data": {"type": "start"}})
 
@@ -180,8 +182,13 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None, db_se
             welcome_chat = parsed.get("welcome_chat", "") if parsed else ""
         except Exception as e:
             logger.warning("Unified Router 流式调用失败", error=str(e))
-            intent = "explicit"
-            welcome_chat = ""
+            stream_failed = True
+            try:
+                await queue.put({"event": "welcome_chat_stream", "data": {"type": "end"}})
+            except Exception:
+                pass
+            intent = "chat"
+            welcome_chat = _ROUTER_FALLBACK_CHAT_REPLY
 
         logger.info(
             "Unified Router 意图判定",
@@ -192,6 +199,8 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None, db_se
         )
 
         if intent == "chat":
+            if stream_failed and welcome_chat:
+                await queue.put({"event": "chat_reply", "data": welcome_chat})
             await queue.put({"event": "done", "data": {}})
             return {"intent": "chat", "welcome_text": "", "chat_reply": welcome_chat}
 
@@ -199,15 +208,27 @@ async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None, db_se
 
     else:
         # 非流式路径: 同步 LLM → 解析 JSON
-        try:
-            raw = await llm.chat(messages, temperature=0.1)
-            parsed = _parse_route_response(raw)
-            intent = parsed.get("intent", "explicit")
-            welcome_chat = parsed.get("welcome_chat", "")
-        except Exception as e:
-            logger.warning("Unified Router LLM 调用失败", error=str(e))
-            intent = "explicit"
-            welcome_chat = ""
+        parsed = None
+        for attempt in range(1, _ROUTER_LLM_MAX_ATTEMPTS + 1):
+            try:
+                raw = await llm.chat(messages, temperature=0.1)
+                parsed = _parse_route_response(raw)
+                break
+            except Exception as e:
+                logger.warning(
+                    "Unified Router LLM 调用失败",
+                    error=str(e),
+                    attempt=attempt,
+                    max_attempts=_ROUTER_LLM_MAX_ATTEMPTS,
+                )
+
+        if parsed is None:
+            parsed = {"welcome_chat": _ROUTER_FALLBACK_CHAT_REPLY, "intent": "chat"}
+
+        intent = parsed.get("intent", "chat")
+        if intent not in {"chat", "explicit", "scenario"}:
+            intent = "chat"
+        welcome_chat = parsed.get("welcome_chat", "")
 
         logger.info(
             "Unified Router 意图判定",
