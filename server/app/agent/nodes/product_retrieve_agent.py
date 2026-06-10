@@ -1,13 +1,22 @@
 """
-Product Retrieval 节点。
+Product Retrieval 节点 —— 商品级多路检索与精排管线。
 
-流水线：
-1. 按品类分组检索（requirements 已按品类分组）
-2. SQL 条件转换 + 双路检索（语义 top-25 + 关键词 top-25）并行
-3. 加权 RRF 融合（semantic 0.7 / keyword 0.3）→ top-25
-4. bge-reranker 精排（top-5）+ fallback
-5. 品类介绍语（LLM，仅多品类）→ 逐商品 SSE 发送（products 单对象 + product_reason 推荐理由）
-6. 返回检索结果（不再写 session_memory）
+完整 RAG 检索管线（每个品类独立执行，多品类并行）：
+1. SubQuery 转换 — intent → keyword/semantic/structured_filter SubQuery 对象
+2. SQL 条件转换 — category/sub_category/price/brand → SQL WHERE clause
+3. 双路并行检索:
+   a. 语义检索: pgvector cosine_distance + SQL 条件 → top-25 (semantic_top_k)
+   b. 关键词检索: plainto_tsquery + ts_rank + SQL 条件 → top-25 (keyword_top_k)
+   c. 按 product_id 去重: ROW_NUMBER() OVER (PARTITION BY product_id)
+4. 加权 RRF 融合 — semantic 0.7 / keyword 0.3, k=60 → top-25 (rrf_top_k), 按 product_id 聚合
+5. bge-reranker 精排 — SiliconFlow API (BAAI/bge-reranker-v2-m3) → top-5 (rerank_top_k)
+   失败 fallback: RRF 前 5
+6. 品类介绍语 — LLM 生成（仅多品类时），逐 token 推送 category_intro_stream
+7. 推荐理由 — 每个商品一条 LLM 生成理由，逐条推送 product_reason
+8. 商品 SSE — 逐商品发送 products 事件（product_id + category + sub_category）
+
+并行策略: asyncio.Semaphore(max_category_concurrency) 限流，每品类独立 AsyncSession
+Review 截断: max_match_texts_per_product 条/商品, max_match_chars_per_product 字/条
 """
 import asyncio
 import traceback
@@ -324,9 +333,33 @@ async def product_retrieve_node(
     reranker=None,
     _sse_queue=None,
 ) -> dict:
-    """Product Retrieval 节点函数。
+    """Product Retrieval 节点函数 —— 商品级多路检索与精排管线。
 
-    流水线：欢迎语 → 并行检索 → 品类介绍(多品类) → 逐商品推荐 → Memory 更新。
+    从 AgentState.requirements 读取按品类分组的意图列表，各品类并行执行完整 RAG 管线：
+
+    管线步骤（每品类）:
+    1. SubQuery 转换: intent → keyword + semantic + structured_filter SubQuery
+    2. SQL 条件转换: category/sub_category/price/stock/brand → FilterClause
+    3. 双路并行检索: 语义 (pgvector cosine) + 关键词 (ts_query) → 各 top-25
+    4. 加权 RRF 融合: semantic 0.7 / keyword 0.3, k=60 → top-25, 按 product_id 聚合
+    5. bge-reranker 精排: SiliconFlow API → top-5; 失败 fallback 到 RRF top-5
+    6. Review 截断: 每商品 max_match_texts_per_product 条 × max_match_chars_per_product 字
+    7. 品类介绍语: LLM 生成（仅多品类）→ 逐 token 推送 category_intro_stream
+    8. 推荐理由: 每商品一条 LLM 理由 → product_reason SSE
+    9. 商品 SSE: 逐商品推送 products 事件 (product_id + category + sub_category)
+
+    并行策略: asyncio.Semaphore(max_category_concurrency) 限流，每品类独立 AsyncSession
+
+    参数:
+        state: AgentState 字典，读取 requirements / conversation_id / _sse_queue
+        llm: LLMService，用于推荐理由和品类介绍
+        emb_service: EmbeddingService，用于语义检索
+        async_session_factory: async_session 工厂，每品类独立 session
+        reranker: 可选 RerankerService，用于精排
+        _sse_queue: 可选，覆盖 state 中的 asyncio.Queue
+
+    返回值:
+        {"retrieval_results": [商品详情], "failed_categories": [失败的 sub_category]}
     """
     user_query = state.get("user_query", "")
     requirements = state.get("requirements", [])

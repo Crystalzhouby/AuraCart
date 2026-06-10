@@ -4,6 +4,20 @@ Intent Router 节点 — 工作流第一个节点，统一入口。
 单次 LLM 完成意图分类 + 回复生成：
 - chat: 生成闲聊回复 + SSE 推送 + done 事件 → 直接结束
 - explicit/scenario: 生成欢迎语 + SSE 推送 → 继续后续链
+
+对话历史: 从 ChatHistory 表加载滑动窗口（最近 memory_recent_rounds 轮），
+注入 INTENT_ROUTER_SYSTEM prompt 提供上下文。越近的对话越重要。
+
+流式路径: LLM chat_stream() → stream_json_field() 提取 welcome_chat 字段，
+逐 token 推送 welcome_chat_stream (start → delta × N → end)
+
+非流式路径: LLM chat() → _parse_route_response() 解析 JSON → 发送对应事件
+
+SSE 事件:
+- chat 流式: welcome_chat_stream → done
+- chat 非流式: chat_reply → done
+- explicit/scenario 流式: welcome_chat_stream（不等 done，继续后续节点）
+- explicit/scenario 非流式: welcome
 """
 import json
 import re
@@ -83,22 +97,24 @@ def _parse_router_response(raw: str) -> dict:
 
 
 async def intent_route_node(state: dict, llm: LLMService, _sse_queue=None, db_session_factory=None) -> dict:
-    """Intent Router 节点函数 — 统一入口。
+    """Intent Router 节点函数 — 工作流第一个节点，统一入口。
 
-    单次 LLM 调用完成分类 + 回复生成：
-    1. 构建 INTENT_ROUTER_SYSTEM prompt（含对话历史）
-    2. 流式: stream_json_field 提取 welcome_chat 逐 token 推送
-    3. 非流式: 同步 LLM → 解析 JSON → 发送对应事件
-    - chat 路径: 发送 done → 直接结束
-    - explicit/scenario 路径: 继续后续链
+    单次 LLM 调用完成意图分类 + 回复生成：
+    1. 从 ChatHistory 表加载滑动窗口对话历史 (最近 memory_recent_rounds 轮)
+    2. 构建 INTENT_ROUTER_SYSTEM prompt（注入 user_query + recent_queries）
+    3. 流式: chat_stream() + stream_json_field() 提取 welcome_chat 逐 token 推送
+    4. 非流式: chat() → _parse_route_response() 解析 JSON
+    - chat: 发送 done → 条件边路由到 END
+    - explicit/scenario: 不发送 done → 继续后续链
 
     参数:
         state: AgentState 字典。
         llm: LLMService 实例。
         _sse_queue: 可选，asyncio.Queue，用于 SSE 推送。
+        db_session_factory: async_session 工厂函数，用于加载对话历史。
 
     返回值:
-        dict: {"intent", "welcome_text"}
+        dict: {"intent", "welcome_text"[, "chat_reply"]}
     """
     user_query = state.get("user_query", "")
     conversation_id = state.get("conversation_id", "")

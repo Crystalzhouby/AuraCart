@@ -1,12 +1,19 @@
 """
-Intent Extraction 节点 — 明确商品需求路径。
+Intent Extraction 节点 — 明确商品需求路径（explicit 分支）。
 
-三步流程：
-1. LLM 提取品类/品牌意图 + Tool 校验合法性
-2. 从 ChatHistory 表按品类检索历史查询并拼接
-3. LLM 分组提取结构化+语义意图
+三步流程:
+Step 1 — 品类/品牌提取: LLM 从 user_query 提取 category/sub_category/brand，
+       注入品类上下文（category_list + 对话历史 + 品牌映射），
+       Tool 校验合法性（query_field_values 验证品牌，category_lookup 验证品类）
+Step 2 — 历史拼接: 从 ChatHistory 表按 (category, sub_category) 过滤加载滑动窗口历史，
+       与当前 user_query 拼接为 context 文本（多品类分段展示）
+Step 3 — 分组意图提取: LLM 从 context 按品类分组提取结构化查询条件
+       (text/min_price/max_price/order_num/brand) + 自然语言价格调整规则
 
-输出新格式: [{category, sub_category, text, min_price, max_price, order_num, brand}]
+输出统一格式: [{category, sub_category, text, min_price, max_price, order_num, brand}]
+
+自然语言价格调整: 当前查询包含"更平价/贵一点/便宜些"等短语且无显式数值时，
+从历史查询中提取价格基线，按比例调整。当前查询有显式数值时直接使用。
 """
 import json
 import re

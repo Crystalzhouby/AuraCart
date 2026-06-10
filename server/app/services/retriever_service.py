@@ -488,10 +488,19 @@ class Retriever:
 
 
 class Merger:
-    """将 keyword/semantic 两路排名结果通过加权 RRF 融合。
+    """加权 RRF (Reciprocal Rank Fusion) 融合器。
+
+    将 keyword/semantic 两路检索排名结果通过加权 RRF 融合为单一排名。
+
+    RRF 公式（加权变体）:
+    score(pid) = semantic_weight / (rrf_k + rank_semantic(pid))
+               + keyword_weight / (rrf_k + rank_keyword(pid))
+
+    对每个 product_id，其在语义路和关键词路的排名分别贡献加权分数，
+    最终按总分降序排列取 top-final_limit。未在某路出现的 product 不贡献该路分数。
 
     属性:
-        rrf_k: RRF 平滑参数（默认 60）。
+        rrf_k: RRF 平滑参数（默认 60），调节排名差异的权重。
         semantic_weight: 语义检索权重（默认 0.7）。
         keyword_weight: 关键词检索权重（默认 0.3）。
         final_limit: 融合后返回的最大 product 数量（默认 25）。
