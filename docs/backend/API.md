@@ -1,6 +1,6 @@
 # AuraCart API 接口文档
 
-> **版本**：v2.4（Unified Router 合并 ChitChat + 流式 SSE 事件 + 结束语选项合并） | **更新日期**：2026-06-07
+> **版本**：v2.5（REFACT_OPT 命名规范化 + DATABASE_OPT ChatMessage 修复 + HISTORY_OPT 时间提示增强） | **更新日期**：2026-06-10
 
 ## 1. 基础信息
 

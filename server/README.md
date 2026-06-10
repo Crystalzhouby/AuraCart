@@ -1,6 +1,6 @@
 # AuraCart — 智能导购 RAG 系统
 
-用户输入自然语言商品查询（如"推荐一款200元以下的防晒霜"），系统自动拆解意图、多策略检索商品、LLM 生成推荐理由。支持 SSE 流式与 JSON 非流式两种返回模式。
+用户输入自然语言商品查询（如"推荐一款200元以下的防晒霜"），系统自动拆解意图、多策略检索商品、LLM 生成推荐理由。支持 SSE 流式事件推送。
 
 ---
 
@@ -43,8 +43,6 @@ llm:
   api_key: "your-llm-api-key"
 ```
 
-`config.yaml` 中的其他配置项（数据库地址、模型名称、超时时间等）一般无需修改。
-
 ### 2.3 启动数据库
 
 ```bash
@@ -65,8 +63,6 @@ CREATE TEXT SEARCH CONFIGURATION chinese (PARSER = zhparser);
 ALTER TEXT SEARCH CONFIGURATION chinese ADD MAPPING FOR n,v,a,i,e,l,j WITH simple;
 ```
 
-创建完成数据库后，其余操作（停止/重启/清空）见 `server/scripts/operation.md`。
-
 ### 2.4 初始化表结构
 
 ```bash
@@ -79,11 +75,8 @@ alembic upgrade head
 ```bash
 cd server
 
-# 默认导入 ecommerce_agent_dataset/data/ 下全部 JSON
+# 默认导入 data/ecommerce_agent_dataset_/data/ 下全部 JSON
 python scripts/import_data.py
-
-# 或指定数据目录
-python scripts/import_data.py ../ecommerce_agent_dataset/data
 ```
 
 ### 2.6 启动服务
@@ -92,103 +85,152 @@ python scripts/import_data.py ../ecommerce_agent_dataset/data
 cd server
 
 python run.py                          # 默认 INFO 日志, 端口 8000
-python run.py --log DEBUG              # 输出 DEBUG级别 日志
+python run.py --log DEBUG              # DEBUG 级别日志
 python run.py --port 8080              # 指定端口
 python run.py --reload                 # 开发模式热重载
 ```
 
 ---
 
-## 3. 功能概览
-
-### 3.1 API 端点一览
+## 3. API 端点
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `GET` | `/health` | 健康检查 |
-| `GET` | `/api/search?q=...&stream=true` | 全链路 RAG：查询解析 → 检索 → LLM 推荐（SSE/JSON） |
-| `GET` | `/api/products/{product_id}` | 商品基本信息（无 SKU 列表、无图片） |
+| `GET` | `/api/conversation` | 创建新会话，返回 conversation_id |
+| `GET` | `/api/search/{conversation_id}` | Agent 工作流搜索（SSE 事件流），必填 q 参数 |
+| `GET` | `/api/products/{product_id}` | 商品基本信息 |
 | `GET` | `/api/products/image/{product_id}` | 商品图片文件 |
 | `GET` | `/api/sku/{sku_id}` | SKU 单品详情 |
+| `GET` | `/api/products/batch?ids=...` | 批量获取商品基本信息 (≤20) |
+| `GET` | `/api/products/image/batch?ids=...` | 批量获取商品图片路径 (≤20) |
+| `GET` | `/api/sku/batch?ids=...` | 批量获取 SKU 详情 (≤20) |
+| `GET` | `/api/history/{conversation_id}` | 获取会话对话历史 (ChatMessage 表) |
+| `GET` | `/api/review/{product_id}` | 获取商品 RAG 知识（营销/FAQ/评价） |
+| `GET` | `/api/all_skus/{product_id}` | 获取商品所有活跃 SKU |
 | `POST` | `/api/admin/sync` | 手动触发数据增量同步 |
-
-### 3.2 核心功能
-
-1. **向量语义搜索** — 基于 pgvector 余弦相似度，理解"保湿效果好""充电速度快"等模糊评价意图
-2. **中文关键词全文搜索** — 基于 zhparser 分词 + PostgreSQL tsvector，精确匹配品类/品牌关键词
-3. **结构化过滤** — 品牌、品类、价格、库存等字段的精确/范围/排除筛选
-4. **RRF 多路融合** — 将语义搜索和关键词搜索的异构得分通过倒数排序融合合并为统一排名
-5. **LLM 查询意图拆解** — 将自然语言查询自动分解为多条子查询，智能分配检索策略
-6. **LLM 推荐生成** — 基于检索到的商品信息，流式输出导购推荐文案
-7. **增量数据同步** — 后台定时轮询，将商品/营销/FAQ/评价变更自动更新到向量库
-
-### 3.3 数据覆盖
-
-4 个品类 × 25 个商品 = 100 个产品：
-
-- 美妆个护（p_beauty_001 ~ 025）
-- 服装（p_clothes_001 ~ 025）
-- 数码电子（p_digital_001 ~ 025）
-- 食品（p_food_001 ~ 025）
-
-每个产品含 SKU 变体、营销描述、FAQ、用户评价等完整数据。
 
 ---
 
-## 4. 快速验证
+## 4. 核心架构
 
-```bash
-# 健康检查
-curl http://localhost:8000/health
+### 4.1 Agent 工作流 (LangGraph 5 节点)
 
-# SSE 全链路检索（stream=true 为默认，可省略）
-curl -N "http://localhost:8000/api/search?q=推荐一款200元以下的防晒霜"
-
-# JSON 非流式检索
-curl "http://localhost:8000/api/search?q=推荐一款200元以下的防晒霜&stream=false"
-
-# 商品详情
-curl http://localhost:8000/api/products/PROD001
-
-# 运行自动化验证脚本
-cd server
-python test_demo.py
+```
+START → Router → Extraction / ScenarioGen → Retrieval → OptionGen → END
 ```
 
-### 运行测试套件
+| 节点 | 文件 | 职责 |
+|------|------|------|
+| Router | `app/agent/nodes/intent_route_agent.py` | 统一意图分类 + 回复生成（chat/explicit/scenario） |
+| Extraction | `app/agent/nodes/intent_extract_agent.py` | 明确商品需求的品类与约束提取 |
+| ScenarioGen | `app/agent/nodes/scene_generate_agent.py` | 场景化查询 → 品类确定 |
+| Retrieval | `app/agent/nodes/product_retrieve_agent.py` | 双路检索（语义 + 关键词）→ RRF 融合 → rerank → 推荐理由 |
+| OptionGen | `app/agent/nodes/option_generate_agent.py` | 结束语 + 后续推荐选项合并生成 |
 
-```bash
-cd server
-python -m pytest tests/ -v
-```
+### 4.2 检索策略
+
+- **语义搜索**：pgvector 余弦相似度，理解模糊评价意图
+- **关键词搜索**：zhparser 分词 + PostgreSQL tsvector/ILIKE，精确匹配品类/品牌
+- **结构化过滤**：品牌、品类、价格、库存精确/范围筛选
+- **RRF 多路融合**：异构得分倒数排序融合 → 统一排名
+
+### 4.3 数据覆盖
+
+4 品类 × 25 商品 = 100 个产品：
+
+- 美妆护肤 (p_beauty_001 ~ 025)
+- 服装 (p_clothes_001 ~ 025)
+- 数码电子 (p_digital_001 ~ 025)
+- 食品 (p_food_001 ~ 025)
+
+每个产品含 SKU 变体、营销描述、FAQ、用户评价等完整数据。
 
 ---
 
 ## 5. 目录结构
 
 ```
-AuraCart/
-├── delivery/                    # 技术说明文档
-├── ecommerce_agent_dataset/     # 100 个商品 JSON + 100 张图片
-│   ├── data/                    # p_beauty_*.json, p_clothes_*.json, ...
-│   └── images/                  # 对应产品图片 .jpg
-├── server/                      # 主应用
-│   ├── run.py                   # 启动入口
-│   ├── config.yaml              # 运行时配置
-│   ├── requirements.txt         # Python 依赖
-│   ├── test_demo.py             # 接口冒烟测试脚本
-│   ├── app/
-│   │   ├── main.py              # FastAPI 入口 + lifespan
-│   │   ├── config.py            # YAML → Pydantic 配置加载
-│   │   ├── database.py          # SQLAlchemy 异步引擎
-│   │   ├── api/                 # 路由层 (search/products/admin)
-│   │   ├── models/              # 6 张 ORM 表
-│   │   ├── schemas/             # Pydantic 响应结构
-│   │   ├── services/            # 业务逻辑 (embedding/llm/retriever/sync)
-│   │   ├── rag/                 # RAG 管线 (prompt/merger/generator)
-│   │   └── core/                # 基础设施 (logging)
-│   ├── scripts/                 # Docker/导入脚本
-│   ├── tests/                   # 38 个 pytest 测试
-│   ├── alembic/                 # 数据库迁移
-│   └── docs/                    # 设计/方案文档
+server/
+├── run.py                           # 启动入口
+├── config.yaml                      # 运行时配置
+├── requirements.txt                 # Python 依赖
+├── app/
+│   ├── main.py                      # FastAPI 入口 + lifespan
+│   ├── config.py                    # YAML → Pydantic 配置加载
+│   ├── database.py                  # SQLAlchemy 异步引擎
+│   ├── api/
+│   │   ├── search.py                # /api/search SSE 搜索路由
+│   │   ├── get_product_info.py      # 商品/图片/SKU/历史/评价查询路由
+│   │   ├── get_conversation.py      # /api/conversation 会话管理路由
+│   │   └── admin.py                 # /api/admin 后台管理路由
+│   ├── agent/
+│   │   ├── state.py                 # AgentState TypedDict 定义
+│   │   ├── graph.py                 # StateGraph 构建 + 条件边
+│   │   ├── memory.py                # 会话记忆 (session_memory)
+│   │   ├── nodes/
+│   │   │   ├── intent_route_agent.py
+│   │   │   ├── intent_extract_agent.py
+│   │   │   ├── scene_generate_agent.py
+│   │   │   ├── product_retrieve_agent.py
+│   │   │   └── option_generate_agent.py
+│   │   ├── prompts/
+│   │   │   ├── intent_router_prompt.py
+│   │   │   ├── intent_extract_prompt.py
+│   │   │   ├── scene_generate_prompt.py
+│   │   │   ├── category_introduct_prompt.py
+│   │   │   ├── product_recommendation_prompt.py
+│   │   │   └── option_generate_prompt.py
+│   │   └── utils/
+│   │       └── stream_json.py       # 流式 JSON 字段解析
+│   ├── models/
+│   │   ├── product.py               # Product
+│   │   ├── sku.py                   # Sku
+│   │   ├── chat_message.py          # ChatMessage
+│   │   ├── conversation.py          # Conversation
+│   │   ├── product_review.py        # ProductReview (pgvector)
+│   │   ├── product_marketing.py     # ProductMarketing
+│   │   ├── product_faq.py           # ProductFaq
+│   │   └── user_review.py           # UserReview
+│   ├── services/
+│   │   ├── llm_service.py           # LLM 调用封装
+│   │   ├── embedding_service.py     # Embedding 调用封装
+│   │   ├── retriever_service.py     # 多路检索 + RRF 融合
+│   │   ├── sync_service.py          # 增量数据同步
+│   │   └── import_data_service.py   # 初始数据导入
+│   ├── schemas/                     # Pydantic 响应模型
+│   └── core/
+│       └── logging.py               # structlog 配置
+├── scripts/
+│   ├── import_data.py               # 数据导入脚本
+│   └── docker-compose.yml           # PostgreSQL 容器配置
+├── docs/                            # 设计文档 (AGENT_OPT/*)
+├── tests/                           # pytest (130+ 用例)
+├── alembic/                         # 数据库迁移
+│   └── versions/
+└── log/                             # 应用日志输出目录
+```
+
+---
+
+## 6. 快速验证
+
+```bash
+# 健康检查
+curl http://localhost:8000/health
+
+# 创建会话
+curl http://localhost:8000/api/conversation
+
+# SSE 全链路搜索
+curl -N "http://localhost:8000/api/search/<conversation_id>?q=推荐一款200元以下的防晒霜"
+
+# 商品详情
+curl http://localhost:8000/api/products/p_beauty_001
+
+# 批量查询
+curl "http://localhost:8000/api/products/batch?ids=p_beauty_001,p_beauty_002"
+
+# 运行测试套件
+python -m pytest tests/ -v
 ```
